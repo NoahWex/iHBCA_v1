@@ -1,0 +1,338 @@
+---
+title: "L1 Harmonization — `r params$compartment`"
+subtitle: "SingleR L1 + cluster_annotation overrides + Leiden vote consolidation"
+params:
+  compartment: "Epithelial"
+  singler_csv: ""
+  seurat_rds: ""
+  outdir: ""
+  dry_run: false
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 12, fig.height = 8)
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+})
+
+COMPARTMENT <- params$compartment
+SINGLER_CSV <- params$singler_csv
+SEURAT_RDS  <- params$seurat_rds
+OUTDIR      <- params$outdir
+DRY_RUN     <- isTRUE(params$dry_run)
+dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
+```
+
+# Parameters
+
+```{r params_echo}
+cat("Compartment:   ", COMPARTMENT, "\n")
+cat("SingleR CSV:   ", SINGLER_CSV, "\n")
+cat("Seurat RDS:    ", SEURAT_RDS, "\n")
+cat("Output dir:    ", OUTDIR, "\n")
+cat("Dry run:       ", DRY_RUN, "\n")
+```
+
+# Validation
+
+```{r validate}
+required <- list(singler_csv = SINGLER_CSV, seurat_rds = SEURAT_RDS)
+missing_items <- character(0)
+for (nm in names(required)) {
+  f <- required[[nm]]
+  ok <- file.exists(f)
+  cat(sprintf("  [%s] %-15s %s\n", if (ok) "OK " else "MISS", nm, f))
+  if (!ok) missing_items <- c(missing_items, nm)
+}
+if (length(missing_items) > 0) {
+  stop("Missing required inputs: ", paste(missing_items, collapse = ", "))
+}
+if (DRY_RUN) {
+  cat("\nVALIDATION PASSED (dry run) — exiting before heavy computation\n")
+  knitr::knit_exit()
+}
+```
+
+# Configuration
+
+Override types are populations present in FLEX v2 `cluster_annotation` that
+are NOT in the 11-type iHBCA L1 vocabulary. These cells get their
+`cluster_annotation` identity instead of the (broader) SingleR label.
+
+The vote column is fixed at `leiden_n30_r1.0` — the rebuilt patched cluster
+column selected in the preceding integration phase. No resolution scan (the
+v1 pipeline scanned multiple resolutions; here we take the patched column as
+authoritative).
+
+```{r config}
+# Override types matching the Spatial_HBCA authoritative list (l1_harmonize.Rmd):
+# populations in cluster_annotation NOT in the 11-type iHBCA L1 vocabulary.
+# Keratinocyte is handled by SingleR (present in the iHBCA reference) and is
+# not overridden here.
+OVERRIDE_TYPES <- c("Adipocyte", "pDC", "PS_Epithelial", "RBC", "Mast", "Neutrophil")
+VOTE_COL       <- "leiden_n30_r1.0"
+
+cat("Override types:", paste(OVERRIDE_TYPES, collapse = ", "), "\n")
+cat("Vote column:   ", VOTE_COL, "\n")
+```
+
+# Load Data
+
+## Seurat (cluster + cluster_annotation)
+
+Pattern source: `l1_harmonize.Rmd:37-58`, simplified — no UMAP join and no
+Leiden resolution scan.
+
+```{r load-seurat}
+cat("Loading Seurat:", SEURAT_RDS, "\n")
+srt <- readRDS(SEURAT_RDS)
+srt <- UpdateSeuratObject(srt)
+cat("Cells:", ncol(srt), "\n")
+
+if (!VOTE_COL %in% colnames(srt@meta.data)) {
+  stop("Expected vote column '", VOTE_COL, "' not in Seurat metadata")
+}
+
+meta <- srt@meta.data
+meta$cell_id <- rownames(meta)
+rm(srt); gc()
+
+cat(VOTE_COL, "clusters:", length(unique(na.omit(meta[[VOTE_COL]]))), "\n")
+```
+
+## SingleR L1 Predictions
+
+Pattern source: `l1_harmonize.Rmd:62-70`. Column names updated to match the
+output schema of `09b_singler_l1.Rmd` (`pruned_label`, `score`, `delta_next`).
+
+```{r load-singler}
+cat("Loading SingleR L1 predictions:", SINGLER_CSV, "\n")
+singler <- read.csv(SINGLER_CSV, stringsAsFactors = FALSE)
+cat("Rows:", nrow(singler), "\n")
+cat("NA pruned_label count:", sum(is.na(singler$pruned_label)), "\n\n")
+print(sort(table(singler$pruned_label, useNA = "ifany"), decreasing = TRUE))
+```
+
+## Check cluster_annotation
+
+```{r check-cluster-annotation}
+stopifnot("cluster_annotation" %in% colnames(meta))
+cat("cluster_annotation distribution:\n")
+print(sort(table(meta$cluster_annotation, useNA = "ifany"), decreasing = TRUE))
+```
+
+## Join
+
+```{r join}
+df <- merge(
+  meta,
+  singler[, c("cell_id", "pruned_label", "score", "delta_next")],
+  by = "cell_id", all.x = TRUE
+)
+cat("Joined:", nrow(df), "cells\n")
+cat("With SingleR pruned_label:", sum(!is.na(df$pruned_label)), "\n")
+cat("With cluster_annotation:  ", sum(!is.na(df$cluster_annotation)), "\n")
+```
+
+# Apply Overrides
+
+Pattern source: `l1_harmonize.Rmd:99-125`.
+
+```{r overrides}
+# Start with the SingleR L1 prediction
+df$l1_label <- df$pruned_label
+
+n_overrides <- 0
+for (otype in OVERRIDE_TYPES) {
+  mask <- !is.na(df$cluster_annotation) & df$cluster_annotation == otype
+  n <- sum(mask)
+  if (n > 0) {
+    df$l1_label[mask] <- otype
+    n_overrides <- n_overrides + n
+    # What SingleR originally called these cells
+    singler_top <- sort(table(df$pruned_label[mask], useNA = "ifany"),
+                        decreasing = TRUE)
+    singler_top_str <- paste(names(head(singler_top, 3)), collapse = ", ")
+    cat(sprintf("  Override %s: %d cells (was: %s)\n",
+                otype, n, singler_top_str))
+  } else {
+    cat(sprintf("  Override %s: 0 cells (not found in cluster_annotation)\n", otype))
+  }
+}
+
+cat(sprintf("\nTotal overrides: %d / %d cells (%.1f%%)\n",
+            n_overrides, nrow(df), 100 * n_overrides / nrow(df)))
+cat("\nPost-override distribution:\n")
+print(sort(table(df$l1_label, useNA = "ifany"), decreasing = TRUE))
+```
+
+# Leiden Vote Consolidation
+
+Pattern source: `l1_harmonize.Rmd:131-204`, simplified to use a fixed vote
+column (`leiden_n30_r1.0`). Purity is still reported.
+
+```{r vote-purity}
+compute_vote_purity <- function(df, leiden_col) {
+  cluster_stats <- df %>%
+    filter(!is.na(.data[[leiden_col]])) %>%
+    group_by(cluster = .data[[leiden_col]]) %>%
+    summarise(
+      n_cells      = n(),
+      label_counts = list(table(l1_label, useNA = "ifany")),
+      .groups      = "drop"
+    ) %>%
+    rowwise() %>%
+    mutate(
+      majority_label = names(which.max(label_counts)),
+      majority_count = max(label_counts),
+      vote_purity    = majority_count / n_cells
+    ) %>%
+    ungroup()
+
+  cluster_to_label  <- setNames(cluster_stats$majority_label, cluster_stats$cluster)
+  cluster_to_purity <- setNames(cluster_stats$vote_purity,    cluster_stats$cluster)
+
+  list(
+    stats             = cluster_stats,
+    mean_purity       = mean(cluster_stats$vote_purity, na.rm = TRUE),
+    median_purity     = median(cluster_stats$vote_purity, na.rm = TRUE),
+    cluster_to_label  = cluster_to_label,
+    cluster_to_purity = cluster_to_purity
+  )
+}
+
+vp <- compute_vote_purity(df, VOTE_COL)
+cat(sprintf("%s: %d clusters, mean purity=%.3f, median=%.3f\n",
+            VOTE_COL, nrow(vp$stats), vp$mean_purity, vp$median_purity))
+print(vp$stats %>% select(cluster, n_cells, majority_label, majority_count, vote_purity))
+```
+
+# Apply Voted Labels
+
+Pattern source: `l1_harmonize.Rmd:189-207`.
+
+```{r apply-voted}
+df$voted_l1_label <- vp$cluster_to_label[as.character(df[[VOTE_COL]])]
+df$vote_purity    <- vp$cluster_to_purity[as.character(df[[VOTE_COL]])]
+
+df$harmonized_l1 <- df$voted_l1_label
+na_voted <- is.na(df$harmonized_l1)
+if (any(na_voted)) {
+  cat(sprintf("Cells without voted label: %d (fall back to direct override label)\n",
+              sum(na_voted)))
+  df$harmonized_l1[na_voted] <- df$l1_label[na_voted]
+}
+
+cat("\nHarmonized L1 distribution:\n")
+print(sort(table(df$harmonized_l1, useNA = "ifany"), decreasing = TRUE))
+```
+
+# Save
+
+Pattern source: `l1_harmonize.Rmd:212-300`. Output schema matches the L1
+worker brief: `cell_id, ihbca_L1.0_singler, singler_score, singler_delta,
+L1.0, L1.0_Long, L1.0_source, vote_purity, leiden_cluster`.
+
+```{r save}
+# Long names for override short labels (Adipocyte and Neutrophil are readable as-is)
+LONG_NAMES <- c(
+  "pDC"          = "Plasmacytoid dendritic cell",
+  "PS_Epithelial" = "Patient-specific epithelial",
+  "RBC"          = "Red blood cell",
+  "Mast"         = "Mast cell"
+)
+
+df$harmonized_l1_long <- df$harmonized_l1
+for (short in names(LONG_NAMES)) {
+  df$harmonized_l1_long[df$harmonized_l1 == short] <- LONG_NAMES[short]
+}
+
+# Long -> Short name mapping for L1.0
+L1_SHORT <- c(
+  "Fibroblast"                            = "Fibro",
+  "Basal-myoepithelial"                   = "Basal",
+  "Vascular endothelial"                  = "VascEndo",
+  "Luminal adaptive secretory precursor"  = "LumSec",
+  "Luminal hormone sensing"               = "LumHR",
+  "Perivascular"                          = "Peri",
+  "T-lymphocyte"                          = "T_cells",
+  "B-lymphocyte"                          = "B_cells",
+  "Myeloid"                               = "Myeloid",
+  "Lymphatic endothelial"                 = "LymphEndo",
+  "Lactocyte"                             = "Lacto",
+  "Adipocyte"                             = "Adipo",
+  "Mast cell"                             = "Mast",
+  "Keratinocyte"                          = "Kerat",
+  "Plasmacytoid dendritic cell"           = "pDC",
+  "Patient-specific epithelial"           = "PS_Epi",
+  "Red blood cell"                        = "RBC",
+  "Neutrophil"                            = "Neutro"
+)
+
+l1_short <- L1_SHORT[df$harmonized_l1_long]
+l1_short[is.na(l1_short)] <- df$harmonized_l1_long[is.na(l1_short)]
+
+# Source: cluster_override if the harmonized label came from an override type
+l1_source <- ifelse(
+  df$harmonized_l1 %in% OVERRIDE_TYPES,
+  "cluster_override",
+  "singler_vote"
+)
+
+out_df <- data.frame(
+  cell_id              = df$cell_id,
+  ihbca_L1.0_singler   = df$pruned_label,
+  singler_score        = round(df$score, 6),
+  singler_delta        = round(df$delta_next, 6),
+  L1.0                 = l1_short,
+  L1.0_Long            = df$harmonized_l1_long,
+  L1.0_source          = l1_source,
+  vote_purity          = round(df$vote_purity, 6),
+  leiden_cluster       = df[[VOTE_COL]],
+  stringsAsFactors     = FALSE
+)
+
+out_csv <- file.path(OUTDIR,
+                     sprintf("harmonized_l1_labels_%s.csv", COMPARTMENT))
+write.csv(out_df, out_csv, row.names = FALSE)
+cat("Saved:", out_csv, "\n")
+cat("Types:", length(unique(out_df$L1.0)), "\n")
+cat("Cells:", nrow(out_df), "\n")
+
+cat("\nL1.0 distribution:\n")
+print(sort(table(out_df$L1.0), decreasing = TRUE))
+
+cat("\nL1.0_source breakdown:\n")
+print(table(out_df$L1.0_source))
+
+# Override detail
+cat("\n=== Override Summary ===\n")
+for (otype in OVERRIDE_TYPES) {
+  long_name  <- LONG_NAMES[otype]
+  if (is.na(long_name)) long_name <- otype
+  short_name <- L1_SHORT[long_name]
+  if (is.na(short_name)) short_name <- otype
+  n <- sum(out_df$L1.0_Long == long_name, na.rm = TRUE)
+  singler_dist <- sort(
+    table(out_df$ihbca_L1.0_singler[out_df$L1.0_Long == long_name]),
+    decreasing = TRUE
+  )
+  cat(sprintf("  %s (%s): %d cells — SingleR called: %s\n",
+              long_name, short_name, n,
+              paste(sprintf("%s(%d)", names(singler_dist), singler_dist),
+                    collapse = ", ")))
+}
+```
+
+```{r session-info}
+cat("\nSeurat:", as.character(packageVersion("Seurat")), "\n")
+```

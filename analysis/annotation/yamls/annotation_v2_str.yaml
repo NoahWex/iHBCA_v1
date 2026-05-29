@@ -1,0 +1,452 @@
+schema_version: 2
+compartment: str
+generated: 2026-04-24
+resolutions_used:
+- '1.0'
+note: 'Stromal Stage 2a draft. Single-resolution (res 1.0) to maintain structural parity with immune pipeline and satisfy
+  script 06 overlap schema. Labels derive from synthesis label_map.csv (Apr 20-21 2026) projected onto res 1.0 clusters; finer-resolution
+  substates (Fibro-matrix, Pericyte_active, VSMC_active) merged into parent per "coarser-leaning" preference (2026-04-24).
+  Vas-venous retained as separate label since res 1.0 c18 isolates it cleanly.
+
+  '
+clusters_by_resolution:
+  '1.0':
+    c0:
+      n_cells: 113101
+      assigned_label: Vas-capillary
+    c1:
+      n_cells: 95430
+      assigned_label: Vas-vein
+    c2:
+      n_cells: 89086
+      assigned_label: Fibro-major
+    c3:
+      n_cells: 71170
+      assigned_label: Fibro-prematrix
+    c4:
+      n_cells: 69232
+      assigned_label: Fibro-IGF1
+    c5:
+      n_cells: 51238
+      assigned_label: Pericyte
+    c6:
+      n_cells: 48191
+      assigned_label: Pericyte_active
+    c7:
+      n_cells: 47899
+      assigned_label: Vas-arterial
+    c8:
+      n_cells: 47698
+      assigned_label: VSMC
+    c9:
+      n_cells: 46780
+      assigned_label: Fibro-major
+    c10:
+      n_cells: 44777
+      assigned_label: Fibro-IGF1
+    c11:
+      n_cells: 42243
+      assigned_label: Fibro-prematrix
+    c12:
+      n_cells: 39394
+      assigned_label: Fibro-major
+    c13:
+      n_cells: 35584
+      assigned_label: VSMC_stress
+    c14:
+      n_cells: 25683
+      assigned_label: Lym-major
+    c15:
+      n_cells: 19079
+      assigned_label: Fibro-major
+    c16:
+      n_cells: 16378
+      assigned_label: Fibro-major
+    c17:
+      n_cells: 15022
+      assigned_label: Fibro-SFRP4
+    c18:
+      n_cells: 13531
+      assigned_label: Vas-vein
+    c19:
+      n_cells: 12345
+      assigned_label: Fibro-major
+    c20:
+      n_cells: 7526
+      assigned_label: Vas-capillary
+    c21:
+      n_cells: 6558
+      assigned_label: Fibro-SFRP4
+    c22:
+      n_cells: 6322
+      assigned_label: Doublet
+    c23:
+      n_cells: 4329
+      assigned_label: Fibro-major
+    c24:
+      n_cells: 3189
+      assigned_label: Fibro-major
+    c25:
+      n_cells: 1126
+      assigned_label: Doublet
+    c26:
+      n_cells: 1052
+      assigned_label: Fibro-SFRP4
+    c27:
+      n_cells: 537
+      assigned_label: Vas-vein
+labels:
+  Fibro-major:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c2
+    - c9
+    - c12
+    - c15
+    - c16
+    - c19
+    - c23
+    - c24
+    parent_label: null
+    lineage: Fibroblast
+    is_artifact: false
+    canonical_markers:
+    - PDPN
+    - PID1
+    - CLMP
+    - TWIST2
+    - RSPO3
+    - COL1A1
+    - COL1A2
+    - COL3A1
+    - DCN
+    - LUM
+    - PDGFRA
+    - APOD
+    required_gene: null
+    identity_markers:
+    - PDPN
+    - PID1
+    - CLMP
+    - RSPO3
+    - PDGFRA
+    scoring_signature: null
+    notes: 'Dominant fibroblast state. 8 res-1.0 clusters (~290K cells total). Fibro-matrix (c12, 35K-cell subset) merged
+      per coarser-leaning decision; matrix-specific markers (COMP, POSTN) may distinguish c12 internally but at this resolution
+      it sits under Fibro-major.
+
+      '
+  Fibro-prematrix:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c3
+    - c11
+    parent_label: null
+    lineage: Fibroblast
+    is_artifact: false
+    canonical_markers:
+    - WISP2
+    - ADH1B
+    - OGN
+    - MFAP5
+    - ABCA8
+    - GPX3
+    - PCOLCE2
+    - CFD
+    - PI16
+    required_gene: null
+    identity_markers:
+    - WISP2
+    - OGN
+    - MFAP5
+    - ADH1B
+    scoring_signature: null
+    notes: "ECM-forming fibroblast (WISP2+/OGN+/MFAP5+/ADH1B+). res 1.0 c3 + c11 (~113K cells). c21 moved to Fibro-SFRP4 based\
+      \ on SFRP4 logFC=4.02 in limma res 1.0. PI16 added to canonical \u2014 broadly adventitial, higher in prematrix z-score\
+      \ than in SFRP4 clusters.\n"
+  Fibro-IGF1:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c4
+    - c10
+    parent_label: null
+    lineage: Fibroblast
+    is_artifact: false
+    canonical_markers:
+    - IGF1
+    - DLK1
+    - MXRA5
+    - TAC1
+    - ISLR
+    - SPON2
+    - PTGDS
+    required_gene: IGF1
+    identity_markers:
+    - IGF1
+    - DLK1
+    - MXRA5
+    scoring_signature: null
+    notes: IGF1+/DLK1+ fibroblast. res 1.0 c4 + c10 (~114K cells).
+  Fibro-SFRP4:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c17
+    - c21
+    - c26
+    parent_label: null
+    lineage: Fibroblast
+    figure_target: fig2
+    is_artifact: false
+    canonical_markers:
+    - SFRP4
+    - OGN
+    - FBLN1
+    - WISP2
+    - ABI3BP
+    - WIF1
+    - MGP
+    - FAP
+    required_gene: SFRP4
+    identity_markers:
+    - SFRP4
+    - WIF1
+    scoring_signature: null
+    notes: "Adventitial/risk-state fibroblast. Relevant to Fig 2 BRCA1 deep-dive. res 1.0 c17 + c26 (synthesis-seeded) + c21\
+      \ (reassigned 2026-04-24 on SFRP4 logFC=4.02 evidence; c21 was originally prematrix in synthesis but markers put it\
+      \ closer to SFRP4). ~23K cells total. PI16 removed from canonical/identity \u2014 not specifically elevated in SFRP4\
+      \ vs other adventitial states.\n"
+  Vas-capillary:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c0
+    - c20
+    parent_label: null
+    lineage: Endothelial_vascular
+    is_artifact: false
+    canonical_markers:
+    - PLVAP
+    - CA4
+    - RBP7
+    - SPARCL1
+    - PECAM1
+    - CDH5
+    - ADGRL4
+    - F2RL3
+    - TM4SF18
+    required_gene: null
+    identity_markers:
+    - PLVAP
+    - CA4
+    - RBP7
+    scoring_signature: null
+    notes: Capillary EC. res 1.0 c0 + c20 (~121K cells).
+  Vas-vein:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c1
+    - c18
+    - c27
+    parent_label: null
+    lineage: Endothelial_vascular
+    is_artifact: false
+    canonical_markers:
+    - ACKR1
+    - VWF
+    - MCTP1
+    - CCL14
+    - SELP
+    - SELE
+    - PECAM1
+    - CDH5
+    required_gene: null
+    identity_markers:
+    - ACKR1
+    - VWF
+    - MCTP1
+    scoring_signature: null
+    notes: 'Venous EC (ACKR1+). res 1.0 c1 + c18 + c27 (~109K cells). Original synthesis split c18 as Vas-venous, but c18/c27
+      share the same marker profile as c1 at lower magnitude with no distinguishing genes; merged 2026-04-24 per DE review.
+
+      '
+  Vas-arterial:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c7
+    parent_label: null
+    lineage: Endothelial_vascular
+    is_artifact: false
+    canonical_markers:
+    - SOX17
+    - GJA5
+    - HEY1
+    - DLL4
+    - EFNB2
+    - PECAM1
+    - MCTP1
+    - SDPR
+    - CLDN5
+    required_gene: null
+    identity_markers:
+    - SOX17
+    - GJA5
+    - DLL4
+    scoring_signature: null
+    notes: Arterial EC (SOX17+/GJA5+). res 1.0 c7 (~48K cells).
+  Lym-major:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c14
+    parent_label: null
+    lineage: Endothelial_lymphatic
+    is_artifact: false
+    canonical_markers:
+    - PROX1
+    - LYVE1
+    - PDPN
+    - FLT4
+    - CCL21
+    - TFF3
+    - CLDN5
+    required_gene: null
+    identity_markers:
+    - PROX1
+    - LYVE1
+    - PDPN
+    scoring_signature: null
+    notes: Lymphatic EC. res 1.0 c14 (~26K cells). Static across resolutions.
+  Pericyte:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c5
+    parent_label: null
+    lineage: Perivascular
+    is_artifact: false
+    canonical_markers:
+    - RGS5
+    - PDGFRB
+    - KCNJ8
+    - ABCC9
+    - STEAP4
+    - TINAGL1
+    - IGFBP5
+    - CD36
+    - MYLK
+    - ACTA2
+    required_gene: null
+    identity_markers:
+    - RGS5
+    - PDGFRB
+    - STEAP4
+    scoring_signature: null
+    notes: "Classic resting pericyte \u2014 pericyte-specific markers (RGS5=6.13, STEAP4=6.19, PDGFRB=2.20, KCNJ8/ABCC9 pan-pericyte)\
+      \ + moderate contractile (ACTA2=3.93, MYLK=3.05). MCAM and NOTCH3 removed from canonical: MCAM is higher in VSMC (c8=4.55\
+      \ vs c5=3.02); NOTCH3 is literature-known mural but not DE-supported in our limma. res 1.0 c5 (51K).\n"
+  Pericyte_active:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c6
+    parent_label: null
+    lineage: Perivascular
+    is_artifact: false
+    canonical_markers:
+    - RGS5
+    - PDGFRB
+    - AXL
+    - EDNRB
+    - EPS8
+    - SDC2
+    - LIF
+    - PRRX1
+    - KCNE4
+    required_gene: null
+    identity_markers:
+    - AXL
+    - EDNRB
+    - EPS8
+    - LIF
+    scoring_signature: null
+    notes: 'Active/secretory pericyte. Much lower contractile markers than Pericyte (ACTA2 logFC=0.61 vs 3.93, MYLK=1.15 vs
+      3.05) and elevated stress/signaling markers (AXL=2.37, EDNRB=2.21, LIF=2.13, EPS8=2.42, PRRX1=2.09). res 1.0 c6 (48K
+      cells). Synthesis called Pericyte_active.
+
+      '
+  VSMC:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c8
+    parent_label: null
+    lineage: Perivascular
+    is_artifact: false
+    canonical_markers:
+    - ACTA2
+    - MYH11
+    - CNN1
+    - TAGLN
+    - MYLK
+    - KCNMB1
+    - MCAM
+    - TINAGL1
+    - BCAM
+    - CRIP1
+    required_gene: ACTA2
+    identity_markers:
+    - ACTA2
+    - MYH11
+    - TAGLN
+    - MCAM
+    scoring_signature: null
+    notes: "Classic vascular smooth muscle \u2014 strong contractile + mural markers (ACTA2=4.66, MCAM=4.55, MYLK=3.60, TAGLN=3.25,\
+      \ TINAGL1=4.65). MCAM canonical here (not Pericyte) since it's higher in VSMC. res 1.0 c8 (48K).\n"
+  VSMC_stress:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c13
+    parent_label: null
+    lineage: Perivascular
+    is_artifact: false
+    canonical_markers:
+    - ACTA2
+    - MYH11
+    - TAGLN
+    - MCAM
+    - APOLD1
+    - CRYAB
+    - AXL
+    - KCNE4
+    - CMSS1
+    required_gene: ACTA2
+    identity_markers:
+    - APOLD1
+    - CRYAB
+    - AXL
+    scoring_signature: null
+    notes: 'Stressed/activated VSMC. Retains VSMC identity (ACTA2=2.6, MCAM=3.9, MYH11 present) but elevated stress-response
+      markers (APOLD1=3.2, CRYAB=2.95, AXL=3.03, KCNE4=2.79). res 1.0 c13 (36K). Synthesis called VSMC_active.
+
+      '
+  Doublet:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c22
+    - c25
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers: []
+    scoring_signature: null
+    notes: Doublet artifact clusters from synthesis. res 1.0 c22 (6.3K) + c25 (1.1K).

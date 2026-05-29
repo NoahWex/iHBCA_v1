@@ -1,0 +1,149 @@
+# Joint FLEX+Xenium library epithelial-content classification
+# ============================================================
+#
+# Generated:     2026-05-18  (restored after threshold-0.10 experiment)
+# Source CSV:    outputs/shared/library_covariates.csv
+# Source column: epithelial_prop (L0 == 'Epithelial' fraction per library)
+# Method:        median split
+# Cut value:     0.305983
+# Levels:        [epi_sparse, epi_rich]  (positive logFC = epi_rich)
+
+metadata:
+  source_csv:     outputs/shared/library_covariates.csv
+  source_column:  epithelial_prop
+  method:         median_split
+  cut:            0.305983
+  generated:      2026-05-18
+  cohort:         joint_anatomic_variation_20260424
+  n_libraries:    127
+  n_epi_rich:     64
+  n_epi_sparse:   63
+
+assignments:
+  Pat1_P1: epi_sparse  # epi_prop=0.2297 platform=flex
+  Pat1_P1_xenium_1: epi_rich  # epi_prop=0.4481 platform=xenium
+  Pat1_P2_Lower: epi_rich  # epi_prop=0.4898 platform=flex
+  Pat1_P2_Lower_xenium_1: epi_rich  # epi_prop=0.5883 platform=xenium
+  Pat1_P2_Upper: epi_rich  # epi_prop=0.4435 platform=flex
+  Pat1_P2_Upper_xenium_1: epi_sparse  # epi_prop=0.1284 platform=xenium
+  Pat1_P3_A_LIQ: epi_sparse  # epi_prop=0.0050 platform=flex
+  Pat1_P3_A_LIQ_xenium_1: epi_sparse  # epi_prop=0.0744 platform=xenium
+  Pat1_P3_A_LOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  Pat1_P3_A_LOQ_xenium_1: epi_sparse  # epi_prop=0.2103 platform=xenium
+  Pat1_P3_A_UIQ: epi_sparse  # epi_prop=0.0038 platform=flex
+  Pat1_P3_A_UIQ_xenium_1: epi_rich  # epi_prop=0.3060 platform=xenium
+  Pat1_P3_A_UOQ: epi_sparse  # epi_prop=0.0372 platform=flex
+  Pat1_P3_A_UOQ_xenium_1: epi_sparse  # epi_prop=0.1944 platform=xenium
+  Pat1_P3_M_LIQ: epi_sparse  # epi_prop=0.1943 platform=flex
+  Pat1_P3_M_LIQ_xenium_1: epi_rich  # epi_prop=0.5723 platform=xenium
+  Pat1_P3_M_LOQ: epi_rich  # epi_prop=0.5481 platform=flex
+  Pat1_P3_M_LOQ_xenium_1: epi_rich  # epi_prop=0.4871 platform=xenium
+  Pat1_P3_M_UIQ: epi_rich  # epi_prop=0.4049 platform=flex
+  Pat1_P3_M_UIQ_xenium_1: epi_rich  # epi_prop=0.4699 platform=xenium
+  Pat1_P3_M_UOQ_xenium_1: epi_sparse  # epi_prop=0.1524 platform=xenium
+  Pat1_P3_P_LIQ: epi_sparse  # epi_prop=0.3050 platform=flex
+  Pat1_P3_P_LIQ_xenium_1: epi_sparse  # epi_prop=0.2750 platform=xenium
+  Pat1_P3_P_LOQ: epi_rich  # epi_prop=0.3416 platform=flex
+  Pat1_P3_P_LOQ_xenium_1: epi_sparse  # epi_prop=0.3044 platform=xenium
+  Pat1_P3_P_UIQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  Pat1_P3_P_UIQ_xenium_1: epi_sparse  # epi_prop=0.0279 platform=xenium
+  Pat1_P3_P_UOQ: epi_sparse  # epi_prop=0.0014 platform=flex
+  Pat1_P3_P_UOQ_xenium_1: epi_sparse  # epi_prop=0.1121 platform=xenium
+  Pat2_P1_xenium_1: epi_rich  # epi_prop=0.3360 platform=xenium
+  Pat2_P1_xenium_2: epi_rich  # epi_prop=0.4317 platform=xenium
+  Pat2_P2_LIQ: epi_rich  # epi_prop=0.4826 platform=flex
+  Pat2_P2_LIQ_xenium_1: epi_sparse  # epi_prop=0.0743 platform=xenium
+  Pat2_P2_LOQ: epi_rich  # epi_prop=0.4059 platform=flex
+  Pat2_P2_LOQ_xenium_1: epi_rich  # epi_prop=0.3985 platform=xenium
+  Pat2_P2_UIQ: epi_rich  # epi_prop=0.4203 platform=flex
+  Pat2_P2_UIQ_xenium_1: epi_sparse  # epi_prop=0.2758 platform=xenium
+  Pat2_P2_UOQ: epi_rich  # epi_prop=0.3698 platform=flex
+  Pat2_P2_UOQ_xenium_1: epi_sparse  # epi_prop=0.0459 platform=xenium
+  Pat2_P3_A_LIQ: epi_sparse  # epi_prop=0.0108 platform=flex
+  Pat2_P3_A_LIQ_xenium_1: epi_sparse  # epi_prop=0.2304 platform=xenium
+  Pat2_P3_A_LOQ: epi_rich  # epi_prop=0.4173 platform=flex
+  Pat2_P3_A_LOQ_xenium_1: epi_sparse  # epi_prop=0.1418 platform=xenium
+  Pat2_P3_A_UIQ: epi_sparse  # epi_prop=0.1159 platform=flex
+  Pat2_P3_A_UIQ_xenium_1: epi_sparse  # epi_prop=0.0184 platform=xenium
+  Pat2_P3_A_UOQ: epi_rich  # epi_prop=0.4801 platform=flex
+  Pat2_P3_A_UOQ_xenium_1: epi_rich  # epi_prop=0.4252 platform=xenium
+  Pat2_P3_M_LIQ: epi_rich  # epi_prop=0.5557 platform=flex
+  Pat2_P3_M_LIQ_xenium_1: epi_rich  # epi_prop=0.3944 platform=xenium
+  Pat2_P3_M_LOQ: epi_rich  # epi_prop=0.5991 platform=flex
+  Pat2_P3_M_LOQ_xenium_1: epi_rich  # epi_prop=0.4729 platform=xenium
+  Pat2_P3_M_UIQ: epi_rich  # epi_prop=0.5780 platform=flex
+  Pat2_P3_M_UIQ_xenium_1: epi_rich  # epi_prop=0.3094 platform=xenium
+  Pat2_P3_M_UOQ: epi_rich  # epi_prop=0.4382 platform=flex
+  Pat2_P3_M_UOQ_xenium_1: epi_rich  # epi_prop=0.3091 platform=xenium
+  Pat2_P3_P_LIQ: epi_rich  # epi_prop=0.6337 platform=flex
+  Pat2_P3_P_LIQ_xenium_1: epi_sparse  # epi_prop=0.2484 platform=xenium
+  Pat2_P3_P_LOQ: epi_rich  # epi_prop=0.4857 platform=flex
+  Pat2_P3_P_LOQ_xenium_1: epi_rich  # epi_prop=0.4407 platform=xenium
+  Pat2_P3_P_UIQ: epi_sparse  # epi_prop=0.1254 platform=flex
+  Pat2_P3_P_UIQ_xenium_1: epi_sparse  # epi_prop=0.0226 platform=xenium
+  Pat2_P3_P_UOQ: epi_rich  # epi_prop=0.5056 platform=flex
+  Pat2_P3_P_UOQ_xenium_1: epi_sparse  # epi_prop=0.1799 platform=xenium
+  UCI220228_P2_LIQ: epi_rich  # epi_prop=0.4247 platform=flex
+  UCI220228_P2_LIQ_xenium_1: epi_rich  # epi_prop=0.3510 platform=xenium
+  UCI220228_P2_LOQ: epi_rich  # epi_prop=0.4022 platform=flex
+  UCI220228_P2_LOQ_xenium_1: epi_rich  # epi_prop=0.3758 platform=xenium
+  UCI220228_P2_UIQ: epi_rich  # epi_prop=0.4537 platform=flex
+  UCI220228_P2_UIQ_xenium_1: epi_rich  # epi_prop=0.3479 platform=xenium
+  UCI220228_P2_UOQ: epi_rich  # epi_prop=0.4554 platform=flex
+  UCI220228_P2_UOQ_xenium_1: epi_rich  # epi_prop=0.3568 platform=xenium
+  UCI220228_P3_A_LIQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_A_LIQ_xenium_1: epi_sparse  # epi_prop=0.0000 platform=xenium
+  UCI220228_P3_A_LOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_A_LOQ_xenium_1: epi_sparse  # epi_prop=0.0019 platform=xenium
+  UCI220228_P3_A_UIQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_A_UIQ_xenium_1: epi_sparse  # epi_prop=0.0000 platform=xenium
+  UCI220228_P3_A_UOQ: epi_sparse  # epi_prop=0.0004 platform=flex
+  UCI220228_P3_A_UOQ_xenium_1: epi_sparse  # epi_prop=0.0022 platform=xenium
+  UCI220228_P3_M_LIQ: epi_sparse  # epi_prop=0.1409 platform=flex
+  UCI220228_P3_M_LIQ_xenium_1: epi_sparse  # epi_prop=0.0038 platform=xenium
+  UCI220228_P3_M_LOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_M_LOQ_xenium_1: epi_sparse  # epi_prop=0.0000 platform=xenium
+  UCI220228_P3_M_UIQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_M_UIQ_xenium_1: epi_sparse  # epi_prop=0.0022 platform=xenium
+  UCI220228_P3_M_UOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_M_UOQ_xenium_1: epi_sparse  # epi_prop=0.0007 platform=xenium
+  UCI220228_P3_P_LIQ: epi_sparse  # epi_prop=0.2526 platform=flex
+  UCI220228_P3_P_LIQ_xenium_1: epi_sparse  # epi_prop=0.0003 platform=xenium
+  UCI220228_P3_P_LOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_P_LOQ_xenium_1: epi_sparse  # epi_prop=0.0005 platform=xenium
+  UCI220228_P3_P_UIQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_P_UIQ_xenium_1: epi_sparse  # epi_prop=0.0159 platform=xenium
+  UCI220228_P3_P_UOQ: epi_sparse  # epi_prop=0.0000 platform=flex
+  UCI220228_P3_P_UOQ_xenium_1: epi_sparse  # epi_prop=0.0025 platform=xenium
+  UCI604_P2_LIQ: epi_rich  # epi_prop=0.5050 platform=flex
+  UCI604_P2_LIQ_xenium_1: epi_rich  # epi_prop=0.3362 platform=xenium
+  UCI604_P2_LOQ: epi_rich  # epi_prop=0.5290 platform=flex
+  UCI604_P2_LOQ_xenium_1: epi_rich  # epi_prop=0.3186 platform=xenium
+  UCI604_P2_UIQ: epi_rich  # epi_prop=0.4687 platform=flex
+  UCI604_P2_UIQ_xenium_1: epi_sparse  # epi_prop=0.2828 platform=xenium
+  UCI604_P2_UOQ: epi_rich  # epi_prop=0.4941 platform=flex
+  UCI604_P2_UOQ_xenium_1: epi_sparse  # epi_prop=0.2085 platform=xenium
+  UCI604_P3_A_LIQ: epi_rich  # epi_prop=0.5371 platform=flex
+  UCI604_P3_A_LIQ_xenium_1: epi_rich  # epi_prop=0.3075 platform=xenium
+  UCI604_P3_A_LOQ: epi_rich  # epi_prop=0.5187 platform=flex
+  UCI604_P3_A_LOQ_xenium_1: epi_sparse  # epi_prop=0.2782 platform=xenium
+  UCI604_P3_A_UIQ: epi_rich  # epi_prop=0.4971 platform=flex
+  UCI604_P3_A_UIQ_xenium_1: epi_sparse  # epi_prop=0.2109 platform=xenium
+  UCI604_P3_A_UOQ: epi_sparse  # epi_prop=0.2213 platform=flex
+  UCI604_P3_A_UOQ_xenium_1: epi_sparse  # epi_prop=0.2479 platform=xenium
+  UCI604_P3_M_LIQ: epi_rich  # epi_prop=0.5218 platform=flex
+  UCI604_P3_M_LIQ_xenium_1: epi_sparse  # epi_prop=0.1514 platform=xenium
+  UCI604_P3_M_LOQ: epi_rich  # epi_prop=0.5668 platform=flex
+  UCI604_P3_M_LOQ_xenium_1: epi_rich  # epi_prop=0.4488 platform=xenium
+  UCI604_P3_M_UIQ: epi_rich  # epi_prop=0.5271 platform=flex
+  UCI604_P3_M_UIQ_xenium_1: epi_rich  # epi_prop=0.3442 platform=xenium
+  UCI604_P3_M_UOQ: epi_sparse  # epi_prop=0.2657 platform=flex
+  UCI604_P3_M_UOQ_xenium_1: epi_sparse  # epi_prop=0.1896 platform=xenium
+  UCI604_P3_P_LIQ: epi_rich  # epi_prop=0.5220 platform=flex
+  UCI604_P3_P_LIQ_xenium_1: epi_rich  # epi_prop=0.3227 platform=xenium
+  UCI604_P3_P_LOQ: epi_rich  # epi_prop=0.5149 platform=flex
+  UCI604_P3_P_LOQ_xenium_1: epi_rich  # epi_prop=0.4464 platform=xenium
+  UCI604_P3_P_UIQ: epi_rich  # epi_prop=0.5563 platform=flex
+  UCI604_P3_P_UIQ_xenium_1: epi_rich  # epi_prop=0.3951 platform=xenium
+  UCI604_P3_P_UOQ: epi_rich  # epi_prop=0.4033 platform=flex
+  UCI604_P3_P_UOQ_xenium_1: epi_rich  # epi_prop=0.3214 platform=xenium

@@ -1,0 +1,1338 @@
+---
+title: "Step 18: Integration Preview — `r params$COMPARTMENT` (harmony_n200 winner)"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+date: "`r Sys.Date()`"
+params:
+  PROJECT_ROOT: ""
+  COMPARTMENT: ""
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = TRUE,
+  warning = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+  library(presto)
+  library(patchwork)
+  library(viridis)
+  library(knitr)
+})
+
+cat("Libraries loaded\n")
+```
+
+# Setup
+
+```{r project_root}
+PROJECT_ROOT <- params$PROJECT_ROOT
+COMPARTMENT  <- params$COMPARTMENT
+
+if (PROJECT_ROOT == "") {
+  if (!require("here", quietly = TRUE)) stop("PROJECT_ROOT not provided and 'here' not available")
+  PROJECT_ROOT <- here::here()
+}
+
+if (COMPARTMENT == "") stop("COMPARTMENT parameter is required")
+
+# Resolve sweep winner from env (set by wrapper.R before render)
+get_env <- function(key, default = NULL) {
+  val <- Sys.getenv(key, unset = NA_character_)
+  if (is.na(val) || val == "") return(default)
+  val
+}
+SWEEP_WINNER <- get_env("CFG_CANONICAL_SWEEP_WINNER")
+if (is.null(SWEEP_WINNER)) stop("CFG_CANONICAL_SWEEP_WINNER not set")
+
+STEP_19B_DIR <- get_env("CFG_PREPROCESSING_STEP_19B",
+                        file.path(PROJECT_ROOT, "outputs/preprocessing/19b_IntegrationPreview"))
+
+cat("============================================================================\n")
+cat("Step 19b: Integration Preview\n")
+cat("============================================================================\n")
+cat("Compartment:    ", COMPARTMENT, "\n")
+cat("Project Root:   ", PROJECT_ROOT, "\n")
+cat("Sweep winner:   ", SWEEP_WINNER, "\n")
+cat("Step 19b dir:   ", STEP_19B_DIR, "\n")
+cat("Integration:   harmony_n200 (winner)\n")
+cat("============================================================================\n")
+```
+
+# Load Seurat Object and Winner Embeddings
+
+**Adapted from step_21**: instead of loading raw H5 counts + step_20 embeddings, we load
+the pre-built compartment Seurat (from `outputs/annotation/l1/`) and inject the
+harmony_n200 UMAP + leiden clusters from the sweep winner sidecars.
+
+```{r load_seurat}
+SEURAT_RDS <- file.path(PROJECT_ROOT, "outputs/annotation/l1", COMPARTMENT, "seurat.rds")
+WINNER_META <- file.path(SWEEP_WINNER, "compartments", COMPARTMENT, "metadata_with_umap.csv")
+
+cat("Seurat RDS:", SEURAT_RDS, "\n")
+cat("Winner metadata:", WINNER_META, "\n")
+
+if (!file.exists(SEURAT_RDS)) stop("Seurat RDS not found: ", SEURAT_RDS)
+if (!file.exists(WINNER_META)) stop("Winner metadata not found: ", WINNER_META)
+
+seurat_merged <- readRDS(SEURAT_RDS)
+seurat_merged <- UpdateSeuratObject(seurat_merged)
+cat("\nLoaded Seurat:", ncol(seurat_merged), "cells x", nrow(seurat_merged), "genes\n")
+
+# Inject winner UMAP coordinates and leiden clusters
+winner_df <- read.csv(WINNER_META, row.names = 1, stringsAsFactors = FALSE)
+cat("Winner metadata:", nrow(winner_df), "cells\n")
+
+cells_common <- intersect(colnames(seurat_merged), rownames(winner_df))
+cat("Matched cells:", length(cells_common), "/", ncol(seurat_merged), "\n")
+
+seurat_merged <- subset(seurat_merged, cells = cells_common)
+
+umap_mat <- as.matrix(winner_df[cells_common, c("UMAP_1", "UMAP_2")])
+colnames(umap_mat) <- paste0("UMAP_", 1:2)
+seurat_merged[["umap"]] <- CreateDimReducObject(
+  embeddings = umap_mat, key = "UMAP_", assay = DefaultAssay(seurat_merged)
+)
+
+leiden_cols <- grep("^leiden_", colnames(winner_df), value = TRUE)
+for (col in leiden_cols) {
+  seurat_merged@meta.data[[col]] <- winner_df[rownames(seurat_merged@meta.data), col]
+}
+cat("Injected leiden columns:", paste(leiden_cols, collapse = ", "), "\n")
+
+# Convert leiden columns to factors with numerically sorted levels
+# Prevents lexicographic ordering (0,1,10,11...) in plots
+for (col in leiden_cols) {
+  vals <- as.character(seurat_merged@meta.data[[col]])
+  unique_vals <- unique(vals[!is.na(vals)])
+  lvls <- as.character(sort(as.numeric(unique_vals)))
+  seurat_merged@meta.data[[col]] <- factor(vals, levels = lvls)
+}
+cat("Leiden columns converted to numerically sorted factors\n")
+
+# Default resolution for main markers/dotplot view
+default_cluster_col <- "leiden_1.0"
+cat("Default cluster column:", default_cluster_col, "\n")
+
+# Clustering columns for multi-resolution analysis
+clustering_columns <- leiden_cols
+cat("Clustering columns:", paste(clustering_columns, collapse = ", "), "\n")
+
+cat("\n✓ Seurat prepared\n")
+```
+
+# Normalize and Join Layers
+
+```{r normalize}
+cat("\n=== Normalizing and Joining Layers ===\n\n")
+
+gc()
+seurat_merged <- NormalizeData(seurat_merged, verbose = FALSE)
+cat("Normalization complete\n")
+
+gc()
+seurat_merged <- JoinLayers(seurat_merged)
+cat("JoinLayers complete\n")
+
+gc()
+```
+
+# Summary Statistics
+
+```{r summary_stats}
+cat("\n============================================================================\n")
+cat("Summary Statistics for", COMPARTMENT, "\n")
+cat("============================================================================\n\n")
+
+cat("Total cells:  ", ncol(seurat_merged), "\n")
+cat("Total genes:  ", nrow(seurat_merged), "\n")
+
+cat("\nCells by patient:\n")
+print(table(seurat_merged$patient_id))
+
+cat("\nCells by sample:\n")
+print(table(seurat_merged$sample_id))
+
+if (default_cluster_col %in% colnames(seurat_merged@meta.data)) {
+  cat("\nClusters at", default_cluster_col, ":\n")
+  print(table(seurat_merged@meta.data[[default_cluster_col]]))
+}
+```
+
+# UMAP Visualizations {.tabset}
+
+## By Cluster (res 1.0)
+
+```{r umap_clusters, fig.width=14, fig.height=10}
+if (default_cluster_col %in% colnames(seurat_merged@meta.data)) {
+  Idents(seurat_merged) <- default_cluster_col
+
+  DimPlot(seurat_merged, reduction = "umap", group.by = default_cluster_col,
+          label = TRUE, pt.size = 0.3, label.size = 4, raster = FALSE) +
+    ggtitle(paste0(COMPARTMENT, " - Clusters (", default_cluster_col, ")")) +
+    theme(legend.position = "right")
+}
+```
+
+## By Cluster (res 0.2)
+
+```{r umap_clusters_02, fig.width=14, fig.height=10}
+if ("leiden_0.2" %in% colnames(seurat_merged@meta.data)) {
+  DimPlot(seurat_merged, reduction = "umap", group.by = "leiden_0.2",
+          label = TRUE, pt.size = 0.3, label.size = 4, raster = FALSE) +
+    ggtitle(paste0(COMPARTMENT, " - Clusters (leiden_0.2)")) +
+    theme(legend.position = "right")
+}
+```
+
+## By Patient
+
+```{r umap_patient, fig.width=12, fig.height=8}
+DimPlot(seurat_merged, reduction = "umap", group.by = "patient_id",
+        pt.size = 0.3, raster = FALSE, shuffle = TRUE) +
+  ggtitle(paste0(COMPARTMENT, " - Patient Distribution"))
+```
+
+## By Sample
+
+```{r umap_sample, fig.width=14, fig.height=10}
+DimPlot(seurat_merged, reduction = "umap", group.by = "sample_id",
+        pt.size = 0.2, raster = FALSE) +
+  ggtitle(paste0(COMPARTMENT, " - Sample Distribution")) +
+  theme(legend.text = element_text(size = 6))
+```
+
+## By Cluster Annotation
+
+```{r umap_cluster_annot, fig.width=14, fig.height=10}
+if ("cluster_annotation" %in% colnames(seurat_merged@meta.data)) {
+  DimPlot(seurat_merged, reduction = "umap",
+          group.by = "cluster_annotation",
+          label = TRUE, repel = TRUE,
+          pt.size = 0.3, alpha = 0.5, raster = FALSE) +
+    ggtitle(paste0(COMPARTMENT, " - Cluster Annotations")) +
+    NoLegend()
+} else {
+  cat("cluster_annotation not available\n")
+}
+```
+
+# Load L1 Labels
+
+```{r load_l1_labels}
+# Load harmonized L1 labels from step 19 output and inject into Seurat metadata.
+# Priority: (1) L1.0 already in Seurat, (2) harmonized_l1_labels CSV, (3) skip.
+#
+# Pattern source: cluster_label_hierarchy.py (iHBCA_V1 V1_Annotation) — same
+# L1.0 column name and concordance logic used downstream.
+
+L1_COL <- NULL
+
+if ("L1.0" %in% colnames(seurat_merged@meta.data)) {
+  L1_COL <- "L1.0"
+  cat("L1 labels found in Seurat metadata column 'L1.0'\n")
+} else {
+  l1_csv <- file.path(PROJECT_ROOT, "outputs/annotation/l1", COMPARTMENT,
+                      paste0("harmonized_l1_labels_", COMPARTMENT, ".csv"))
+  if (file.exists(l1_csv)) {
+    l1_df <- read.csv(l1_csv, stringsAsFactors = FALSE)
+    cells_match <- intersect(colnames(seurat_merged), l1_df$cell_id)
+    if (length(cells_match) > 0 && "L1.0" %in% colnames(l1_df)) {
+      l1_vec <- setNames(rep(NA_character_, ncol(seurat_merged)), colnames(seurat_merged))
+      l1_vec[cells_match] <- l1_df$L1.0[match(cells_match, l1_df$cell_id)]
+      seurat_merged@meta.data[["L1.0"]] <- l1_vec
+      L1_COL <- "L1.0"
+      cat(sprintf("L1 labels loaded from CSV: %d / %d cells matched\n",
+                  length(cells_match), ncol(seurat_merged)))
+      cat(sprintf("  %d unique L1 types: %s\n",
+                  length(unique(na.omit(l1_vec))),
+                  paste(sort(unique(na.omit(l1_vec))), collapse = ", ")))
+    } else {
+      cat("WARNING: L1 CSV found but column 'L1.0' missing or no cell overlap\n")
+    }
+  } else {
+    cat("WARNING: No L1 labels found — concordance analysis will be skipped\n")
+    cat("  Expected:", l1_csv, "\n")
+  }
+}
+```
+
+# Cluster–Label Concordance Sweep
+
+Compactness metric from iHBCA_V1 `cluster_label_hierarchy.py`: harmonic mean of
+cluster purity and label purity (F1 of precision × recall).
+
+- **cluster_purity** = dominant_label_cells / cluster_size — how pure is the cluster
+- **label_purity** = dominant_label_cells / total_cells_with_label — how concentrated is the label
+- **compactness** = 2 × cp × lp / (cp + lp) — low cp = merge; low lp = split
+
+```{r concordance_sweep, fig.width=12, fig.height=8}
+if (!is.null(L1_COL)) {
+
+  # Per cluster: top label, cluster_purity, label_purity, compactness
+  # Pattern: cluster_label_hierarchy.py lines 80-112
+  compute_compactness <- function(seurat, cluster_col, label_col) {
+    cl <- as.character(seurat@meta.data[[cluster_col]])
+    lb <- as.character(seurat@meta.data[[label_col]])
+    valid <- !is.na(cl) & !is.na(lb)
+    cl <- cl[valid]; lb <- lb[valid]
+    total_per_label <- table(lb)
+
+    rows <- lapply(unique(cl), function(k) {
+      k_mask    <- cl == k
+      n_cluster <- sum(k_mask)
+      vc        <- sort(table(lb[k_mask]), decreasing = TRUE)
+      if (length(vc) == 0) return(NULL)
+      top_label <- names(vc)[1]
+      top_count <- as.integer(vc[1])
+      c_purity  <- top_count / n_cluster
+      l_purity  <- top_count / as.integer(total_per_label[top_label])
+      compact   <- 2 * c_purity * l_purity / (c_purity + l_purity + 1e-10)
+      data.frame(
+        cluster        = k,
+        n_cells        = n_cluster,
+        top_label      = top_label,
+        runner_up      = if (length(vc) > 1) names(vc)[2] else NA_character_,
+        cluster_purity = round(c_purity, 3),
+        label_purity   = round(l_purity, 3),
+        compactness    = round(compact, 3),
+        stringsAsFactors = FALSE
+      )
+    })
+    do.call(rbind, Filter(Negate(is.null), rows))
+  }
+
+  # Sweep all available resolutions
+  all_compactness <- list()
+  sweep_df <- lapply(leiden_cols, function(col) {
+    res <- as.numeric(sub("leiden_", "", col))
+    df  <- compute_compactness(seurat_merged, col, L1_COL)
+    all_compactness[[col]] <<- df
+    data.frame(
+      resolution         = res,
+      mean_compactness   = mean(df$compactness, na.rm = TRUE),
+      median_compactness = median(df$compactness, na.rm = TRUE),
+      mean_cluster_purity = mean(df$cluster_purity, na.rm = TRUE),
+      mean_label_purity  = mean(df$label_purity, na.rm = TRUE),
+      n_clusters         = nrow(df),
+      stringsAsFactors   = FALSE
+    )
+  }) |> do.call(what = rbind) |> (\(x) x[order(x$resolution), ])()
+
+  opt_res  <- sweep_df$resolution[which.max(sweep_df$mean_compactness)]
+  def_res  <- as.numeric(sub("leiden_", "", default_cluster_col))
+
+  cat(sprintf("Optimal resolution (max mean compactness): %.1f\n", opt_res))
+  cat(sprintf("Default resolution: %.1f\n", def_res))
+  cat("\nSweep table:\n")
+  print(sweep_df, digits = 3, row.names = FALSE)
+
+  # -- Plot 1: compactness + component purities vs resolution --
+  long_df <- sweep_df |>
+    select(resolution, mean_compactness, mean_cluster_purity, mean_label_purity) |>
+    pivot_longer(-resolution, names_to = "metric", values_to = "value") |>
+    mutate(metric = recode(metric,
+      mean_compactness    = "Compactness (F1)",
+      mean_cluster_purity = "Cluster purity (precision)",
+      mean_label_purity   = "Label purity (recall)"
+    ))
+
+  p_concordance <- ggplot(long_df, aes(x = resolution, y = value,
+                                       color = metric, linetype = metric)) +
+    geom_line(linewidth = 1.1) +
+    geom_point(size = 2.5) +
+    geom_vline(xintercept = def_res, linetype = "dotdash", alpha = 0.4) +
+    annotate("text", x = def_res + 0.05, y = 0.98, label = paste0("default (", def_res, ")"),
+             hjust = 0, size = 3, color = "grey40") +
+    geom_vline(xintercept = opt_res, color = "#c0392b", linetype = "dashed", alpha = 0.7) +
+    annotate("text", x = opt_res + 0.05, y = 0.93, label = paste0("optimal (", opt_res, ")"),
+             hjust = 0, size = 3, color = "#c0392b") +
+    scale_color_manual(values = c("Compactness (F1)" = "#2c7bb6",
+                                  "Cluster purity (precision)" = "#4dac26",
+                                  "Label purity (recall)"      = "#d7191c")) +
+    scale_linetype_manual(values = c("Compactness (F1)" = "solid",
+                                     "Cluster purity (precision)" = "dashed",
+                                     "Label purity (recall)"      = "dotted")) +
+    scale_y_continuous(limits = c(0, 1), labels = function(x) paste0(round(x * 100), "%")) +
+    labs(title = paste0(COMPARTMENT, " — Cluster-Label Concordance vs Resolution"),
+         x = "Leiden resolution", y = "Mean value across clusters",
+         color = NULL, linetype = NULL) +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom")
+
+  # -- Plot 2: N clusters vs resolution --
+  p_nclusters <- ggplot(sweep_df, aes(x = resolution, y = n_clusters)) +
+    geom_line(color = "#7b2d8b", linewidth = 1.1) +
+    geom_point(color = "#7b2d8b", size = 2.5) +
+    geom_vline(xintercept = def_res, linetype = "dotdash", alpha = 0.4) +
+    geom_vline(xintercept = opt_res, color = "#c0392b", linetype = "dashed", alpha = 0.7) +
+    labs(x = "Leiden resolution", y = "N clusters") +
+    theme_minimal(base_size = 11)
+
+  print(p_concordance / p_nclusters + plot_layout(heights = c(3, 1)))
+
+  # -- Per-label label_purity heatmap --
+  # For each L1 label, label_purity(label, r) = max label_purity across all
+  # clusters where that label is the top label. Answers: "at resolution r, what
+  # fraction of label X's cells are in their dominant cluster?"
+  # Rows sorted by argmax resolution (early-resolving labels at top).
+  leiden_cols_ordered <- leiden_cols[order(as.numeric(sub("leiden_", "", leiden_cols)))]
+  sorted_res_vals     <- as.numeric(sub("leiden_", "", leiden_cols_ordered))
+
+  all_labels <- sort(unique(as.character(
+    seurat_merged@meta.data[[L1_COL]][!is.na(seurat_merged@meta.data[[L1_COL]])]
+  )))
+
+  label_purity_wide <- do.call(cbind, lapply(leiden_cols_ordered, function(col) {
+    df <- all_compactness[[col]]
+    sapply(all_labels, function(lbl) {
+      rows <- df[!is.na(df$top_label) & df$top_label == lbl, ]
+      if (nrow(rows) == 0) return(NA_real_)
+      max(rows$label_purity, na.rm = TRUE)
+    })
+  }))
+  colnames(label_purity_wide) <- as.character(sorted_res_vals)
+  rownames(label_purity_wide) <- all_labels
+
+  best_res_per_label <- setNames(
+    apply(label_purity_wide, 1, function(row) {
+      if (all(is.na(row))) return(NA_real_)
+      as.numeric(colnames(label_purity_wide)[which.max(row)])
+    }),
+    rownames(label_purity_wide)
+  )
+  max_lp_per_label <- apply(label_purity_wide, 1, max, na.rm = TRUE)
+
+  label_order        <- order(best_res_per_label, -max_lp_per_label)
+  label_purity_wide  <- label_purity_wide[label_order, ]
+  best_res_per_label <- best_res_per_label[label_order]
+  max_lp_per_label   <- max_lp_per_label[label_order]
+
+  lp_long <- data.frame(
+    label      = factor(rep(rownames(label_purity_wide), ncol(label_purity_wide)),
+                         levels = rownames(label_purity_wide)),
+    resolution = rep(sorted_res_vals, each = nrow(label_purity_wide)),
+    lp         = as.vector(label_purity_wide),
+    stringsAsFactors = FALSE
+  )
+  best_df <- data.frame(
+    label      = factor(names(best_res_per_label), levels = rownames(label_purity_wide)),
+    resolution = best_res_per_label
+  )
+
+  p_lp_heatmap <- ggplot(lp_long, aes(x = factor(resolution), y = label, fill = lp)) +
+    geom_tile(color = "white", linewidth = 0.3) +
+    geom_point(data = best_df, aes(x = factor(resolution), y = label),
+               shape = 8, size = 2.5, color = "black", inherit.aes = FALSE) +
+    scale_fill_gradient(low = "#f7f7f7", high = "#2166ac", na.value = "grey90",
+                        name = "label\npurity", limits = c(0, 1)) +
+    labs(
+      title    = paste0(COMPARTMENT, " — Per-label label_purity across resolutions"),
+      subtitle = paste0("★ = best resolution for that label  |  rows sorted early→late resolver  |",
+                        "  red dashed = r_L1 (", opt_res, ")  |  dotdash = default (", def_res, ")"),
+      x = "Leiden resolution", y = NULL
+    ) +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "right",
+          axis.text.y     = element_text(size = 8),
+          panel.grid      = element_blank())
+  print(p_lp_heatmap)
+
+  # -- Per-label argmax summary: which labels require fine resolution? --
+  best_summary <- data.frame(
+    label  = factor(names(best_res_per_label), levels = rev(names(best_res_per_label))),
+    best_r = best_res_per_label,
+    max_lp = max_lp_per_label
+  )
+  p_best_res <- ggplot(best_summary, aes(x = best_r, y = label)) +
+    geom_vline(xintercept = opt_res, color = "#c0392b", linetype = "dashed", alpha = 0.6) +
+    geom_vline(xintercept = def_res, linetype = "dotdash", alpha = 0.4) +
+    geom_point(aes(fill = max_lp, size = max_lp), shape = 21, stroke = 0.5) +
+    scale_fill_gradient(low = "#fde0dd", high = "#b30000",
+                        name = "max\nlabel purity", limits = c(0, 1)) +
+    scale_size_continuous(range = c(2.5, 8), guide = "none") +
+    scale_x_continuous(breaks = sorted_res_vals) +
+    labs(
+      title    = paste0(COMPARTMENT, " — Best resolution per L1 label"),
+      subtitle = "Dot fill/size = label_purity at argmax resolution. Labels sorted top→bottom by early→late resolver.",
+      x = "Leiden resolution at argmax label_purity", y = NULL
+    ) +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "right",
+          axis.text.y     = element_text(size = 8))
+  print(p_best_res)
+
+} else {
+  cat("Skipping concordance sweep: no L1 labels available\n")
+  all_compactness <- list()
+  opt_res <- as.numeric(sub("leiden_", "", default_cluster_col))
+}
+```
+
+# Resolution × Marker Quality
+
+For each cluster at each resolution, `auc_score_norm` measures how robustly the
+cluster is distinguished by its top markers — the normalized trapezoidal integral
+of the threshold-swept AUC curve (top 20 genes, thresholds 0.50–0.90).
+
+Ported from iHBCA_V1 `04_cluster_distinctiveness.py:compute_area_scores()`, which
+itself ports `calculate_marker_areas` from `scQC/rawPipelineDesignV1.Rmd:2585-2677`.
+
+- `auc_score_norm` ∈ [0,1]: 1 = every top gene is a perfect discriminator
+- A cluster **gaining** score at finer resolution = meaningful split
+- A cluster **losing** score = over-splitting into noise
+
+```{r auc_score_functions}
+# Trapezoid integration (base R, no packages needed)
+trapz <- function(x, y) sum(diff(x) * (head(y, -1) + tail(y, -1)) / 2)
+
+# Port of 04_cluster_distinctiveness.py:compute_area_scores()
+AUC_THRESHOLDS   <- seq(0.50, 0.90, length.out = 41)
+LOGFC_THRESHOLDS <- seq(0.00, 4.00, length.out = 81)
+N_TOP_MARKERS    <- 20
+
+compute_area_scores <- function(aucs, logfcs) {
+  n   <- min(N_TOP_MARKERS, length(aucs))
+  top <- order(aucs, decreasing = TRUE)[seq_len(n)]
+  a   <- aucs[top]
+  l   <- logfcs[top]
+
+  auc_areas   <- sapply(AUC_THRESHOLDS,   function(t) sum(pmax(0, a - t)) / (1 - t))
+  logfc_areas <- sapply(LOGFC_THRESHOLDS, function(t) sum(pmax(0, l - t)))
+
+  auc_raw  <- trapz(AUC_THRESHOLDS, auc_areas)
+  auc_max  <- n * (max(AUC_THRESHOLDS) - min(AUC_THRESHOLDS))
+  list(
+    auc_score      = auc_raw,
+    auc_score_norm = if (auc_max > 0) auc_raw / auc_max else 0.0,
+    logfc_score    = trapz(LOGFC_THRESHOLDS, logfc_areas),
+    strong_markers = sum(a > 0.7 & l > 1.0)
+  )
+}
+```
+
+```{r compute_all_markers, cache=FALSE}
+# Run presto::wilcoxauc for each leiden resolution; store results in a named
+# list consumed by the marker_quality_sweep chunk below.
+# Pattern: presto::wilcoxauc per Leiden resolution; auc/logFC ranking.
+cat("\n=== Computing markers per resolution ===\n")
+
+seurat_norm <- NormalizeData(seurat_merged, verbose = FALSE)
+seurat_norm <- JoinLayers(seurat_norm)
+
+all_resolution_markers <- setNames(
+  lapply(leiden_cols, function(res_col) {
+    cat(sprintf("  wilcoxauc: %s ... ", res_col))
+    Idents(seurat_norm) <- res_col
+    mrk <- presto::wilcoxauc(seurat_norm, assay = "data")
+    cat(sprintf("%d rows\n", nrow(mrk)))
+    # Convert group to numerically-sorted factor to prevent lexicographic
+    # ordering (0,1,10,11...) in all downstream plots and tables.
+    grp_levels <- as.character(sort(as.numeric(unique(mrk$group))))
+    mrk$group  <- factor(mrk$group, levels = grp_levels)
+    mrk
+  }),
+  leiden_cols
+)
+
+cat(sprintf("Markers computed for %d resolutions\n", length(all_resolution_markers)))
+rm(seurat_norm); gc()
+```
+
+```{r marker_quality_sweep, fig.width=14, fig.height=10}
+cat("\n=== Resolution × Marker Quality ===\n\n")
+
+if (length(all_resolution_markers) > 0) {
+
+  # Compute auc_score_norm per (resolution, cluster) from existing marker data
+  quality_rows <- lapply(names(all_resolution_markers), function(res_col) {
+    res  <- as.numeric(sub("leiden_", "", res_col))
+    mrk  <- all_resolution_markers[[res_col]]
+    cl   <- as.character(seurat_merged@meta.data[[res_col]])
+
+    lapply(unique(mrk$group), function(k) {
+      grp_mrk <- mrk[mrk$group == k, ]
+      grp_mrk <- grp_mrk[order(grp_mrk$auc, decreasing = TRUE), ]
+      if (nrow(grp_mrk) == 0) return(NULL)
+      scores <- compute_area_scores(grp_mrk$auc, grp_mrk$logFC)
+      top3   <- head(grp_mrk$feature[grp_mrk$auc > 0.5], 3)
+      top3   <- c(top3, rep(NA_character_, 3 - length(top3)))
+      data.frame(
+        resolution     = res,
+        cluster        = as.character(k),
+        n_cells        = sum(!is.na(cl) & cl == k),
+        auc_score_norm = round(scores$auc_score_norm, 4),
+        logfc_score    = round(scores$logfc_score, 4),
+        strong_markers = scores$strong_markers,
+        top_marker_1   = top3[1],
+        top_marker_2   = top3[2],
+        top_marker_3   = top3[3],
+        stringsAsFactors = FALSE
+      )
+    }) |> do.call(what = rbind)
+  }) |> do.call(what = rbind)
+
+  cat(sprintf("Computed auc_score_norm for %d (resolution × cluster) combinations\n",
+              nrow(quality_rows)))
+
+  # -- Resolution summary table --
+  res_summary <- quality_rows |>
+    group_by(resolution) |>
+    summarise(
+      n_clusters    = n(),
+      mean_auc      = round(mean(auc_score_norm,  na.rm = TRUE), 3),
+      median_auc    = round(median(auc_score_norm, na.rm = TRUE), 3),
+      frac_above_05 = round(mean(auc_score_norm >= 0.5, na.rm = TRUE), 3),
+      frac_above_07 = round(mean(auc_score_norm >= 0.7, na.rm = TRUE), 3),
+      worst_cluster = cluster[which.min(auc_score_norm)],
+      worst_auc     = round(min(auc_score_norm, na.rm = TRUE), 3),
+      .groups = "drop"
+    ) |>
+    arrange(resolution)
+  cat("\nResolution summary:\n")
+  print(as.data.frame(res_summary), row.names = FALSE)
+
+  # -- Plot: split delta arrows --
+  # For each pair of adjacent resolutions, draw parent_auc → child_auc as a
+  # segment per split. Color = gain (green) / loss (red) / neutral (grey).
+  # Child node size ∝ n_cells.
+  # Interpretation: green rising lines = split is meaningful (biology resolves);
+  #   red falling lines = over-splitting into noise (merge back).
+  sorted_res  <- sort(unique(quality_rows$resolution))
+  sorted_cols <- paste0("leiden_", sorted_res)
+  sorted_cols <- sorted_cols[sorted_cols %in% leiden_cols]
+
+  auc_lookup <- setNames(
+    lapply(sorted_res, function(r) {
+      qr <- quality_rows[abs(quality_rows$resolution - r) < 0.001, ]
+      setNames(qr$auc_score_norm, as.character(qr$cluster))
+    }),
+    as.character(sorted_res)
+  )
+
+  edges <- do.call(rbind, lapply(seq_len(length(sorted_cols) - 1), function(i) {
+    coarse_col <- sorted_cols[i]
+    fine_col   <- sorted_cols[i + 1]
+    coarse_res <- sorted_res[i]
+    fine_res   <- sorted_res[i + 1]
+
+    cc    <- as.character(seurat_merged@meta.data[[coarse_col]])
+    fc    <- as.character(seurat_merged@meta.data[[fine_col]])
+    valid <- !is.na(cc) & !is.na(fc)
+
+    tab        <- table(fine = fc[valid], coarse = cc[valid])
+    parent_map <- apply(tab, 1, function(row) names(which.max(row)))
+
+    p_auc <- auc_lookup[[as.character(coarse_res)]]
+    c_auc <- auc_lookup[[as.character(fine_res)]]
+
+    rows <- lapply(names(parent_map), function(child) {
+      parent <- parent_map[[child]]
+      pa <- p_auc[parent]; ca <- c_auc[child]
+      if (is.na(pa) || is.na(ca)) return(NULL)
+      data.frame(
+        transition = paste0(coarse_res, " → ", fine_res),
+        coarse_res = coarse_res,
+        parent     = parent,
+        child      = child,
+        parent_auc = pa,
+        child_auc  = ca,
+        delta      = ca - pa,
+        n_cells    = sum(valid & fc == child, na.rm = TRUE),
+        stringsAsFactors = FALSE
+      )
+    })
+    do.call(rbind, Filter(Negate(is.null), rows))
+  }))
+
+  if (!is.null(edges) && nrow(edges) > 0) {
+    edges$direction <- ifelse(edges$delta >  0.03, "gain",
+                       ifelse(edges$delta < -0.03, "loss", "neutral"))
+    edges$transition <- factor(
+      edges$transition,
+      levels = unique(edges$transition[order(edges$coarse_res)])
+    )
+
+    p_splits <- ggplot(edges) +
+      geom_segment(aes(x = 0, xend = 1,
+                       y = parent_auc, yend = child_auc,
+                       color = direction),
+                   linewidth = 0.8, alpha = 0.75) +
+      geom_point(aes(x = 0, y = parent_auc),
+                 color = "grey30", size = 2.5) +
+      geom_point(aes(x = 1, y = child_auc,
+                     size = n_cells, color = direction), alpha = 0.85) +
+      geom_hline(yintercept = 0.5, linetype = "dashed",
+                 color = "grey40", alpha = 0.6) +
+      scale_color_manual(
+        values = c(gain = "#2ca25f", loss = "#e34a33", neutral = "grey60"),
+        name   = "Split direction"
+      ) +
+      scale_size_continuous(range = c(1.5, 6), guide = "none") +
+      scale_x_continuous(breaks = c(0, 1), labels = c("parent", "child"),
+                         expand = expansion(mult = 0.2)) +
+      scale_y_continuous(limits = c(0, 1)) +
+      facet_wrap(~ transition, nrow = 1) +
+      labs(
+        title    = paste0(COMPARTMENT, " — Split quality: auc_score_norm parent → child"),
+        subtitle = "Green = gaining score (split justified) | Red = losing score (over-splitting) | size ∝ n_cells | dashed = 0.5",
+        x = NULL, y = "auc_score_norm"
+      ) +
+      theme_minimal(base_size = 10) +
+      theme(legend.position  = "bottom",
+            strip.text       = element_text(face = "bold", size = 9),
+            axis.text.x      = element_text(face = "bold", size = 9))
+    print(p_splits)
+  } else {
+    cat("Split delta plot not available: only one resolution present\n")
+  }
+
+  # Summary table: low-quality clusters at default resolution
+  low_quality <- quality_rows[
+    quality_rows$resolution == as.numeric(sub("leiden_", "", default_cluster_col)) &
+    quality_rows$auc_score_norm < 0.5, ]
+  cat(sprintf("\nLow-quality clusters at %s (auc_score_norm < 0.5): %d\n",
+              default_cluster_col, nrow(low_quality)))
+  if (nrow(low_quality) > 0) print(low_quality[order(low_quality$auc_score_norm), ],
+                                    row.names = FALSE)
+
+  # Save for downstream use (L2 review Rmd)
+  quality_out <- file.path(STEP_19B_DIR, COMPARTMENT, "markers_by_resolution",
+                            "marker_quality_sweep.csv")
+  write.csv(quality_rows, quality_out, row.names = FALSE)
+  cat(sprintf("Saved: %s\n", quality_out))
+
+} else {
+  cat("Skipping: all_resolution_markers not populated\n")
+  quality_rows <- NULL
+}
+```
+
+# Split & Merge Analysis {.tabset}
+
+For each cluster at the chosen resolution, compactness decomposes into:
+
+- **Low cluster_purity → merge**: multiple L1 types coexist in one cluster
+- **Low label_purity → split**: one L1 type is fragmented across multiple clusters
+
+Threshold for flagging: compactness < 0.6 (same stability threshold as iHBCA_V1).
+Marker investigation uses `presto::wilcoxauc()` on cell subsets — clusters for splits,
+L1 labels for merges.
+
+```{r split_merge_setup}
+COMPACTNESS_THRESHOLD <- 0.6  # below = unstable (split or merge)
+SPLIT_MERGE_TOP_N    <- 5     # max cases to investigate per category
+
+# Use optimal resolution for split/merge analysis (fall back to default)
+sm_col <- paste0("leiden_", opt_res)
+if (!sm_col %in% leiden_cols) sm_col <- default_cluster_col
+cat(sprintf("Split/merge analysis at resolution: %s\n", sm_col))
+
+compact_df <- if (sm_col %in% names(all_compactness)) {
+  all_compactness[[sm_col]]
+} else if (!is.null(L1_COL)) {
+  compute_compactness(seurat_merged, sm_col, L1_COL)
+} else {
+  NULL
+}
+
+# Per-label summary: for each L1 type, find its best-case label_purity
+# (fraction of its cells concentrated in its dominant cluster)
+if (!is.null(compact_df)) {
+  cl  <- as.character(seurat_merged@meta.data[[sm_col]])
+  lb  <- as.character(seurat_merged@meta.data[[L1_COL]])
+  total_per_label <- table(lb[!is.na(lb)])
+
+  label_summary <- lapply(names(total_per_label), function(lbl) {
+    rows <- compact_df[compact_df$top_label == lbl, ]
+    if (nrow(rows) == 0) return(NULL)
+    best_row <- rows[which.max(rows$label_purity), ]
+    data.frame(
+      label              = lbl,
+      total_cells        = as.integer(total_per_label[lbl]),
+      best_cluster       = best_row$cluster,
+      best_cluster_purity = best_row$cluster_purity,
+      best_label_purity  = best_row$label_purity,
+      compactness        = best_row$compactness,
+      n_dominant_clusters = nrow(rows),
+      stringsAsFactors   = FALSE
+    )
+  }) |> do.call(what = rbind) |> (\(x) x[order(x$best_label_purity), ])()
+
+  merge_cases <- compact_df[compact_df$cluster_purity < COMPACTNESS_THRESHOLD, ]
+  merge_cases <- merge_cases[order(merge_cases$cluster_purity), ]
+  split_cases <- label_summary[label_summary$best_label_purity < COMPACTNESS_THRESHOLD, ]
+
+  cat(sprintf("\nMerge candidates (cluster_purity < %.1f): %d clusters\n",
+              COMPACTNESS_THRESHOLD, nrow(merge_cases)))
+  cat(sprintf("Split candidates (label_purity  < %.1f): %d labels\n",
+              COMPACTNESS_THRESHOLD, nrow(split_cases)))
+}
+```
+
+## Confusion Matrix
+
+```{r confusion_heatmap, fig.width=14, fig.height=10}
+if (!is.null(compact_df) && !is.null(L1_COL)) {
+  cl <- as.character(seurat_merged@meta.data[[sm_col]])
+  lb <- as.character(seurat_merged@meta.data[[L1_COL]])
+  valid <- !is.na(cl) & !is.na(lb)
+
+  tab <- as.data.frame(table(cluster = cl[valid], label = lb[valid]))
+  tab_norm <- tab |>
+    group_by(label) |>
+    mutate(frac = Freq / sum(Freq)) |>
+    ungroup()
+
+  cl_levels <- as.character(sort(as.numeric(unique(cl[valid]))))
+  lb_levels <- names(sort(table(lb[valid]), decreasing = TRUE))
+  tab_norm$cluster <- factor(tab_norm$cluster, levels = cl_levels)
+  tab_norm$label   <- factor(tab_norm$label,   levels = lb_levels)
+
+  p_conf <- ggplot(tab_norm, aes(x = cluster, y = label, fill = frac)) +
+    geom_tile(color = "white", linewidth = 0.2) +
+    scale_fill_viridis(option = "magma", direction = -1,
+                       labels = function(x) paste0(round(x * 100), "%"),
+                       name = "% of label\nin cluster") +
+    labs(title = paste0(COMPARTMENT, " — L1 Label × Cluster (", sm_col, ")"),
+         subtitle = "Color = fraction of each L1 label's cells in each cluster (row-normalized)",
+         x = "Leiden cluster", y = "L1 label") +
+    theme_minimal(base_size = 9) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+          axis.text.y = element_text(size = 7))
+  print(p_conf)
+} else {
+  cat("Confusion matrix not available: missing L1 labels or compactness data\n")
+}
+```
+
+## Confusion Matrices (All Resolutions)
+
+Row-normalized (same as above) across every leiden resolution. L1 label order is
+fixed by decreasing total cell count so rows are comparable across panels.
+
+```{r confusion_all_resolutions, fig.width=18, fig.height=6}
+if (!is.null(L1_COL)) {
+  lb_all  <- as.character(seurat_merged@meta.data[[L1_COL]])
+  lb_levels <- names(sort(table(lb_all[!is.na(lb_all)]), decreasing = TRUE))
+
+  all_conf <- lapply(leiden_cols, function(col) {
+    res <- as.numeric(sub("leiden_", "", col))
+    cl  <- as.character(seurat_merged@meta.data[[col]])
+    valid <- !is.na(cl) & !is.na(lb_all)
+    tab <- as.data.frame(table(cluster = cl[valid], label = lb_all[valid]))
+    tab |>
+      group_by(label) |>
+      mutate(frac = Freq / sum(Freq), resolution = res) |>
+      ungroup()
+  }) |> do.call(what = rbind)
+
+  # Numeric cluster ordering per resolution
+  all_conf$cluster <- factor(
+    all_conf$cluster,
+    levels = as.character(sort(as.numeric(unique(all_conf$cluster))))
+  )
+  all_conf$label <- factor(all_conf$label, levels = lb_levels)
+  all_conf$res_label <- paste0("res ", all_conf$resolution)
+  all_conf$res_label <- factor(all_conf$res_label,
+                                levels = paste0("res ", sort(unique(all_conf$resolution))))
+
+  p_all <- ggplot(all_conf, aes(x = cluster, y = label, fill = frac)) +
+    geom_tile(color = "white", linewidth = 0.15) +
+    scale_fill_viridis(option = "magma", direction = -1,
+                       labels = function(x) paste0(round(x * 100), "%"),
+                       name = "% of label") +
+    facet_wrap(~ res_label, scales = "free_x", nrow = 1) +
+    labs(title = paste0(COMPARTMENT, " — L1 Label × Cluster across all resolutions"),
+         x = "Leiden cluster", y = NULL) +
+    theme_minimal(base_size = 8) +
+    theme(axis.text.x  = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 6),
+          axis.text.y  = element_text(size = 7),
+          strip.text   = element_text(size = 9, face = "bold"),
+          panel.spacing = unit(0.3, "lines"),
+          legend.position = "right")
+
+  print(p_all)
+} else {
+  cat("Skipping: no L1 labels available\n")
+}
+```
+
+## Merges
+
+Clusters where cluster_purity < `r COMPACTNESS_THRESHOLD`: the dominant L1 label accounts for
+fewer than `r paste0(round(COMPACTNESS_THRESHOLD*100), "%")` of cells. These clusters contain
+multiple L1 types — either genuine intermediates or integration artifacts.
+
+```{r merge_cases, fig.width=12, fig.height=6}
+if (!is.null(compact_df) && nrow(merge_cases) > 0) {
+  cat(sprintf("%d merge-candidate clusters (showing top %d by lowest cluster_purity):\n\n",
+              nrow(merge_cases), SPLIT_MERGE_TOP_N))
+  print(head(merge_cases, 20), row.names = FALSE)
+
+  top_merges <- head(merge_cases, SPLIT_MERGE_TOP_N)
+
+  for (i in seq_len(nrow(top_merges))) {
+    k <- top_merges$cluster[i]
+    cp <- top_merges$cluster_purity[i]
+    ru <- top_merges$runner_up[i]
+    tl <- top_merges$top_label[i]
+
+    cat(sprintf("\n--- Cluster %s (cluster_purity=%.2f, top=%s, runner_up=%s) ---\n",
+                k, cp, tl, ifelse(is.na(ru), "none", ru)))
+
+    # Subset to this cluster's cells, use L1 label as group
+    cluster_cells <- colnames(seurat_merged)[
+      !is.na(seurat_merged@meta.data[[sm_col]]) &
+      as.character(seurat_merged@meta.data[[sm_col]]) == k
+    ]
+    if (length(cluster_cells) < 20) {
+      cat("  Skipping (< 20 cells)\n"); next
+    }
+    sub_seu <- seurat_merged[, cluster_cells]
+    lbl_in_cluster <- as.character(sub_seu@meta.data[[L1_COL]])
+    present_labels  <- names(which(table(lbl_in_cluster) >= 10))
+    if (length(present_labels) < 2) {
+      cat("  Skipping (< 2 labels with ≥10 cells)\n"); next
+    }
+
+    sub_seu@meta.data[["_merge_label"]] <- ifelse(
+      lbl_in_cluster %in% present_labels, lbl_in_cluster, NA_character_)
+    sub_seu <- subset(sub_seu, cells = colnames(sub_seu)[!is.na(sub_seu@meta.data[["_merge_label"]])])
+    Idents(sub_seu) <- "_merge_label"
+
+    tryCatch({
+      mrk <- presto::wilcoxauc(sub_seu, assay = "data") |>
+        filter(padj < 0.05, logFC > 0, auc > 0.6) |>
+        group_by(group) |>
+        slice_max(order_by = auc, n = 5) |>
+        ungroup()
+      if (nrow(mrk) == 0) { cat("  No significant markers\n"); next }
+      top_feats <- unique(mrk$feature)
+      p <- DotPlot(sub_seu, features = top_feats, group.by = "_merge_label") +
+        coord_flip() + scale_color_viridis(option = "viridis") +
+        ggtitle(paste0("Cluster ", k, " — merge markers (", sm_col, ")")) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+      print(p)
+    }, error = function(e) cat("  Marker error:", e$message, "\n"))
+  }
+} else {
+  cat(sprintf("No merge candidates at threshold %.1f\n", COMPACTNESS_THRESHOLD))
+}
+```
+
+## Splits
+
+L1 labels where best_label_purity < `r COMPACTNESS_THRESHOLD`: even the dominant cluster captures
+fewer than `r paste0(round(COMPACTNESS_THRESHOLD*100), "%")` of this label's cells. These types
+are fragmented across clusters — potential sub-populations or integration artifacts.
+
+```{r split_cases, fig.width=12, fig.height=6}
+if (!is.null(compact_df) && nrow(split_cases) > 0) {
+  cat(sprintf("%d split-candidate labels (showing all, top %d investigated):\n\n",
+              nrow(split_cases), SPLIT_MERGE_TOP_N))
+  print(split_cases, row.names = FALSE)
+
+  top_splits <- head(split_cases, SPLIT_MERGE_TOP_N)
+
+  for (i in seq_len(nrow(top_splits))) {
+    lbl    <- top_splits$label[i]
+    lp     <- top_splits$best_label_purity[i]
+    n_dom  <- top_splits$n_dominant_clusters[i]
+
+    cat(sprintf("\n--- %s (label_purity=%.2f, dominant in %d clusters) ---\n",
+                lbl, lp, n_dom))
+
+    # Subset to cells with this L1 label; group by cluster
+    label_cells <- colnames(seurat_merged)[
+      !is.na(seurat_merged@meta.data[[L1_COL]]) &
+      as.character(seurat_merged@meta.data[[L1_COL]]) == lbl
+    ]
+    if (length(label_cells) < 20) {
+      cat("  Skipping (< 20 cells)\n"); next
+    }
+    sub_seu <- seurat_merged[, label_cells]
+    cl_in_label <- as.character(sub_seu@meta.data[[sm_col]])
+    # Keep only top-2 clusters by cell count to focus the comparison
+    cl_counts   <- sort(table(cl_in_label), decreasing = TRUE)
+    top2_cl     <- names(cl_counts)[seq_len(min(2, length(cl_counts)))]
+    if (length(top2_cl) < 2) { cat("  Skipping (< 2 clusters)\n"); next }
+
+    sub_seu <- subset(sub_seu, cells = colnames(sub_seu)[cl_in_label %in% top2_cl])
+    sub_seu@meta.data[["_split_cluster"]] <- as.character(
+      sub_seu@meta.data[[sm_col]])
+    Idents(sub_seu) <- "_split_cluster"
+
+    cat(sprintf("  Comparing clusters %s (%d cells) vs %s (%d cells)\n",
+                top2_cl[1], as.integer(cl_counts[top2_cl[1]]),
+                top2_cl[2], as.integer(cl_counts[top2_cl[2]])))
+
+    tryCatch({
+      mrk <- presto::wilcoxauc(sub_seu, assay = "data") |>
+        filter(padj < 0.05, logFC > 0, auc > 0.6) |>
+        group_by(group) |>
+        slice_max(order_by = auc, n = 5) |>
+        ungroup()
+      if (nrow(mrk) == 0) { cat("  No significant markers\n"); next }
+      top_feats <- unique(mrk$feature)
+      p <- DotPlot(sub_seu, features = top_feats, group.by = "_split_cluster") +
+        coord_flip() + scale_color_viridis(option = "viridis") +
+        ggtitle(paste0(lbl, " — split markers (top-2 clusters, ", sm_col, ")")) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+      print(p)
+    }, error = function(e) cat("  Marker error:", e$message, "\n"))
+  }
+} else {
+  cat(sprintf("No split candidates at threshold %.1f\n", COMPACTNESS_THRESHOLD))
+}
+```
+
+# QC Metric Overlays {.tabset}
+
+## UMI Counts
+
+```{r qc_umi, fig.width=12, fig.height=8}
+q95_counts <- quantile(seurat_merged$nCount_RNA, 0.95, na.rm = TRUE)
+
+FeaturePlot(seurat_merged, features = "nCount_RNA",
+            max.cutoff = q95_counts, pt.size = 0.2, alpha = 0.5, raster = FALSE) +
+  scale_color_viridis(option = "viridis", direction = -1) +
+  ggtitle(paste0(COMPARTMENT, " - UMI Counts per Cell"))
+```
+
+## Genes Detected
+
+```{r qc_genes, fig.width=12, fig.height=8}
+q95_features <- quantile(seurat_merged$nFeature_RNA, 0.95, na.rm = TRUE)
+
+FeaturePlot(seurat_merged, features = "nFeature_RNA",
+            max.cutoff = q95_features, pt.size = 0.2, alpha = 0.5, raster = FALSE) +
+  scale_color_viridis(option = "viridis") +
+  ggtitle(paste0(COMPARTMENT, " - Genes Detected per Cell"))
+```
+
+# Multi-Resolution Marker Analysis
+
+```{r marker_analysis, fig.width=14, fig.height=10}
+cat("\n=== Multi-Resolution Marker Analysis ===\n\n")
+
+gc()
+
+all_resolution_markers <- list()
+
+for (i in seq_along(clustering_columns)) {
+  res_col <- clustering_columns[i]
+
+  cat("---\n")
+  cat("Resolution", i, "of", length(clustering_columns), ":", res_col, "\n")
+
+  Idents(seurat_merged) <- seurat_merged@meta.data[[res_col]]
+
+  n_clusters <- length(unique(Idents(seurat_merged)))
+  cat("  Clusters:", n_clusters, "\n")
+
+  cat("  Running presto::wilcoxauc()...\n")
+  markers <- presto::wilcoxauc(seurat_merged, assay = "data")
+
+  cat("  Found", nrow(markers), "marker tests\n")
+
+  sig_markers <- markers %>%
+    filter(padj < 0.05, logFC > 0) %>%
+    arrange(group, desc(logFC))
+
+  cat("  Significant markers (padj < 0.05, logFC > 0):", nrow(sig_markers), "\n")
+
+  top_markers <- sig_markers %>%
+    group_by(group) %>%
+    slice_max(order_by = logFC, n = 5) %>%
+    ungroup()
+
+  all_resolution_markers[[res_col]] <- markers
+
+  gc()
+
+  if (nrow(top_markers) > 0) {
+    tryCatch({
+      p_dotplot <- DotPlot(
+        seurat_merged,
+        features = unique(top_markers$feature),
+        group.by = res_col
+      ) +
+        coord_flip() +
+        scale_color_viridis(option = "viridis") +
+        ggtitle(paste0(COMPARTMENT, " - Top Markers (", res_col, ")")) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+              axis.text.y = element_text(size = 6))
+
+      print(p_dotplot)
+    }, error = function(e) {
+      cat("  Dotplot generation failed:", e$message, "\n")
+    })
+  }
+
+  cat("\n")
+}
+
+cat("Multi-resolution marker analysis complete\n")
+```
+
+# Top Markers by Cluster {.tabset}
+
+```{r top_markers_setup}
+if (default_cluster_col %in% names(all_resolution_markers)) {
+  default_markers <- all_resolution_markers[[default_cluster_col]]
+
+  top_markers <- default_markers %>%
+    filter(padj < 0.05, logFC > 0) %>%
+    group_by(group) %>%
+    slice_max(order_by = logFC, n = 5) %>%
+    ungroup()
+}
+```
+
+## DotPlot
+
+```{r dotplot, fig.width=16, fig.height=12}
+if (exists("top_markers") && nrow(top_markers) > 0) {
+  Idents(seurat_merged) <- default_cluster_col
+
+  tryCatch({
+    DotPlot(seurat_merged, features = unique(top_markers$feature),
+            group.by = default_cluster_col) +
+      coord_flip() +
+      scale_color_viridis(option = "viridis") +
+      ggtitle(paste0(COMPARTMENT, " - Top Markers (", default_cluster_col, ")")) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+            axis.text.y = element_text(size = 7))
+  }, error = function(e) {
+    cat("DotPlot error:", e$message, "\n")
+  })
+}
+```
+
+## Marker Table
+
+```{r marker_table}
+if (exists("top_markers") && nrow(top_markers) > 0) {
+  top_markers %>%
+    select(group, feature, logFC, auc, padj, pct_in, pct_out) %>%
+    arrange(group, desc(logFC)) %>%
+    head(100) %>%
+    knitr::kable(digits = 3,
+                 caption = paste0("Top markers for ", COMPARTMENT,
+                                  " (", default_cluster_col, ")"))
+}
+```
+
+# Cell Type Annotation Analysis
+
+```{r celltype_analysis, fig.width=14, fig.height=10}
+if ("cluster_annotation" %in% colnames(seurat_merged@meta.data)) {
+
+  cat("\n=== Cell Type Annotation Analysis ===\n\n")
+
+  p_celltype <- DimPlot(seurat_merged,
+          group.by = "cluster_annotation",
+          raster = FALSE,
+          label = TRUE,
+          repel = TRUE,
+          pt.size = 0.4,
+          alpha = 0.5) +
+    ggtitle(paste0(COMPARTMENT, " - Cell Type Annotations")) +
+    NoLegend()
+
+  print(p_celltype)
+
+  Idents(seurat_merged) <- "cluster_annotation"
+  celltype_markers <- presto::wilcoxauc(seurat_merged, assay = "data")
+
+  top_celltype_markers <- celltype_markers %>%
+    filter(auc > 0.6, pct_in > 25) %>%
+    group_by(group) %>%
+    slice_max(order_by = auc, n = 15) %>%
+    arrange(group, desc(auc))
+
+  cat("\n=== TOP 10 MARKERS PER CELL TYPE ===\n")
+  top_celltype_markers %>%
+    group_by(group) %>%
+    slice_head(n = 10) %>%
+    select(group, feature, auc, pct_in, pct_out) %>%
+    print(n = 50)
+
+  n_celltypes <- length(unique(seurat_merged$cluster_annotation))
+  markers_per_type <- ceiling(60 / n_celltypes)
+
+  markers_for_heatmap <- top_celltype_markers %>%
+    group_by(group) %>%
+    slice_head(n = markers_per_type) %>%
+    pull(feature) %>%
+    unique()
+
+  cat("\nPlotting", length(markers_for_heatmap), "markers across cell types\n")
+
+  cells_downsample <- sample(colnames(seurat_merged), size = min(7500, ncol(seurat_merged)))
+  cells_downsample_prop <- subset(seurat_merged, downsample = 1500) %>% colnames()
+
+  if (length(markers_for_heatmap) > 0) {
+    tryCatch({
+      p_heatmap <- DoHeatmap(seurat_merged[, cells_downsample],
+                             features = markers_for_heatmap,
+                             group.by = "cluster_annotation",
+                             slot = "data", size = 3) +
+        ggtitle(paste0(COMPARTMENT, " - Cell Type Markers (Random Sample)"))
+      print(p_heatmap)
+    }, error = function(e) {
+      cat("  Random heatmap failed:", e$message, "\n")
+    })
+
+    tryCatch({
+      p_heatmap_prop <- DoHeatmap(seurat_merged[, cells_downsample_prop],
+                                  features = markers_for_heatmap,
+                                  group.by = "cluster_annotation",
+                                  slot = "data", size = 3) +
+        ggtitle(paste0(COMPARTMENT, " - Cell Type Markers (Proportional Sample)")) +
+        NoLegend()
+      print(p_heatmap_prop)
+    }, error = function(e) {
+      cat("  Proportional heatmap failed:", e$message, "\n")
+    })
+  }
+
+} else {
+  cat("\nNOTE: cluster_annotation not found in Seurat metadata — skipping.\n")
+}
+```
+
+# Cluster Heatmaps (All Resolutions)
+
+Top markers per cluster (auc > 0.55, pct_in > 20, logFC > 0) shown as DoHeatmap
+for each leiden resolution. Each resolution produces two panels:
+
+- **Random sample** (up to 5,000 cells): representative density
+- **Proportional sample** (1,500 cells per cluster): equal visual weight per cluster
+
+```{r cluster_heatmaps_all, results='asis', fig.width=16, fig.height=16}
+for (res_col in leiden_cols) {
+  res <- as.numeric(sub("leiden_", "", res_col))
+
+  # Emit a TOC-visible H2 section header per resolution
+  cat(sprintf("\n\n## Resolution %s\n\n", res_col))
+
+  if (!res_col %in% names(all_resolution_markers)) {
+    cat("No markers computed for this resolution.\n\n"); next
+  }
+
+  res_markers <- all_resolution_markers[[res_col]]
+  cl_vals <- seurat_merged@meta.data[[res_col]]
+  n_clusters <- length(unique(cl_vals[!is.na(cl_vals)]))
+  markers_per_cluster <- max(3, ceiling(80 / n_clusters))
+
+  top_feats <- res_markers %>%
+    filter(auc > 0.55, pct_in > 20, logFC > 0) %>%
+    group_by(group) %>%
+    slice_max(order_by = auc, n = markers_per_cluster) %>%
+    pull(feature) %>%
+    unique()
+
+  cat(sprintf("**%d clusters | %d markers (≤%d per cluster)**\n\n",
+              n_clusters, length(top_feats), markers_per_cluster))
+
+  # auc_score_norm summary for this resolution (from quality_rows if available)
+  if (!is.null(quality_rows)) {
+    qr <- quality_rows[abs(quality_rows$resolution - res) < 0.001, ]
+    if (nrow(qr) > 0) {
+      cat(sprintf("auc_score_norm — mean: %.3f | median: %.3f | fraction ≥ 0.5: %.0f%%\n\n",
+                  mean(qr$auc_score_norm, na.rm = TRUE),
+                  median(qr$auc_score_norm, na.rm = TRUE),
+                  100 * mean(qr$auc_score_norm >= 0.5, na.rm = TRUE)))
+      # Per-cluster auc table (worst first)
+      qr_display <- qr[order(qr$auc_score_norm), c("cluster", "n_cells",
+                                                     "auc_score_norm", "strong_markers",
+                                                     "top_marker_1", "top_marker_2", "top_marker_3")]
+      print(knitr::kable(qr_display, digits = 3,
+                         caption = paste0("auc_score_norm per cluster — res ", res)))
+      cat("\n\n")
+    }
+  }
+
+  if (length(top_feats) == 0) {
+    cat("No markers passing thresholds (auc > 0.55, pct_in > 20, logFC > 0) — skipping heatmaps.\n\n")
+    next
+  }
+
+  cells_rand <- sample(colnames(seurat_merged), size = min(5000, ncol(seurat_merged)))
+  cells_prop <- subset(seurat_merged, downsample = 1500) %>% colnames()
+  Idents(seurat_merged) <- res_col
+
+  tryCatch({
+    p_rand <- DoHeatmap(seurat_merged[, cells_rand],
+                        features = top_feats,
+                        group.by = res_col,
+                        slot = "data", size = 3) +
+      ggtitle(paste0(COMPARTMENT, " — ", res_col, " — Random Sample")) +
+      NoLegend()
+    print(p_rand)
+  }, error = function(e) cat("Random heatmap failed:", e$message, "\n\n"))
+
+  tryCatch({
+    p_prop <- DoHeatmap(seurat_merged[, cells_prop],
+                        features = top_feats,
+                        group.by = res_col,
+                        slot = "data", size = 3) +
+      ggtitle(paste0(COMPARTMENT, " — ", res_col, " — Proportional Sample")) +
+      NoLegend()
+    print(p_prop)
+  }, error = function(e) cat("Proportional heatmap failed:", e$message, "\n\n"))
+
+  gc()
+}
+```
+
+# Save Outputs
+
+```{r save_outputs}
+cat("\n=== Saving Outputs ===\n\n")
+
+OUTPUT_BASE <- file.path(STEP_19B_DIR, COMPARTMENT)
+dir.create(file.path(OUTPUT_BASE, "markers_by_resolution"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "metadata"), recursive = TRUE, showWarnings = FALSE)
+
+# Save metadata
+METADATA_PATH <- file.path(OUTPUT_BASE, "metadata/unified_metadata.csv")
+write.csv(seurat_merged@meta.data, METADATA_PATH, row.names = TRUE)
+cat("Metadata saved:", METADATA_PATH, "\n")
+
+# Save per-resolution markers
+for (res_col in names(all_resolution_markers)) {
+  filename <- paste0("markers_", gsub("\\.", "", res_col), ".csv")
+  filepath <- file.path(OUTPUT_BASE, "markers_by_resolution", filename)
+  write.csv(all_resolution_markers[[res_col]], file = filepath, row.names = FALSE)
+  cat("Markers saved:", filename, "\n")
+}
+
+# Save cell type markers if available
+if (exists("celltype_markers") && !is.null(celltype_markers)) {
+  filepath <- file.path(OUTPUT_BASE, "markers_by_resolution/markers_cluster_annotation.csv")
+  write.csv(celltype_markers, filepath, row.names = FALSE)
+  cat("Cell type markers saved\n")
+}
+
+cat("\n✓ Outputs saved to:", OUTPUT_BASE, "\n")
+```
+
+```{r session_info}
+cat("\nSeurat:", as.character(packageVersion("Seurat")), "\n")
+cat("presto:", as.character(packageVersion("presto")), "\n")
+```

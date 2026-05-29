@@ -1,0 +1,237 @@
+# =============================================================================
+# HCA SOURCE DATASET REGISTRY
+# =============================================================================
+# Maps each source study → h5ad output filename, input path, and packaging status.
+# Follows HCA kebab-case naming convention (firstauthorYYYY.h5ad).
+#
+# Source: hca_atlas_ingestion.yaml file_naming rules + studies.yaml
+# Updated: 2026-02-11
+# =============================================================================
+
+version: "1.0"
+
+# Base paths (relative to project root)
+paths:
+  source_inputs:
+    # preprocessing: "01_Preprocessing/outputs"  # OUT OF SCOPE — Lawson native data, lives in Spatial_HBCA
+    external_studies: "external_studies/outputs"
+    # xenium: "06_Xenium"  # OUT OF SCOPE — Lawson native data, lives in Spatial_HBCA
+  packaging_outputs: "publication/outputs/source_datasets"
+  validation_reports: "publication/outputs/validation_reports"
+
+# ---------------------------------------------------------------------------
+# ATLAS IDENTITY
+# ---------------------------------------------------------------------------
+atlas:
+  name: "Breast"
+  version: "1.0"
+  bionetwork: "Breast"
+  integration_leads:
+    - "Dawson Lab (UCI)"
+  modalities:
+    - chromium_flex
+    - xenium
+    - scRNA-seq  # external studies
+
+# ---------------------------------------------------------------------------
+# SOURCE DATASETS
+# ---------------------------------------------------------------------------
+# Each entry = one h5ad file to be uploaded to HCA Tracker.
+# Partitioned per HCA rules: one source study, one tissue, one assay.
+
+datasets:
+
+  # === Native (Lawson lab, unpublished) ===
+
+  lawson_chromium:
+    output_filename: "lawson2026-chromium-breast.h5ad"
+    source_study: lawson_unpublished
+    type: original-unpublished
+    assay: "10x Chromium FLEX-seq"
+    assay_ontology_term_id: null  # TBD — check EFO for FLEX-specific term
+    tissue: breast
+    expected_cells: 258317
+    donors: 4
+    input_paths:
+      # These paths reference Spatial_HBCA/project/01_Preprocessing/ — OUT OF SCOPE for this repo
+      h5ad: "Spatial_HBCA::01_Preprocessing/outputs/17_ScviIntegration/integrated_objects/integrated_adata.h5ad"
+      seurat: "Spatial_HBCA::01_Preprocessing/outputs/18_IntegrationPreview/seurat_objects/integrated_seurat.rds"
+    packaging_status: not_started
+    packaging_plan: B2_source_datasets_native
+    notes: |
+      Pre-integration per-study data (not the integrated object).
+      May need to export pre-integration counts rather than the
+      integrated object, since source datasets are per-study.
+
+  lawson_xenium:
+    output_filename: "lawson2026-xenium-breast.h5ad"
+    source_study: lawson_unpublished
+    type: original-unpublished
+    assay: "10x Xenium"
+    assay_ontology_term_id: "EFO:0022615"  # 10x Xenium (not EFO:0030062 which is Slide-seqV2)
+    tissue: breast
+    expected_cells: null  # TBD — depends on final segmentation
+    donors: 4
+    input_paths:
+      note: "Depends on xenium_full_pipeline completion (currently at L2 segmentation)"
+    packaging_status: blocked
+    packaging_plan: B3_source_datasets_xenium
+    blocked_reason: "xenium_full_pipeline must reach L3_cohort (annotation)"
+    notes: |
+      ProSeg segmentation selected. 67 tissue positions across 4 patients.
+      Cell count depends on final QC filtering.
+
+  # === External studies ===
+
+  gray:
+    output_filename: "gray2022.h5ad"
+    source_study: gray
+    type: original
+    citation: "Gray et al. 2022, Developmental Cell"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null  # TBD — map to EFO
+    tissue: breast
+    expected_cells: 52681
+    donors: 16
+    input_paths:
+      published: "02_ExternalStudies/outputs/gray/published/"
+      build_yaml: "02_ExternalStudies/outputs/gray/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+
+  kumar:
+    output_filename: "kumar2023.h5ad"
+    source_study: kumar
+    type: original
+    citation: "Kumar et al. 2023, Nature"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 714331
+    donors: 126
+    input_paths:
+      published: "02_ExternalStudies/outputs/kumar/published/"
+      build_yaml: "02_ExternalStudies/outputs/kumar/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+    notes: "Largest dataset. 126 donors missing continuous age."
+
+  murrow:
+    output_filename: "murrow2022.h5ad"
+    source_study: murrow
+    type: original
+    citation: "Murrow et al. 2022, Cell Systems"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 86136
+    donors: 28
+    input_paths:
+      published: "02_ExternalStudies/outputs/murrow/published/"
+      build_yaml: "02_ExternalStudies/outputs/murrow/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+
+  nee:
+    output_filename: "nee2023.h5ad"
+    source_study: nee
+    type: original
+    citation: "Nee et al. 2023, Nature Genetics"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 230100
+    donors: 22
+    input_paths:
+      published: "02_ExternalStudies/outputs/nee/published/"
+      build_yaml: "02_ExternalStudies/outputs/nee/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+    notes: "Risk status mislabeling in iHBCA corrected in harmonized metadata."
+
+  twigger:
+    output_filename: "twigger2022.h5ad"
+    source_study: twigger
+    type: original
+    citation: "Twigger et al. 2022, Nature Communications"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 110744
+    donors: 16
+    input_paths:
+      published: "02_ExternalStudies/outputs/twigger/published/"
+      build_yaml: "02_ExternalStudies/outputs/twigger/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+    notes: "18 donors in harmonized metadata vs 16 in studies.yaml — reconcile during packaging."
+
+  reed:
+    output_filename: "reed2024.h5ad"
+    source_study: reed
+    type: original
+    citation: "Reed et al. 2024, Nature Genetics"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 803283
+    donors: 55
+    input_paths:
+      published: "02_ExternalStudies/outputs/reed/published/"
+      build_yaml: "02_ExternalStudies/outputs/reed/published/build.yaml"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+    notes: "iHBCA reference atlas. 29/55 donors missing ethnicity."
+
+  pal:
+    output_filename: "pal2021.h5ad"
+    source_study: pal
+    type: original
+    citation: "Pal et al. 2021, EMBO J"
+    assay: "10x scRNA-seq"
+    assay_ontology_term_id: null
+    tissue: breast
+    expected_cells: 167814  # sum of 3 sub-studies: 53716 + 54332 + 59766
+    donors: 22
+    sub_studies:
+      - pal_norm_epi
+      - pal_norm_total
+      - pal_norm_b1
+    input_paths:
+      published_epi: "02_ExternalStudies/outputs/pal_norm_epi/published/"
+      published_total: "02_ExternalStudies/outputs/pal_norm_total/published/"
+      published_b1: "02_ExternalStudies/outputs/pal_norm_b1/published/"
+    packaging_status: not_started
+    packaging_plan: B1_source_datasets_external
+    notes: |
+      Consolidated from 3 sub-studies into one source dataset for HCA.
+      Shared donor pool across epi/total/b1 sub-cohorts.
+      Cell deduplication may be needed (donors appear in multiple sub-studies).
+      All 22 donors missing ethnicity.
+
+# ---------------------------------------------------------------------------
+# INTEGRATED OBJECTS (populated by plan C1)
+# ---------------------------------------------------------------------------
+integrated_objects:
+  - filename: "all-breast-cells.h5ad"
+    description: "Full iHBCA integration (7 studies, 287 donors)"
+    cells: 2122065
+    genes: 15153
+    size_gb: 90
+    schema_version: "5.3.2"
+    status: validated
+    validators_passed: [CAP, CxG]
+    plan: C1_integrated_objects
+  # Per-lineage splits (epithelial/stromal/immune) exist on disk but are not
+  # part of the submission — trivial subsets with no lineage-specific re-analysis.
+  # HCA process doc section 3 item 6: "All Cells" OR lineage splits (not both required).
+
+# ---------------------------------------------------------------------------
+# SUMMARY
+# ---------------------------------------------------------------------------
+summary:
+  total_source_datasets: 10
+  native_datasets: 2   # lawson chromium + xenium
+  external_datasets: 8  # 7 studies + pal consolidated
+  blocked: 1           # lawson_xenium
+  total_expected_cells: ~2423407  # approximate, excluding xenium

@@ -1,0 +1,53 @@
+# Container registry for FLEX preprocessing pipeline
+# Each container defines: path, language-specific lib paths, env vars
+
+containers:
+  # Python/GPU container — scVI integration, scIB, postprocessing
+  scgpt_gpu:
+    path: /dfs8/singularity_containers/rcic/devel/BioDL/Jupyter_scGPT_GPU_2025Q3.sif
+    pythonuserbase_host: /data/homezvol0/nwechter/python_user_packages/scGPT_GPU_2025Q3
+    pythonuserbase_container: /data/homezvol0/nwechter/python_user_packages/scGPT_GPU_2025Q3
+    lang: python
+    gpu: true
+
+  # R/Python hybrid — Harmony integration
+  giotto_spatial:
+    path: /dfs8/singularity_containers/rcic/devel/Jupyter_R_4.4.2_Giotto_Spatial_Python_2025Q2.sif
+    pythonuserbase_host: /data/homezvol0/nwechter/python_user_packages/Giotto_Spatial_Python_2025Q2
+    pythonuserbase_container: /home/jovyan/python_packages
+    lang: python_r
+    gpu: false
+
+  # R container — Rmd rendering, SingleR, Milo, BigSur
+  r_spatial:
+    path: /dfs7/singularity_containers/rcic/JHUB3/Rocky8_jupyter_base_R4.3.3_Spatial.sif
+    r_libs_user_host: /data/homezvol0/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library
+    r_libs_user_container: /home/jovyan/R/library
+    pandoc_path: /usr/lib/rstudio-server/bin/quarto/bin/tools
+    lang: r
+    gpu: false
+
+# Standard bind mounts (applied to all containers)
+bind_mounts:
+  - host: /share/crsp/lab/dalawson/share
+    container: /share/crsp/lab/dalawson/share
+    mode: ro
+  - host: /share/crsp/lab/dalawson/nwechter
+    container: /share/crsp/lab/dalawson/nwechter
+    mode: rw
+  - host: /dfs7
+    container: /dfs7
+    mode: ro
+  - host: /dfs8
+    container: /dfs8
+    mode: ro
+  - host: /data/homezvol0/nwechter
+    container: /data/homezvol0/nwechter
+    mode: rw
+
+# Environment variables applied to all containers
+env:
+  NUMBA_CACHE_DIR: /tmp/numba_cache
+  MPLCONFIGDIR: /tmp/matplotlib_config
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8

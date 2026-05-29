@@ -1,0 +1,84 @@
+# FLEX library epithelial-content classification
+# ============================================================
+#
+# Generated:     2026-05-18  (restored after threshold-0.10 experiment)
+# Source CSV:    outputs/shared/flex_library_covariates.csv
+# Source column: epithelial_prop (L0 == 'Epithelial' fraction per library)
+# Method:        median split
+# Cut value:     0.405413
+# Levels:        [epi_sparse, epi_rich]  (positive logFC = epi_rich)
+
+metadata:
+  source_csv:     outputs/shared/flex_library_covariates.csv
+  source_column:  epithelial_prop
+  method:         median_split
+  cut:            0.405413
+  generated:      2026-05-18
+  cohort:         flex_anatomic_variation_20260427
+  n_libraries:    62
+  n_epi_rich:     31
+  n_epi_sparse:   31
+
+assignments:
+  Pat1_P1: epi_sparse  # epi_prop=0.2297
+  Pat1_P2_Lower: epi_rich  # epi_prop=0.4898
+  Pat1_P2_Upper: epi_rich  # epi_prop=0.4435
+  Pat1_P3_A_LIQ: epi_sparse  # epi_prop=0.0050
+  Pat1_P3_A_LOQ: epi_sparse  # epi_prop=0.0000
+  Pat1_P3_A_UIQ: epi_sparse  # epi_prop=0.0038
+  Pat1_P3_A_UOQ: epi_sparse  # epi_prop=0.0372
+  Pat1_P3_M_LIQ: epi_sparse  # epi_prop=0.1943
+  Pat1_P3_M_LOQ: epi_rich  # epi_prop=0.5481
+  Pat1_P3_M_UIQ: epi_sparse  # epi_prop=0.4049
+  Pat1_P3_P_LIQ: epi_sparse  # epi_prop=0.3050
+  Pat1_P3_P_LOQ: epi_sparse  # epi_prop=0.3416
+  Pat1_P3_P_UIQ: epi_sparse  # epi_prop=0.0000
+  Pat1_P3_P_UOQ: epi_sparse  # epi_prop=0.0014
+  Pat2_P2_LIQ: epi_rich  # epi_prop=0.4826
+  Pat2_P2_LOQ: epi_rich  # epi_prop=0.4059
+  Pat2_P2_UIQ: epi_rich  # epi_prop=0.4203
+  Pat2_P2_UOQ: epi_sparse  # epi_prop=0.3698
+  Pat2_P3_A_LIQ: epi_sparse  # epi_prop=0.0108
+  Pat2_P3_A_LOQ: epi_rich  # epi_prop=0.4173
+  Pat2_P3_A_UIQ: epi_sparse  # epi_prop=0.1159
+  Pat2_P3_A_UOQ: epi_rich  # epi_prop=0.4801
+  Pat2_P3_M_LIQ: epi_rich  # epi_prop=0.5557
+  Pat2_P3_M_LOQ: epi_rich  # epi_prop=0.5991
+  Pat2_P3_M_UIQ: epi_rich  # epi_prop=0.5780
+  Pat2_P3_M_UOQ: epi_rich  # epi_prop=0.4382
+  Pat2_P3_P_LIQ: epi_rich  # epi_prop=0.6337
+  Pat2_P3_P_LOQ: epi_rich  # epi_prop=0.4857
+  Pat2_P3_P_UIQ: epi_sparse  # epi_prop=0.1254
+  Pat2_P3_P_UOQ: epi_rich  # epi_prop=0.5056
+  UCI220228_P2_LIQ: epi_rich  # epi_prop=0.4247
+  UCI220228_P2_LOQ: epi_sparse  # epi_prop=0.4022
+  UCI220228_P2_UIQ: epi_rich  # epi_prop=0.4537
+  UCI220228_P2_UOQ: epi_rich  # epi_prop=0.4554
+  UCI220228_P3_A_LIQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_A_LOQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_A_UIQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_A_UOQ: epi_sparse  # epi_prop=0.0004
+  UCI220228_P3_M_LIQ: epi_sparse  # epi_prop=0.1409
+  UCI220228_P3_M_LOQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_M_UIQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_M_UOQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_P_LIQ: epi_sparse  # epi_prop=0.2526
+  UCI220228_P3_P_LOQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_P_UIQ: epi_sparse  # epi_prop=0.0000
+  UCI220228_P3_P_UOQ: epi_sparse  # epi_prop=0.0000
+  UCI604_P2_LIQ: epi_rich  # epi_prop=0.5050
+  UCI604_P2_LOQ: epi_rich  # epi_prop=0.5290
+  UCI604_P2_UIQ: epi_rich  # epi_prop=0.4687
+  UCI604_P2_UOQ: epi_rich  # epi_prop=0.4941
+  UCI604_P3_A_LIQ: epi_rich  # epi_prop=0.5371
+  UCI604_P3_A_LOQ: epi_rich  # epi_prop=0.5187
+  UCI604_P3_A_UIQ: epi_rich  # epi_prop=0.4971
+  UCI604_P3_A_UOQ: epi_sparse  # epi_prop=0.2213
+  UCI604_P3_M_LIQ: epi_rich  # epi_prop=0.5218
+  UCI604_P3_M_LOQ: epi_rich  # epi_prop=0.5668
+  UCI604_P3_M_UIQ: epi_rich  # epi_prop=0.5271
+  UCI604_P3_M_UOQ: epi_sparse  # epi_prop=0.2657
+  UCI604_P3_P_LIQ: epi_rich  # epi_prop=0.5220
+  UCI604_P3_P_LOQ: epi_rich  # epi_prop=0.5149
+  UCI604_P3_P_UIQ: epi_rich  # epi_prop=0.5563
+  UCI604_P3_P_UOQ: epi_sparse  # epi_prop=0.4033

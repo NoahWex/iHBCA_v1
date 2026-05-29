@@ -1,0 +1,293 @@
+# paths.yaml — Single source of truth for path resolution
+# All scripts source this instead of hardcoding paths.
+# Supports HPC (direct filesystem) and local (CRSP SMB mount).
+
+# Environment detection: set IHBCA_ENV=hpc or IHBCA_ENV=local to override.
+# If unset, auto-detects based on hostname.
+environment: auto
+
+# Root directories per environment
+roots:
+  hpc: /share/crsp/lab/dalawson/nwechter
+  local: "/Users/NoahWechter/Library/Application Support/CRSP Desktop/Volumes.noindex/CRSP Lab - dalawson.localized/nwechter"
+  # Shared lab paths (not under user root — environment-independent)
+  shared_datasets: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets
+  shared_lab: /share/crsp/lab/dalawson/share
+  hpc_home: /data/homezvol0/nwechter
+
+# ---- Project directories (relative to root) ----
+projects:
+  publication: iHBCA_publication
+  spatial_hbca: Spatial_HBCA
+  ihbcav1_upload: iHBCAv1_upload
+  ihbca_v1: iHBCA_V1
+  scqc: scQC
+
+# ---- Upstream data sources (read-only) ----
+# These are consumed by iHBCA_publication scripts. Paths relative to root.
+sources:
+  # iHBCA v1 assembly (from iHBCAv1_upload)
+  ihbca_integrated: iHBCAv1_upload/publication/outputs/integrated_objects/all-breast-cells.h5ad
+  ihbca_sketch: iHBCAv1_upload/publication/outputs/integrated_objects/all-breast-cells-sketch.h5ad
+  source_datasets: iHBCAv1_upload/publication/outputs/source_datasets/
+  study_registry: iHBCAv1_upload/publication/config/source_dataset_registry.yaml
+  donor_metadata: iHBCAv1_upload/publication/config/metadata_stages/L1_harmonized_donor.csv
+  external_studies: iHBCAv1_upload/external_studies/outputs/
+  mappings: iHBCAv1_upload/publication/mappings/
+
+  # iHBCA V1 dev-stage sources (analysis repo; consumed by publication/ producers
+  # that reference upstream-dev artifacts not lifted into publication/)
+  # Read by: publication/analysis/markers/limma/scripts/run_14b_limma_*_chunked.sh
+  ihbca_v1_pseudobulk_root: iHBCA_V1/Analysis/stages/V1_Annotation/dev/compartment_integration_20260401/.dev/annotation_mvp_20260416/outputs
+
+  # Author share (fixed location on CRSP)
+  author_share: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/iHBCA_Reed_2024/author_share
+
+  # Spatial HBCA objects (from Spatial_HBCA preprocessing)
+  spatial_seurat: Spatial_HBCA/project/01_Preprocessing/outputs/18_IntegrationPreview/seurat_objects/integrated_seurat.rds
+  spatial_milo: Spatial_HBCA/project/04_DifferentialAbundance/da_v1/outputs/milo/full/milo_full.rds
+  spatial_compartment_seurats: Spatial_HBCA/project/01_Preprocessing/outputs/21_CompartmentPreview/seurat_objects/
+
+  # Joint Concord integration model (joint_v6, Apr 18 training) — promoted 2026-05-05
+  joint_concord_model:   iHBCA_publication/publication/preprocessing/integration/joint_concord/model/final_model_Apr18-1457.pt
+  joint_concord_config:  iHBCA_publication/publication/preprocessing/integration/joint_concord/model/config_Apr18-1457.json
+  # joint_v6_latent stays in dev (1.2 GB; only consumed for re-training; full objects exempted from publication/ per output-storage rule)
+  joint_v6_latent:       Spatial_HBCA_Xenium/.dev/07_joint_canonical/outputs/joint_v6/joint_latent.csv
+  # Promoted 2026-05-07 as Supp 7 Panel 1 substrate (companion to joint_concord/model/)
+  joint_v6_umap:         iHBCA_publication/publication/preprocessing/integration/joint_concord/embeddings/joint_v6_umap.csv
+  joint_v6_obs:          iHBCA_publication/publication/preprocessing/integration/joint_concord/embeddings/joint_v6_obs.csv
+  joint_knn_purity:      iHBCA_publication/publication/preprocessing/integration/benchmark/outputs/knn_purity_summary.csv
+  # Per-cell purity (1.8M rows × 7 configs); stays in dev (110 MB) — only needed for per-celltype mean aggregation in supp7.5 render
+  joint_knn_purity_per_cell: Spatial_HBCA_Xenium/.dev/02_integration/benchmark/outputs/knn_purity.csv
+
+  # Joint FLEX+Xenium Milo objects (from Spatial_HBCA_Xenium joint DA pipeline)
+  # Not copied to publication/ — rebuild requires dev repo. Mirrors spatial_milo precedent.
+  joint_milo_all:        Spatial_HBCA_Xenium/DifferentialAbundance/outputs/All/All_milo.rds
+  joint_milo_epithelial: Spatial_HBCA_Xenium/DifferentialAbundance/outputs/Epithelial/Epithelial_milo.rds
+  joint_milo_stromal:    Spatial_HBCA_Xenium/DifferentialAbundance/outputs/Stromal/Stromal_milo.rds
+  joint_milo_immune:     Spatial_HBCA_Xenium/DifferentialAbundance/outputs/Immune/Immune_milo.rds
+
+  # Joint DA analysis outputs (publication-promoted)
+  joint_da_results_c1:      iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c1/M0/da_results.csv
+  joint_da_results_c2a:     iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c2a/M0/da_results.csv
+  joint_da_results_c2b:     iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c2b/M0/da_results.csv
+  joint_da_results_c3:      iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c3/M0/da_results.csv
+  joint_da_results_c3a:     iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c3a/M0/da_results.csv
+  joint_da_results_c3b:     iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c3b/M0/da_results.csv
+  joint_da_results_c3c:     iHBCA_publication/publication/analysis/abundance/spatial/joint/results/c3c/M0/da_results.csv
+  joint_da_family_fdr:      iHBCA_publication/publication/analysis/abundance/spatial/joint/results/quadrant_family/family_fdr.csv
+  joint_library_covariates: iHBCA_publication/publication/analysis/abundance/spatial/joint/shared/library_covariates.csv
+  # nhood_counts_All.csv — referenced at render time; not promoted (16MB derived intermediate)
+  joint_nhood_counts:       Spatial_HBCA_Xenium/DifferentialAbundance/joint_anatomic_variation_20260424/outputs/shared/nhood_counts_All.csv
+
+  # FLEX-only anatomic DA results (flex_anatomic_variation_20260427)
+  # nhood_groups.csv = da_results + NhoodGroup column; used to join L2S labels
+  flex_da_results_c1:       Spatial_HBCA_Xenium/DifferentialAbundance/flex_anatomic_variation_20260427/outputs/da/C1_p1p2_vs_p3/flex_full/M0/nhood_groups.csv
+  flex_da_results_c3:       Spatial_HBCA_Xenium/DifferentialAbundance/flex_anatomic_variation_20260427/outputs/da/C3_p3_uoq_vs_rest/flex_full/M0/nhood_groups.csv
+  # Pre-computed NhoodGroup → dominant L2S label (modal by n_cells; 2KB each)
+  flex_l2s_nhood_map_c1:    Spatial_HBCA_Xenium/DifferentialAbundance/flex_anatomic_variation_20260427/outputs/da/C1_p1p2_vs_p3/flex_full/M0/within_L2S_nhood_group_rename_map.csv
+  flex_l2s_nhood_map_c3:    Spatial_HBCA_Xenium/DifferentialAbundance/flex_anatomic_variation_20260427/outputs/da/C3_p3_uoq_vs_rest/flex_full/M0/within_L2S_nhood_group_rename_map.csv
+  # Per-nhood dominant L2S annotation for FLEX Milo (shared across contrasts).
+  # Generated by annotate_nhoods.R at L2S level (flex_anatomic_variation_20260427/scripts/01_annotate/).
+  flex_nhood_l2s:           Spatial_HBCA_Xenium/DifferentialAbundance/flex_anatomic_variation_20260427/outputs/shared/nhood_l2s_full.csv
+
+  # Xenium data (from Spatial_HBCA Xenium pipeline)
+  xenium_loaded: Spatial_HBCA/project/06_Xenium/L1_load/outputs/
+  xenium_bridge: Spatial_HBCA/project/06_Xenium/shared/chromium_bridge/
+
+  # Spatial HBCA promoted outputs (from Analysis/Submission_v1)
+  submission_v1_stages: Spatial_HBCA/Analysis/Submission_v1/stages/
+
+  # FLEX preprocessing QC + manifold artifact gate substrate
+  # Promoted 2026-05-08 for Supp 1 (cell QC) + Supp 1.5 (manifold artifact gate)
+  # Source provenance recorded in publication/manifest.yaml
+  flex_central_cell_status:    iHBCA_publication/publication/preprocessing/chromium_spatial/qc_status/central_cell_status.csv
+  flex_cell_metadata_dir:      iHBCA_publication/publication/preprocessing/chromium_spatial/cell_filtering/cell_metadata/
+  flex_per_patient_umap_dir:   iHBCA_publication/publication/preprocessing/chromium_spatial/embeddings/per_patient/
+  flex_kumar_labels_dir:       iHBCA_publication/publication/preprocessing/chromium_spatial/label_transfer/cell_metadata/
+  flex_scvi_n100_umap:         iHBCA_publication/publication/preprocessing/chromium_spatial/embeddings/scvi_n100_umap.csv
+  flex_manifold_decision_matrix: iHBCA_publication/publication/preprocessing/chromium_spatial/manifold_qc/full_decision_matrix.csv
+
+  # Per-compartment joint annotation substrate (Supp 8) — already in publication/, registering tokens 2026-05-08
+  compartment_epi_joint_umap:        iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/epithelial/joint_umap.csv
+  compartment_epi_joint_obs:         iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/epithelial/joint_obs.csv
+  compartment_epi_cell_annotations:  iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/epithelial/cell_annotations.csv
+  compartment_imm_joint_umap:        iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/immune/joint_umap.csv
+  compartment_imm_joint_obs:         iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/immune/joint_obs.csv
+  compartment_imm_cell_annotations:  iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/immune/cell_annotations.csv
+  compartment_str_joint_umap:        iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/stromal/joint_umap.csv
+  compartment_str_joint_obs:         iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/stromal/joint_obs.csv
+  compartment_str_cell_annotations:  iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment/stromal/cell_annotations.csv
+
+  # iHBCA V1 analysis outputs
+  ihbca_v1_abundance: iHBCA_V1/Analysis/stages/V1_Abundance/
+  ihbca_v1_milo: iHBCA_V1/Analysis/stages/V1_Milo_Build/
+  ihbca_v1_annotation: iHBCA_V1/Analysis/stages/V1_Annotation/
+  ihbca_v1_markers: iHBCA_V1/Analysis/stages/V1_Markers/
+
+  # Downloaded datasets (absolute paths under shared lab storage)
+  component_studies: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/iHBCA_Reed_2024/component_studies/
+  ihbca_reed_root: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/iHBCA_Reed_2024/
+  integrated_atlas_reed: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/iHBCA_Reed_2024/integrated_atlas/
+  kumar_original: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/Kumar_2023_original/
+  murrow_original: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/Murrow_2022_original/
+  pal_original: /share/crsp/lab/dalawson/share/3_Downloaded_Datasets/Pal_2021_original/
+  brca_natgen: /share/crsp/lab/dalawson/share/BRCA_NatGen_Objects/
+  spaceranger_ref: /share/crsp/lab/dalawson/share/spaceranger-data/refdata-gex-GRCh38-2020-A/
+
+  # iHBCAv1_upload sub-paths (relative to root)
+  ihbcav1_external_studies: iHBCAv1_upload/external_studies/
+  ihbcav1_harmonization: iHBCAv1_upload/external_studies/harmonization/
+  ihbcav1_publication_root: iHBCAv1_upload/publication/
+  ihbcav1_upload_staging: iHBCAv1_upload/upload-staging/
+
+  # iHBCA v1 assembly internals (pre-promotion staging in iHBCAv1_upload/.dev/).
+  # When iHBCAv1_upload graduates the assembly out of .dev/, only these 4
+  # tokens change — every downstream pipeline + render script keeps working.
+  ihbcav1_assembly_root:        iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/
+  ihbcav1_assembly_components:  iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/
+  ihbcav1_assembly_aligned:     iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/aligned/
+  ihbcav1_assembly_scanvi:      iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/scanvi/
+
+  # Spatial HBCA sub-paths (relative to root)
+  spatial_analyses: Spatial_HBCA/project/05_Analyses/
+  spatial_l1_reannotation: Spatial_HBCA/project/05_Analyses/outputs/l1_reannotation_20260323/
+  spatial_publication_outputs: Spatial_HBCA/project/07_Publication/outputs/
+  spatial_reference_datasets: Spatial_HBCA/project/ReferenceDatasets/iHBCA/
+
+  # ---- Track 3 (FLEX preprocessing) — pending Track A landing ----
+  # Tokens point into publication/preprocessing/chromium_spatial/. Track A
+  # (track-a-flex-preprocessing) is in flight; these tokens are valid as soon as
+  # Track A writes to publication/. Until then they resolve to a bare directory
+  # with only SOURCES.md — consumers will fail loudly if they read prematurely.
+  flex_preprocessing_root: iHBCA_publication/publication/preprocessing/chromium_spatial
+  flex_canonical_manifest: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/manifest.yaml
+  flex_canonical_latent: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/integration_intermediate/full/scvi_n100/latent.csv
+  flex_canonical_umap: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/integration_intermediate/full/scvi_n100/umap.csv
+  flex_canonical_metadata: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/integration_intermediate/full/scvi_n100/obs.csv
+
+  # ---- Collaborator-delivered substrate (read-only; not promoted) ----
+  # Gautham SpaceFlow per-cell structure classification on the Xenium cohort.
+  # Delivered 2026-05-12 as 65 per-sample annotated h5ad files (667MB total).
+  # Schema (per file):
+  #   obs:   patient_id, xenium_id, p_level, is_uoq, l0p5, domain_id,
+  #          spaceflow_domain, structure_confidence,
+  #          structure_label          (broad: Duct / Stroma / TDLU / Unknown
+  #                                    + sparse Epidermal),
+  #          structure_label_discrete (per-instance: {Class}_{idx} or
+  #                                    {Class}_isolated; sample-local --
+  #                                    consumers prepend sample-ID for
+  #                                    global uniqueness)
+  #   obsm:  X_spaceflow (graph embedding), spatial (raw tissue coords)
+  #   uns:   n_discrete_structures
+  #   cell-ID: {patient_sample}_xenium_{N}__{barcode}-{N} (double underscore)
+  # Cohort cardinality (1,069,321 cells total across 65 samples):
+  #   Stroma 399,468 / Unknown 368,257 / TDLU 190,299 / Duct 106,563 /
+  #   Epidermal 4,734.  Unknowns = QC drops (filter at pipeline entry).
+  # Per-class instance count caps per sample: Duct <=30, TDLU <=32,
+  #   Stroma <=121, Epidermal <=10.
+  # First consumer: Fig 4 Lane C (niche-DA + position x niche heatmap).
+  # If/when promoted: copy under publication/preprocessing/xenium/spaceflow/
+  #   and re-point this token to the promoted location.
+  # Corrected 2026-05-22: points at annotated_corrected/ (Gautham's revised
+  # delivery with the structure_label_discrete column the motifs pipeline
+  # consumes). The earlier annotated/ delivery is superseded.
+  xenium_spaceflow_dir: /share/crsp/lab/dalawson/share/Nee_Xenium/gautham/spaceflow_domains/annotated_corrected/
+  flex_integration_intermediate: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/integration_intermediate
+  flex_raw_data_manifest: iHBCA_publication/publication/preprocessing/chromium_spatial/inputs/raw_data_manifest.template.tsv
+
+  # ---- Track C (FLEX L2S annotation) — LANDED 2026-04-28 ----
+  # Independent path from flex_preprocessing_root (annotation lives under
+  # analysis/, not preprocessing/, per coordinator decision 2026-04-28).
+  # Resolver: 07_resolve_l2s_labels.py adopts LBridge build_flex_l2s_labels.py.
+  flex_annotation_root: iHBCA_publication/publication/analysis/annotation/flex
+  flex_annotation_scripts: iHBCA_publication/publication/analysis/annotation/flex/scripts
+  flex_annotation_run: iHBCA_publication/publication/analysis/annotation/flex/run
+  flex_annotation_yamls: iHBCA_publication/publication/analysis/annotation/flex/annotation_yamls
+  flex_l2s_labels: iHBCA_publication/publication/analysis/annotation/flex/outputs/flex_l2s_labels.csv
+  flex_annotation_evidence: iHBCA_publication/publication/analysis/annotation/flex/outputs/per_compartment
+
+  # ---- Track B (Xenium pipeline) — LANDED 2026-04-28 ----
+  # 4-sub-track structure (4a-counts / 4b-joint / 4c-annotation / 4e excluded).
+  # 11 outward-facing tokens. Internal pipeline tokens (~50) live in
+  # publication/preprocessing/xenium/config/paths.yaml.
+  xenium_preprocessing_root: iHBCA_publication/publication/preprocessing/xenium
+  xenium_annotation_root: iHBCA_publication/publication/analysis/annotation/xenium
+  xenium_manifest: iHBCA_publication/publication/preprocessing/xenium/counts/config/xenium_manifest.tsv
+  xenium_panel_genes: iHBCA_publication/publication/preprocessing/xenium/counts/config/xenium_panel_genes.txt
+  xenium_cell_annotations: iHBCA_publication/publication/preprocessing/xenium/integration/outputs/annotations/cell_annotations.csv
+  xenium_joint_l1p5: iHBCA_publication/publication/analysis/annotation/xenium/outputs/joint_l1p5.csv
+  xenium_joint_latent: iHBCA_publication/publication/preprocessing/xenium/integration/outputs/embedding/joint_latent.csv
+  xenium_joint_umap: iHBCA_publication/publication/preprocessing/xenium/integration/outputs/embedding/joint_umap.csv
+  xenium_compartment_dir: iHBCA_publication/publication/analysis/annotation/xenium/outputs/compartment
+  xenium_cascades_dir: iHBCA_publication/publication/analysis/annotation/xenium/config/cascades
+  lbridge_vocabulary:    iHBCA_publication/publication/preprocessing/xenium/integration/outputs/annotations/lbridge_vocabulary.csv
+  flex_l2s_lbridge_map: iHBCA_publication/publication/preprocessing/xenium/integration/outputs/annotations/flex_l2s_lbridge_map.csv
+
+  # ---- Fig 3 motifs pipeline (added 2026-05-22) ----
+  # Cell-level density-weighted NMF over 21 non-epithelial L1.5 neighborhoods.
+  # Producer: publication/analysis/spatial/motifs/ (8 scripts: NMF fit,
+  # 4 validations, K=6/K=11 rank-neighborhood comparison, DBSCAN motif units,
+  # hull-composition). Substrate joins joint Xenium L1.5 with Gautham
+  # SpaceFlow structure annotations (xenium_spaceflow_dir).
+  motif_pipeline_root:                iHBCA_publication/publication/analysis/spatial/motifs
+  motif_basis_csv:                    iHBCA_publication/publication/analysis/spatial/motifs/outputs/basis.csv
+  motif_basis_k6_csv:                 iHBCA_publication/publication/analysis/spatial/motifs/outputs/basis_K6.csv
+  motif_basis_k11_csv:                iHBCA_publication/publication/analysis/spatial/motifs/outputs/basis_K11.csv
+  motif_diagnostics_csv:              iHBCA_publication/publication/analysis/spatial/motifs/outputs/diagnostics.csv
+  motif_rank_neighborhood_cosine:     iHBCA_publication/publication/analysis/spatial/motifs/outputs/rank_neighborhood_cosine.csv
+  motif_rank_neighborhood_audit:      iHBCA_publication/publication/analysis/spatial/motifs/outputs/rank_neighborhood_audit.json
+  motif_nmf_input_features:           iHBCA_publication/publication/analysis/spatial/motifs/outputs/nmf_input_features.parquet
+  motif_joint_cells_parquet:          iHBCA_publication/publication/analysis/spatial/motifs/outputs/joint_l1p5_xenium_cells.parquet
+  motif_units_parquet:                iHBCA_publication/publication/analysis/spatial/motifs/outputs/motif_units/motif_units.parquet
+  motif_units_cells_parquet:          iHBCA_publication/publication/analysis/spatial/motifs/outputs/motif_units/motif_cells.parquet
+  motif_units_audit_json:             iHBCA_publication/publication/analysis/spatial/motifs/outputs/motif_units/motif_units.audit.json
+  motif_unit_hull_composition:        iHBCA_publication/publication/analysis/spatial/motifs/outputs/motif_units/unit_hull_composition.parquet
+  motif_validation_dir:               iHBCA_publication/publication/analysis/spatial/motifs/outputs/validation
+  motif_program_epi_context_stats:    iHBCA_publication/publication/analysis/spatial/motifs/outputs/program_epi_context_stats.csv
+
+  # ---- Fig 3 dotplot inputs (added 2026-04-29) ----
+  xenium_nuclear_bundle: iHBCA_publication/publication/preprocessing/xenium/counts/outputs/pooled_nuclear
+  xenium_cytoplasmic_bundle: iHBCA_publication/publication/preprocessing/xenium/counts/outputs/pooled_cytoplasmic
+  flex_compartment_bundle_root: iHBCA_publication/publication/preprocessing/chromium_spatial/outputs/integration_intermediate
+  fig3_dotplot_features: iHBCA_publication/publication/figures/data/fig3/fig3_dotplot_features.csv
+  fig3_dotplot_features_l2s: iHBCA_publication/publication/figures/data/fig3/fig3_dotplot_features_l2s.csv
+
+# ---- HPC containers ----
+containers:
+  r_spatial_4.3.3: /dfs7/singularity_containers/rcic/JHUB3/Rocky8_jupyter_base_R4.3.3_Spatial.sif
+  python_spatial_2025Q2: /dfs8/singularity_containers/rcic/devel/Jupyter_R_4.4.2_Giotto_Spatial_Python_2025Q2.sif
+  cellpose_biodl_2025Q3: /dfs8/singularity_containers/rcic/devel/BioDL/Jupyter_CellPose_2025Q3.sif
+  python_scvi_gpu_2025Q3: /dfs8/singularity_containers/rcic/devel/BioDL/Jupyter_scGPT_GPU_2025Q3.sif
+  python_spatial_2025Q4E2: /dfs8/singularity_containers/rcic/devel/Jupyter_R_4.4.2_Spatial_2025Q4E2.sif
+
+# ---- R library paths (per container) ----
+r_libs_user: /data/homezvol0/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library
+r_libs:
+  r_spatial_4.3.3: /data/homezvol0/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library
+
+# ---- Python library paths (per container) ----
+python_libs:
+  python_spatial_2025Q2: /data/homezvol0/nwechter/.local/lib/python3.10/site-packages
+  python_spatial_2025Q4E2: /data/homezvol0/nwechter/biojhub4_dir/Jupyter_R_4.4.2_Spatial_2025Q4E2.sif/python
+  scgpt_gpu_2025Q3: /data/homezvol0/nwechter/python_user_packages/scGPT_GPU_2025Q3
+  scvi_gpu_2025Q3_userbase: /pub/nwechter/biojhub4_dir/BioDL_Jupyter_scGPT_GPU_2025Q3.sif
+
+# ---- Singularity bind mounts ----
+bind_mounts:
+  - /share/crsp/lab/dalawson/share:/share/crsp/lab/dalawson/share:ro
+  - /share/crsp/lab/dalawson/nwechter:/share/crsp/lab/dalawson/nwechter:rw
+  - /data/homezvol0/nwechter:/data/homezvol0/nwechter:ro
+  - /dfs7:/dfs7:ro
+  - /dfs8:/dfs8:ro
+
+# ---- HPC SLURM logs (canonical location) ----
+hpc_logs_dir: /share/crsp/lab/dalawson/nwechter/iHBCA_publication/logs/
+
+# ---- HPC account ----
+slurm:
+  account: dalawson_lab
+  partition: standard
+  default_cpus: 4
+  default_mem: 16G
+  default_time: "01:00:00"

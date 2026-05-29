@@ -1,0 +1,26 @@
+# =============================================================================
+# PAL NORM EPI STUDY CONFIGURATION
+# =============================================================================
+
+study_name: pal_norm_epi
+source_path: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormEpi.rds"
+ihbca_dataset: "Pal"
+
+cell_id_format:
+  pattern: "N_{donor}_{type}_{barcode}-1"
+  has_suffix: true
+  example: "N_1105_epi_AAACCTGAGACTAGGC-1"
+  notes: "Pal substudy - epithelial enriched"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues:
+  - PAL_PARTIAL_MATCH  # ~86% match rate expected
+
+shared_reference: "../pal_shared/donor_mapping.yaml"
+
+notes: |
+  Very complex - Pal substudy 1 of 3 (epithelial enriched).
+  53,716 cells. See pal_shared/ for donor mapping.
+  Testable conditions to be determined during discovery phase.

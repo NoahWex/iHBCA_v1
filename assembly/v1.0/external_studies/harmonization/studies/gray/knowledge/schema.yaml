@@ -1,0 +1,173 @@
+# =============================================================================
+# GRAY STUDY - DATA SCHEMA
+# =============================================================================
+# Cell ID format, metadata structure, and condition mappings.
+# Status: PRELIMINARY - pending Track 2 verification
+# =============================================================================
+
+study: gray
+schema_version: 1
+last_updated: 2026-01-20
+status: PENDING_TRACK2_VERIFICATION
+
+# -----------------------------------------------------------------------------
+# CELL ID SCHEMA
+# -----------------------------------------------------------------------------
+# Source: Archived knowledge (KNOWLEDGE_EXTRACTION.md) + supplemental data
+# Verification: PENDING Track 2 raw data extraction
+
+cell_id:
+  pattern: "{donor}_{barcode}"
+  has_suffix: false
+  example: "PM-D_AAACCTGAGAATCTCC"
+  separator: "_"
+  notes: |
+    NO -1 suffix unlike most studies (Kumar, Murrow, Twigger, etc.).
+    Donor prefix matches scRNA-seq sample_id column (RM-A, PM-D, etc.).
+    NOT the 'Donor' column which uses Individual_XX format.
+
+  components:
+    - name: donor
+      position: 1
+      description: "Sample identifier from scRNA-seq supplemental table"
+      expected_values: ["RM-A", "RM-B", "RM-C", "RM-D",
+                        "PM-A", "PM-B", "PM-C", "PM-D", "PM-E", "PM-F",
+                        "PM-G", "PM-H", "PM-I", "PM-J", "PM-K", "PM-L"]
+      count: 16
+
+    - name: barcode
+      position: 2
+      description: "10x barcode"
+      format: "[ACGT]{16}"
+      notes: "Standard 16bp 10x barcode"
+
+# -----------------------------------------------------------------------------
+# DONOR METADATA
+# -----------------------------------------------------------------------------
+# Source: GRAY_scRNA-seq.csv / supplemental xlsx
+
+donors:
+  total: 16
+  source: "1-s2.0-S1534580722003318-mmc2.xlsx::scRNA-seq"
+
+  id_mapping:
+    RM-A: Individual_01
+    RM-B: Individual_02
+    RM-C: Individual_03
+    RM-D: Individual_04
+    PM-A: Individual_05
+    PM-B: Individual_06
+    PM-C: Individual_07
+    PM-D: Individual_08
+    PM-E: Individual_09
+    PM-F: Individual_10
+    PM-G: Individual_11
+    PM-H: Individual_12
+    PM-I: Individual_13
+    PM-J: Individual_14
+    PM-K: Individual_15
+    PM-L: Individual_16
+
+  naming_convention: |
+    RM = Reductive Mammoplasty (cosmetic breast reduction)
+    PM = Prophylactic Mastectomy (preventive surgery, typically for BRCA carriers)
+
+# -----------------------------------------------------------------------------
+# CONDITION MAPPINGS
+# -----------------------------------------------------------------------------
+# Source: supplemental_extraction.yaml
+
+conditions:
+  age_binary:
+    source_column: "Age"
+    cutoff: 50
+    mapping:
+      "<50": ["RM-A", "RM-B", "RM-C", "RM-D", "PM-A", "PM-B", "PM-G", "PM-H"]
+      ">=50": ["PM-C", "PM-D", "PM-E", "PM-I", "PM-J", "PM-K"]
+      null: ["PM-F", "PM-L"]
+    counts:
+      "<50": 8
+      ">=50": 6
+      null: 2
+    coverage: 0.875
+    testable: true
+
+  parity:
+    source_column: "Births"
+    mapping_rule: "births == 0 -> nulliparous, births > 0 -> parous"
+    mapping:
+      nulliparous: ["RM-A", "PM-A", "PM-G", "PM-K"]
+      parous: ["RM-C", "RM-D", "PM-B", "PM-C", "PM-D", "PM-E", "PM-H", "PM-I", "PM-J"]
+      null: ["RM-B", "PM-F", "PM-L"]
+    counts:
+      nulliparous: 4
+      parous: 9
+      null: 3
+    coverage: 0.8125
+    testable: true
+
+  risk_status:
+    source_column: "Genotype (mutation)"
+    mapping_rule: "WT -> AR, any_mutation -> HR"
+    mapping:
+      AR: ["RM-A", "RM-B", "RM-C"]
+      HR: ["RM-D", "PM-A", "PM-B", "PM-C", "PM-D", "PM-E", "PM-F",
+           "PM-G", "PM-H", "PM-I", "PM-J", "PM-K", "PM-L"]
+    counts:
+      AR: 3
+      HR: 13
+    coverage: 1.0
+    testable: true
+    notes: |
+      RM-D carries RAD51C mutation despite having reductive mammoplasty surgery.
+      RAD51C is a cancer risk gene, so RM-D classifies as HR (High Risk).
+
+  menopausal_status:
+    source_column: "Menopause"
+    mapping_rule: "Premenopausal -> pre, Surgical menopause -> post"
+    mapping:
+      pre: ["RM-A", "RM-B", "RM-C", "RM-D", "PM-A", "PM-B", "PM-G", "PM-I"]
+      post: ["PM-C", "PM-D", "PM-E", "PM-H", "PM-J", "PM-K"]
+      null: ["PM-F", "PM-L"]
+    counts:
+      pre: 8
+      post: 6
+      null: 2
+    coverage: 0.875
+    testable: true
+    notes: "No natural menopause - all 'post' cases are surgical menopause"
+
+# -----------------------------------------------------------------------------
+# iHBCA CORRESPONDENCE
+# -----------------------------------------------------------------------------
+# How Gray study maps to iHBCA integrated dataset
+
+ihbca:
+  dataset_name: "Gray"
+  expected_cell_count: 52681
+  expected_match_rate: 1.0
+  notes: |
+    Gray cells in iHBCA should have metadata field identifying them.
+    Known issue: RM-* donor assignment was incorrect in previous builds.
+    Fix: Extract donor from cell ID prefix, ignore metadata RM field.
+
+# -----------------------------------------------------------------------------
+# VERIFICATION CHECKLIST
+# -----------------------------------------------------------------------------
+# Items to verify with Track 2 extraction
+
+verification_pending:
+  - item: "Cell ID format matches {donor}_{barcode}"
+    verification: "Inspect colnames from gray.rds"
+
+  - item: "No -1 suffix on cell IDs"
+    verification: "Check suffix pattern"
+
+  - item: "16 unique donors in cell IDs"
+    verification: "Extract unique prefixes"
+
+  - item: "Total cell count is 52,681"
+    verification: "length(colnames(obj))"
+
+  - item: "Donor prefixes match RM-A/B/C/D, PM-A through PM-L"
+    verification: "Compare extracted prefixes to expected list"

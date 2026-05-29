@@ -1,0 +1,32 @@
+{
+  "k_list": [
+    6,
+    11
+  ],
+  "n_init": 15,
+  "n_cells": 440817,
+  "k_results": {
+    "6": {
+      "recon_err": 88.38986960930981,
+      "mean_matched_cosine": 0.9740987147207538,
+      "n_matched_pairs": 6,
+      "unmatched_refit": [],
+      "unmatched_canonical": [
+        "P6",
+        "P7",
+        "P8"
+      ]
+    },
+    "11": {
+      "recon_err": 50.89441857299808,
+      "mean_matched_cosine": 0.9872766686756456,
+      "n_matched_pairs": 9,
+      "unmatched_refit": [
+        "P9",
+        "P10"
+      ],
+      "unmatched_canonical": []
+    }
+  },
+  "elapsed_sec": 136.38030099868774
+}

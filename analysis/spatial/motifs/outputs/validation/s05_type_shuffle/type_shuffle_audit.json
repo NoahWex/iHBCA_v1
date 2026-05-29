@@ -1,0 +1,72 @@
+{
+  "null_type": "l1p5_within_instance_permutation",
+  "n_cells": 440817,
+  "n_perms": 1,
+  "cohort_concordance": 0.43667326804547013,
+  "per_program_retention": [
+    {
+      "real_program": "P0",
+      "top_l1p5": "Fb_Activated",
+      "n_cells_real": 133764,
+      "n_retain_under_type_shuffle": 89274,
+      "retention_frac": 0.6673993002601597
+    },
+    {
+      "real_program": "P1",
+      "top_l1p5": "EC",
+      "n_cells_real": 82578,
+      "n_retain_under_type_shuffle": 13230,
+      "retention_frac": 0.16021216304584757
+    },
+    {
+      "real_program": "P2",
+      "top_l1p5": "Fb",
+      "n_cells_real": 134029,
+      "n_retain_under_type_shuffle": 75773,
+      "retention_frac": 0.5653477978646413
+    },
+    {
+      "real_program": "P3",
+      "top_l1p5": "PV",
+      "n_cells_real": 35494,
+      "n_retain_under_type_shuffle": 8105,
+      "retention_frac": 0.22834845325970587
+    },
+    {
+      "real_program": "P4",
+      "top_l1p5": "CD4T",
+      "n_cells_real": 18860,
+      "n_retain_under_type_shuffle": 3014,
+      "retention_frac": 0.15980911983032875
+    },
+    {
+      "real_program": "P5",
+      "top_l1p5": "LEC",
+      "n_cells_real": 9456,
+      "n_retain_under_type_shuffle": 325,
+      "retention_frac": 0.03436971235194585
+    },
+    {
+      "real_program": "P6",
+      "top_l1p5": "B",
+      "n_cells_real": 5698,
+      "n_retain_under_type_shuffle": 106,
+      "retention_frac": 0.018603018603018603
+    },
+    {
+      "real_program": "P7",
+      "top_l1p5": "Mac",
+      "n_cells_real": 15498,
+      "n_retain_under_type_shuffle": 2548,
+      "retention_frac": 0.16440831074977416
+    },
+    {
+      "real_program": "P8",
+      "top_l1p5": "Plas",
+      "n_cells_real": 5440,
+      "n_retain_under_type_shuffle": 118,
+      "retention_frac": 0.021691176470588235
+    }
+  ],
+  "elapsed_sec": 6.7
+}

@@ -1,0 +1,30 @@
+# 4b-joint local paths.yaml — sub-track sidecar.
+#
+# Used ONLY by phase-08 scripts (01_assemble_annotations, 05_per_sample_qc,
+# 06_write_manifest, 07_render_summary_html) which read paths.yaml directly
+# via `os.path.join(args.project_root, "config/paths.yaml")`. All paths are
+# joined against project_root by the script's own load_paths() helper.
+#
+# project_root for these wrappers is `${PIPELINE_ROOT}/4b-joint` in staging,
+# `publication/preprocessing/xenium/integration` post-promotion. Keys here
+# resolve to canonical publication paths via that join.
+#
+# All other Track B scripts use the unified track_b/config/paths.yaml
+# (CFG_* tokens via _common.sh).
+
+# ---- Joint embedding (canonical) ----
+joint_latent:           outputs/embedding/joint_latent.csv
+joint_umap:             outputs/embedding/joint_umap.csv
+joint_obs:              outputs/embedding/joint_obs.csv
+joint_leiden:           outputs/embedding/joint_leiden_assignments.csv
+
+# ---- Annotations ----
+l0p5_xenium:            outputs/annotations/l0p5_xenium.csv
+three_axis_filter:      outputs/annotations/three_axis_filter.csv
+cell_annotations:       outputs/annotations/cell_annotations.csv
+
+# ---- Per-sample QC + summary ----
+previews_dir:           outputs/previews
+
+# ---- Provenance manifest ----
+manifest:               outputs/manifest.json

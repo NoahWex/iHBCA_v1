@@ -1,0 +1,418 @@
+# =============================================================================
+# REED STUDY - EDGE CASES AND CANONICAL SCHEMA DEFINITIONS
+# =============================================================================
+# Reed et al. 2024 is the iHBCA reference atlas paper.
+# This file documents the CANONICAL schemas that other studies should map to.
+# =============================================================================
+
+study: reed
+last_updated: 2026-01-20
+
+# =============================================================================
+# CANONICAL METADATA SCHEMA
+# =============================================================================
+# These are the ground truth values for metadata harmonization.
+# All other studies should map their metadata TO these values.
+# =============================================================================
+
+canonical_schema:
+
+  # ---------------------------------------------------------------------------
+  # Risk Status
+  # ---------------------------------------------------------------------------
+  risk_status:
+    description: "Binary or categorical risk classification for breast cancer"
+    canonical_values:
+      AR:
+        meaning: "Average Risk"
+        criteria: "Reduction mammoplasty patients without known BRCA mutations"
+        typical_surgery: "reduction_mammoplasty"
+      HR-BR1:
+        meaning: "High Risk - BRCA1 carrier"
+        criteria: "Confirmed pathogenic BRCA1 mutation"
+        typical_surgery: "prophylactic_mastectomy"
+      HR-BR2:
+        meaning: "High Risk - BRCA2 carrier"
+        criteria: "Confirmed pathogenic BRCA2 mutation"
+        typical_surgery: "prophylactic_mastectomy"
+      HR-unk:
+        meaning: "High Risk - unknown mutation"
+        criteria: "Prophylactic mastectomy but mutation status unknown"
+        typical_surgery: "prophylactic_mastectomy"
+      Contralateral-BR1:
+        meaning: "Contralateral mastectomy in BRCA1 carrier"
+        criteria: "BRCA1 carrier with history of breast cancer in opposite breast"
+        typical_surgery: "contralateral"
+
+    binary_mapping:
+      AR: "AR"
+      HR-BR1: "HR"
+      HR-BR2: "HR"
+      HR-unk: "HR"
+      Contralateral-BR1: "HR"
+
+    notes: |
+      For binary DA analysis, map all HR variants to "HR".
+      AR (Average Risk) is the reference group for DA comparisons.
+      Contralateral may be excluded from some analyses due to prior cancer history.
+
+  # ---------------------------------------------------------------------------
+  # BRCA Status
+  # ---------------------------------------------------------------------------
+  brca_status:
+    description: "BRCA1/2 mutation status"
+    canonical_values:
+      WT:
+        meaning: "Wild type, tested negative"
+        criteria: "Genetic testing confirmed no pathogenic BRCA mutations"
+      assume_WT:
+        meaning: "Assumed wild type, untested"
+        criteria: "Reduction mammoplasty patients not tested for BRCA"
+        notes: "These are healthy controls - RM patients are assumed WT"
+      BRCA1:
+        meaning: "Pathogenic BRCA1 mutation"
+        criteria: "Confirmed pathogenic variant in BRCA1 gene"
+      BRCA2:
+        meaning: "Pathogenic BRCA2 mutation"
+        criteria: "Confirmed pathogenic variant in BRCA2 gene"
+      unknown:
+        meaning: "Status not determined"
+        criteria: "Testing not performed or inconclusive"
+
+    notes: |
+      For BRCA-specific DA analysis, use BRCA1 vs AR or BRCA2 vs AR.
+      assume_WT donors should be grouped with WT for control group.
+
+  # ---------------------------------------------------------------------------
+  # Surgery Type
+  # ---------------------------------------------------------------------------
+  surgery_type:
+    description: "Type of surgery from which tissue was obtained"
+    canonical_values:
+      reduction_mammoplasty:
+        meaning: "Healthy tissue reduction"
+        abbreviation: "RM"
+        typical_risk: "AR"
+        notes: "Healthy volunteers reducing breast size"
+      prophylactic_mastectomy:
+        meaning: "Preventive removal"
+        abbreviation: "PM"
+        typical_risk: "HR"
+        notes: "BRCA carriers removing healthy tissue preventively"
+      contralateral:
+        meaning: "Mastectomy of opposite breast after cancer"
+        typical_risk: "HR"
+        notes: "May have treatment history, use with caution"
+
+    mapping_from_other_studies:
+      reductive_mammoplasty: "reduction_mammoplasty"
+      rm: "reduction_mammoplasty"
+      RM: "reduction_mammoplasty"
+      prophylactic: "prophylactic_mastectomy"
+      pm: "prophylactic_mastectomy"
+      PM: "prophylactic_mastectomy"
+
+  # ---------------------------------------------------------------------------
+  # Menopause Status
+  # ---------------------------------------------------------------------------
+  menopause_status:
+    description: "Menopausal status at time of surgery"
+    canonical_values:
+      Pre:
+        meaning: "Premenopausal"
+        criteria: "Active menstrual cycles"
+      Post:
+        meaning: "Natural postmenopausal"
+        criteria: "Natural cessation of menstrual cycles (typically age >50)"
+      Post_(surgically_induced):
+        meaning: "Surgical menopause"
+        criteria: "Menopause induced by oophorectomy"
+        notes: "Common in BRCA carriers who undergo risk-reducing surgery"
+      Peri/Post:
+        meaning: "Perimenopausal transitioning to post"
+        criteria: "Transitional period between pre and post"
+
+    binary_mapping:
+      Pre: "pre"
+      Post: "post"
+      Post_(surgically_induced): "post"
+      Peri/Post: "post"
+
+    mapping_from_other_studies:
+      Premenopausal: "Pre"
+      premenopausal: "Pre"
+      pre: "Pre"
+      Postmenopausal: "Post"
+      postmenopausal: "Post"
+      post: "Post"
+      Surgical_menopause: "Post_(surgically_induced)"
+
+  # ---------------------------------------------------------------------------
+  # Parity
+  # ---------------------------------------------------------------------------
+  parity:
+    description: "Number of births/pregnancies carried to term"
+    canonical_values:
+      - "0"  # nulliparous
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "unknown"
+
+    binary_mapping:
+      "0": "nulliparous"
+      "1": "parous"
+      "2": "parous"
+      "3": "parous"
+      "4": "parous"
+      "unknown": null  # exclude from binary analysis
+
+  # ---------------------------------------------------------------------------
+  # Age
+  # ---------------------------------------------------------------------------
+  age:
+    description: "Donor age at time of surgery"
+    continuous: true
+    binary_threshold: 50
+    binary_mapping:
+      under_50: "Y"  # Young
+      over_50: "O"   # Old
+
+# =============================================================================
+# CELL TYPE CANONICAL NAMES
+# =============================================================================
+
+cell_type_schema:
+
+  level1:
+    description: "High-level cell type classification (9 types)"
+    canonical_names:
+      - "Luminal adaptive secretory precursor"
+      - "Luminal hormone sensing"
+      - "Basal-myoepithelial"
+      - "Fibroblast"
+      - "Perivascular"
+      - "Vascular endothelial"
+      - "Lymphatic endothelial"
+      - "Lymphoid"
+      - "Myeloid"
+
+    abbreviations:
+      LASP: "Luminal adaptive secretory precursor"
+      LHS: "Luminal hormone sensing"
+      BMYO: "Basal-myoepithelial"
+      FB: "Fibroblast"
+      PV: "Perivascular"
+      VE: "Vascular endothelial"
+      LE: "Lymphatic endothelial"
+
+  level2:
+    description: "Fine-grained cell type classification (40 types)"
+    epithelial:
+      - "LASP1"
+      - "LASP2"
+      - "LASP3"
+      - "LASP4"
+      - "LASP5"
+      - "LHS1"
+      - "LHS2"
+      - "LHS3"
+      - "BMYO1"
+      - "BMYO2"
+    stromal:
+      - "FB1"
+      - "FB2"
+      - "FB3"
+      - "FB4"
+      - "PV1"
+      - "PV2"
+      - "PV3"
+      - "PV4"
+      - "PV5"
+    endothelial:
+      - "VEV"
+      - "VEC"
+      - "VEA"
+      - "VEAT"
+      - "LE1"
+      - "LE2"
+    immune:
+      lymphoid:
+        - "CD4_naive"
+        - "CD4_Th"
+        - "CD8_Tem"
+        - "CD8_Trm"
+        - "CD8_Tc1"
+        - "NKT"
+        - "NK"
+        - "ILC"
+        - "B_naive"
+        - "B_mem_switched"
+        - "B_mem_unswitched"
+        - "Plasma_cell"
+      myeloid:
+        - "Macro"
+        - "Macro-lipo"
+        - "DC"
+
+# =============================================================================
+# REED-SPECIFIC EDGE CASES
+# =============================================================================
+
+edge_cases:
+
+  identity_mapping:
+    description: "Reed cell IDs are already in iHBCA format"
+    action: "Use identity mapping - no transformation needed"
+    notes: |
+      Reed IS the iHBCA reference, so cell IDs don't need transformation.
+      This is different from other studies which need mapping.
+
+  sample_vs_donor:
+    description: "Multiple samples per donor"
+    observation: "161 samples from 58 donors (avg 2.8 samples/donor)"
+    action: "Use donor_id for biological replicates, not sample_id"
+    notes: |
+      Sample types include: Organoid unsorted, Supernatant unsorted,
+      Organoid LP sorted, spike-in, Supernatant live-sorted.
+      DA analysis should be at donor level.
+
+  contralateral_exclusion:
+    description: "Contralateral mastectomy donors may have prior cancer treatment"
+    affected_donors: 6
+    affected_samples: 11
+    recommendation: "Consider excluding from some DA analyses"
+    notes: |
+      These donors had cancer in the opposite breast and may have had
+      chemotherapy or other treatments that affect tissue biology.
+
+  assume_wt_interpretation:
+    description: "assume_WT vs WT distinction"
+    observation: "68 samples have assume_WT, only 6 have tested WT"
+    action: "Group assume_WT with WT for control group"
+    notes: |
+      Reduction mammoplasty patients are not routinely tested for BRCA.
+      For population-level analysis, they represent average risk.
+
+  missing_menopause:
+    description: "High rate of missing menopausal status"
+    observation: "35% missing (57/161 samples), ~31% at donor level"
+    action: "Exclude missing from menopause DA analysis"
+    notes: |
+      Menopausal status loaded from REED_Supplementary_Table_1.csv (Menopause_status column).
+      Aggregated from sample-level (161 rows) to donor-level (55 donors) using first non-null.
+      Many PM patients do not have recorded menopausal status.
+      This may introduce bias if missingness is non-random.
+      Values mapped: Pre -> pre, Post/Peri/Post/Post_(surgically_induced) -> post.
+
+  age_from_ihbca:
+    description: "Reed age sourced from ihbca_age column"
+    observation: "All 55 donors have age in iHBCA unified metadata"
+    action: "Use ihbca_age for continuous age; derive binary from cutoff=50"
+    notes: |
+      Reed was previously excluded from age harmonization despite having
+      ihbca_age available for all donors. Fixed to include in col_map.
+
+# =============================================================================
+# HARMONIZATION RULES FOR OTHER STUDIES
+# =============================================================================
+
+harmonization_rules:
+
+  to_ar_hr_binary:
+    description: "Map any risk status to AR/HR binary"
+    rules:
+      - "Average Risk" -> "AR"
+      - "Control" -> "AR"
+      - "Normal" -> "AR"
+      - "Healthy" -> "AR"
+      - "High Risk" -> "HR"
+      - "BRCA1" -> "HR"
+      - "BRCA2" -> "HR"
+      - "Carrier" -> "HR"
+
+  to_age_binary:
+    description: "Map continuous age to binary"
+    threshold: 50
+    rules:
+      - "age < 50" -> "Y" (Young)
+      - "age >= 50" -> "O" (Old)
+
+  to_parity_binary:
+    description: "Map parity to binary"
+    rules:
+      - "0" -> "nulliparous"
+      - ">=1" -> "parous"
+
+  to_menopause_binary:
+    description: "Map menopause status to binary"
+    rules:
+      - "Pre" -> "pre"
+      - "Post" -> "post"
+      - "Surgical" -> "post"
+      - "Peri" -> "exclude or post"
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+# Reed is unique as the canonical reference - fewer open questions than other studies
+
+open_questions:
+
+  cell_id_format:
+    question: "What is the exact cell ID format in reed.rds?"
+    context: |
+      Reed defines the canonical cell ID format for iHBCA.
+      Track 2 should document this format explicitly so other studies
+      can be mapped to it.
+
+      Expected format components:
+      - donor_id (Donor_N format)
+      - sample_type
+      - barcode
+
+      UNSUPERVISED pattern analysis required.
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+
+  metadata_column_verification:
+    question: "Do RDS @meta.data columns match Supplementary Table 1?"
+    context: |
+      Supplementary Table 1 has 36 columns of sample/donor metadata.
+      RDS may have subset or different column names.
+      Need explicit mapping for Track 2.
+    resolve_by: "Track 2 - colnames(obj@meta.data) comparison"
+    status: OPEN
+
+  cell_count_verification:
+    question: "Confirm total cell count is 803,283"
+    context: |
+      knowledge.md lists 803,283 cells for Reed.
+      Verify this matches ncol(reed.rds).
+    resolve_by: "Track 2 - ncol(obj)"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do 803,283 cells distribute across 58 donors?"
+    context: |
+      58 donors with multiple samples each.
+      Need per-donor cell counts for understanding
+      potential imbalances in DA testing.
+    resolve_by: "Track 2 - table(obj$donor_column)"
+    status: OPEN
+
+  sample_type_in_rds:
+    question: "Is sample_type (Organoid/Supernatant/etc) preserved in RDS?"
+    context: |
+      Supplementary Table 1 shows:
+      - Organoid unsorted (63)
+      - Supernatant unsorted (57)
+      - Organoid LP sorted (39)
+      - spike-in (1)
+      - Supernatant live-sorted (1)
+
+      These represent different cell fractions. Need to verify
+      if this distinction is preserved in RDS metadata.
+    resolve_by: "Track 2 - check for sample_type column"
+    status: OPEN

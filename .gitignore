@@ -1,0 +1,43 @@
+# iHBCA code archive — keep this repo code-only.
+# Derived data, third-party supplements, model weights, and large
+# reference tables are deposited separately (GEO / Zenodo); see README.
+
+# --- Serialized data objects (never in a code repo) ---
+*.h5ad
+*.h5
+*.rds
+*.RData
+*.mtx
+*.mtx.gz
+*.npz
+*.npy
+*.pkl
+*.parquet
+*.loom
+
+# --- Trained model weights (deposit to Zenodo with code DOI) ---
+*.pt
+*.pth
+
+# --- Derived analysis result tables (large; deposit separately) ---
+analysis/abundance/clinical/risk_main_effects/differential_abundance/*/da_results.csv
+
+# --- Third-party copyrighted journal supplements (cite, do not redistribute) ---
+assembly/v1.0/external_studies/harmonization/studies/*/reference/
+assembly/v1.0/external_studies/harmonization/studies/*/extracted/
+analysis/markers/aucell_methods_qc/outputs/plots/*/_panel_provenance/*.xlsx
+
+# --- Logs / job output ---
+*.out
+*.err
+**/logs/
+
+# --- OS / editor / Python cruft ---
+.DS_Store
+._*
+Thumbs.db
+*~
+*.swp
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

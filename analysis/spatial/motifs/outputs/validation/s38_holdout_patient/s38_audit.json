@@ -1,0 +1,13 @@
+{
+  "n_folds": 4,
+  "patients_tested": [
+    "Pat1",
+    "Pat2",
+    "UCI220228",
+    "UCI604"
+  ],
+  "median_retention_frac": 0.7571991366579575,
+  "median_H_cosine_per_program": 0.9999671904878522,
+  "n_perfect_program_match_at_0.95": 34,
+  "elapsed_sec": 89.8
+}

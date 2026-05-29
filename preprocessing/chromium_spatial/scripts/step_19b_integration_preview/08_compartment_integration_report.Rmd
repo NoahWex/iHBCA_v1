@@ -1,0 +1,1058 @@
+---
+title: "Compartment Integration Report - `r params$compartment` (`r params$config_label`)"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+date: "`r Sys.Date()`"
+params:
+  project_root: ""
+  compartment: ""
+  config_label: ""
+  upstream_root: ""
+  intermediate_dir: ""
+  outdir: ""
+  dry_run: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = TRUE,
+  warning = TRUE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(presto)
+  library(patchwork)
+  library(viridis)
+  library(Matrix)
+  library(jsonlite)
+})
+
+# Coerce a leiden column to a factor with numerically-sorted levels. Without
+# this, Seurat sees character labels and orders clusters alphabetically
+# ("0","1","10","11","2","20",...), which scrambles every downstream heatmap
+# column and marker grouping. Falls back to lexical sort if the labels aren't
+# all numeric.
+order_cluster_factor <- function(x) {
+  lvls <- unique(as.character(x))
+  num <- suppressWarnings(as.numeric(lvls))
+  if (all(!is.na(num))) {
+    lvls <- lvls[order(num)]
+  } else {
+    lvls <- sort(lvls)
+  }
+  factor(as.character(x), levels = lvls)
+}
+
+cat("Libraries loaded\n")
+```
+
+# Parameters and Paths
+
+```{r params_echo}
+PROJECT_ROOT     <- params$project_root
+COMPARTMENT      <- params$compartment
+CONFIG_LABEL     <- params$config_label
+UPSTREAM_ROOT    <- params$upstream_root
+INTERMEDIATE_DIR <- params$intermediate_dir
+OUTDIR           <- params$outdir
+DRY_RUN          <- isTRUE(params$dry_run)
+
+# Required params must be supplied by the rendering wrapper. Fail loudly
+# if any are empty rather than silently substituting a default path.
+for (.p in c("project_root", "compartment", "config_label",
+             "upstream_root", "intermediate_dir", "outdir")) {
+  if (!nzchar(params[[.p]])) {
+    stop(sprintf("FATAL: required param '%s' is empty. Render via run/run_compartment_integration_report.sh.", .p))
+  }
+}
+
+# Intermediate directory written by 08a_export_h5ad_intermediate.py
+COUNTS_MTX        <- file.path(INTERMEDIATE_DIR, "counts.mtx.gz")
+CELLS_TSV         <- file.path(INTERMEDIATE_DIR, "cells.tsv")
+GENES_TSV         <- file.path(INTERMEDIATE_DIR, "genes.tsv")
+OBS_CSV           <- file.path(INTERMEDIATE_DIR, "obs.csv")
+LATENT_CSV        <- file.path(INTERMEDIATE_DIR, "latent.csv")
+UMAP_CSV          <- file.path(INTERMEDIATE_DIR, "umap.csv")
+MANIFEST_JSON     <- file.path(INTERMEDIATE_DIR, "manifest.json")
+
+# Assembly cell metadata (whole object; filtered to compartment cells downstream)
+CELL_METADATA_CSV <- file.path(UPSTREAM_ROOT, "assembly_step15", "cell_metadata.csv")
+
+# Contamination / cluster_annotation source of truth
+CONTAMINATION_CSV <- file.path(UPSTREAM_ROOT, "contamination", "cell_compartments.csv")
+
+cat("============================================================================\n")
+cat("Compartment Integration Report\n")
+cat("============================================================================\n")
+cat("Compartment:      ", COMPARTMENT, "\n")
+cat("Config label:     ", CONFIG_LABEL, "\n")
+cat("Intermediate dir: ", INTERMEDIATE_DIR, "\n")
+cat("Cell metadata:    ", CELL_METADATA_CSV, "\n")
+cat("Contamination:    ", CONTAMINATION_CSV, "\n")
+cat("Output directory: ", OUTDIR, "\n")
+cat("Dry run:          ", DRY_RUN, "\n")
+cat("============================================================================\n")
+```
+
+# Validation Preamble
+
+Checks that the compartment integration h5ad, assembly metadata, contamination
+CSV, and the compartment cell list are all present. If `dry_run` is true, the
+report exits here — used for cheap path validation before submitting the
+full-scale job.
+
+```{r validate_inputs}
+required_files <- list(
+  counts_mtx      = COUNTS_MTX,
+  cells_tsv       = CELLS_TSV,
+  genes_tsv       = GENES_TSV,
+  obs_csv         = OBS_CSV,
+  latent_csv      = LATENT_CSV,
+  umap_csv        = UMAP_CSV,
+  manifest_json   = MANIFEST_JSON,
+  cell_metadata   = CELL_METADATA_CSV,
+  contamination   = CONTAMINATION_CSV
+)
+
+missing <- character(0)
+for (nm in names(required_files)) {
+  f <- required_files[[nm]]
+  ok <- file.exists(f)
+  cat(sprintf("  [%s] %-15s %s\n", if (ok) "OK " else "MISS", nm, f))
+  if (!ok) missing <- c(missing, nm)
+}
+
+if (length(missing) > 0) {
+  stop("Missing required input files: ", paste(missing, collapse = ", "))
+}
+
+if (DRY_RUN) {
+  cat("\nVALIDATION PASSED (dry run) - exiting before heavy computation\n")
+  knitr::knit_exit()
+}
+```
+
+# Load Integration Intermediate
+
+The compartment integration h5ad is exported to a flat intermediate directory
+by `scripts/08a_export_h5ad_intermediate.py` (run in the scgpt_gpu container).
+This Rmd then reads MTX + CSV directly — no reticulate, no Python.
+
+Inputs (under `INTERMEDIATE_DIR`):
+- `counts.mtx.gz` — sparse counts (cells x genes; transposed below for Seurat)
+- `cells.tsv`, `genes.tsv` — IDs
+- `obs.csv` — per-cell obs frame from h5ad
+- `latent.csv`, `umap.csv` — embeddings (cell_id keyed)
+- `manifest.json` — source path, dimensions, latent/umap key names
+
+```{r load_intermediate}
+cat("\n=== Loading integration intermediate ===\n\n")
+
+manifest <- jsonlite::fromJSON(MANIFEST_JSON)
+cat("Manifest:\n")
+cat("  source_h5ad:", manifest$source_h5ad, "\n")
+cat("  shape:", manifest$n_cells, "cells x", manifest$n_genes, "genes\n")
+cat("  latent_key:", manifest$latent_key, "\n")
+cat("  umap_key:  ", manifest$umap_key, "\n")
+
+cell_ids <- readLines(CELLS_TSV)
+gene_ids <- readLines(GENES_TSV)
+cat("Loaded", length(cell_ids), "cell IDs and", length(gene_ids), "gene IDs\n")
+
+# Counts: MTX is cells x genes; Seurat wants genes x cells.
+counts_mat <- Matrix::readMM(gzfile(COUNTS_MTX))
+counts_mat <- as(counts_mat, "CsparseMatrix")
+counts_mat <- Matrix::t(counts_mat)
+rownames(counts_mat) <- gene_ids
+colnames(counts_mat) <- cell_ids
+cat("Counts matrix:", nrow(counts_mat), "genes x", ncol(counts_mat), "cells\n")
+
+# obs
+obs_df <- read.csv(OBS_CSV, stringsAsFactors = FALSE, check.names = FALSE)
+rownames(obs_df) <- obs_df$cell_id
+obs_df$cell_id <- NULL
+stopifnot(all(rownames(obs_df) == cell_ids))
+cat("obs columns (", ncol(obs_df), "):\n  ",
+    paste(colnames(obs_df), collapse = ", "), "\n", sep = "")
+
+# Latent embedding
+latent_df <- read.csv(LATENT_CSV, stringsAsFactors = FALSE, check.names = FALSE)
+stopifnot(all(latent_df$cell_id == cell_ids))
+latent_mat <- as.matrix(latent_df[, setdiff(colnames(latent_df), "cell_id"), drop = FALSE])
+rownames(latent_mat) <- cell_ids
+cat("Latent (", manifest$latent_key, "):", ncol(latent_mat), "dims\n")
+
+# UMAP embedding
+umap_df <- read.csv(UMAP_CSV, stringsAsFactors = FALSE, check.names = FALSE)
+stopifnot(all(umap_df$cell_id == cell_ids))
+umap_mat <- as.matrix(umap_df[, setdiff(colnames(umap_df), "cell_id"), drop = FALSE])
+rownames(umap_mat) <- cell_ids
+cat("UMAP (", manifest$umap_key, "):", ncol(umap_mat), "dims\n")
+
+# Canonical compartment cell IDs used throughout the report
+compartment_cells <- cell_ids
+gc()
+```
+
+# Load Assembly Cell Metadata
+
+Loads the whole-assembly `cell_metadata.csv` and filters to the compartment's
+cells only. This becomes the source for patient_id / sample_id / position and
+(if present) pre-computed QC metrics.
+
+```{r load_cell_metadata}
+cat("\n=== Loading assembly cell metadata ===\n\n")
+
+cell_meta <- read.csv(CELL_METADATA_CSV, stringsAsFactors = FALSE)
+
+cell_id_col <- intersect(c("cell_id", "X", "barcode"), colnames(cell_meta))[1]
+if (is.na(cell_id_col)) cell_id_col <- colnames(cell_meta)[1]
+rownames(cell_meta) <- cell_meta[[cell_id_col]]
+cat("Whole cell_metadata.csv:", nrow(cell_meta), "rows x", ncol(cell_meta), "cols\n")
+
+# Filter to compartment cells only - critical: QC overlays downstream should
+# reflect ONLY these cells, not the whole assembly
+cell_meta_comp <- cell_meta[intersect(compartment_cells, rownames(cell_meta)), , drop = FALSE]
+cat("Filtered to compartment cells:", nrow(cell_meta_comp), "/", length(compartment_cells), "\n")
+cat("Columns:", paste(colnames(cell_meta_comp), collapse = ", "), "\n")
+```
+
+# Load Contamination / cluster_annotation
+
+```{r load_contamination}
+cat("\n=== Loading contamination CSV ===\n\n")
+
+contam <- read.csv(CONTAMINATION_CSV, stringsAsFactors = FALSE)
+contam_id_col <- intersect(c("cell_id", "X", "barcode"), colnames(contam))[1]
+if (is.na(contam_id_col)) contam_id_col <- colnames(contam)[1]
+rownames(contam) <- contam[[contam_id_col]]
+cat("Whole contamination CSV:", nrow(contam), "rows\n")
+cat("Columns:", paste(colnames(contam), collapse = ", "), "\n")
+
+contam_comp <- contam[intersect(compartment_cells, rownames(contam)), , drop = FALSE]
+cat("Filtered to compartment cells:", nrow(contam_comp), "\n")
+
+expected_contam_cols <- c("cluster_annotation", "compartment", "leiden_1.0")
+have    <- intersect(expected_contam_cols, colnames(contam_comp))
+missing_contam <- setdiff(expected_contam_cols, colnames(contam_comp))
+cat("Have:", paste(have, collapse = ", "), "\n")
+if (length(missing_contam) > 0) {
+  cat("NOTE: missing (non-fatal):", paste(missing_contam, collapse = ", "), "\n")
+}
+
+if ("compartment" %in% colnames(contam_comp)) {
+  n_mismatch <- sum(contam_comp$compartment != COMPARTMENT, na.rm = TRUE)
+  if (n_mismatch > 0) {
+    cat("WARNING:", n_mismatch, "cells have compartment != ", COMPARTMENT, "\n")
+  }
+}
+```
+
+# Load Kumar Consensus Labels
+
+```{r load_kumar}
+cat("\n=== Loading per-sample Kumar labels ===\n\n")
+
+# Derive samples from compartment-filtered cell_metadata. The
+# compartments_step15/cell_lists/{Compartment}.csv file is a cell-id list
+# (not a sample inventory), so we cannot use it directly.
+if (!"sample_id" %in% colnames(cell_meta_comp)) {
+  stop("cell_meta_comp lacks sample_id column - cannot derive sample list")
+}
+samples_in_compartment <- sort(unique(cell_meta_comp$sample_id))
+cat("Samples in compartment:", length(samples_in_compartment), "\n")
+
+kumar_list   <- list()
+missing_kumar <- character(0)
+
+for (sid in samples_in_compartment) {
+  kfile <- file.path(UPSTREAM_ROOT, sid, "kumar_labels.csv")
+  if (!file.exists(kfile)) {
+    missing_kumar <- c(missing_kumar, sid)
+    next
+  }
+  kdf <- read.csv(kfile, stringsAsFactors = FALSE)
+  kid_col <- intersect(c("cell_id", "X", "barcode"), colnames(kdf))[1]
+  if (is.na(kid_col)) kid_col <- colnames(kdf)[1]
+  kdf$cell_id <- kdf[[kid_col]]
+
+  if ("consensus_label" %in% colnames(kdf)) {
+    kumar_list[[sid]] <- kdf[, c("cell_id", "consensus_label"), drop = FALSE]
+  } else {
+    cat("  ", sid, ": no consensus_label column\n")
+  }
+}
+
+if (length(missing_kumar) > 0) {
+  cat("Missing kumar_labels.csv for", length(missing_kumar), "samples:\n  ",
+      paste(head(missing_kumar, 10), collapse = ", "),
+      if (length(missing_kumar) > 10) " ..." else "", "\n")
+}
+
+if (length(kumar_list) > 0) {
+  kumar_df <- bind_rows(kumar_list)
+  cat("Kumar rows loaded:", nrow(kumar_df), "- unique labels:",
+      length(unique(na.omit(kumar_df$consensus_label))), "\n")
+} else {
+  kumar_df <- NULL
+  cat("WARNING: no Kumar labels loaded\n")
+}
+```
+
+# Load Per-Sample scQC Metrics
+
+Loads `doublet_score` (from `scqc/doublet_scores.csv`) and `smooth_r2` (from
+`scqc/discordance_scores.csv`) per sample. These are bare-barcode keyed, so
+they get sample-prefixed to match the assembly cell IDs.
+
+```{r load_scqc}
+cat("\n=== Loading per-sample scQC metrics ===\n\n")
+
+scqc_list <- list()
+missing_scqc <- character(0)
+
+for (sid in samples_in_compartment) {
+  doub_file <- file.path(UPSTREAM_ROOT, sid, "scqc", "doublet_scores.csv")
+  disc_file <- file.path(UPSTREAM_ROOT, sid, "scqc", "discordance_scores.csv")
+
+  if (!file.exists(doub_file) || !file.exists(disc_file)) {
+    missing_scqc <- c(missing_scqc, sid)
+    next
+  }
+
+  d <- read.csv(doub_file, stringsAsFactors = FALSE)
+  s <- read.csv(disc_file, stringsAsFactors = FALSE)
+
+  # Sample-prefix the bare barcodes to match assembly cell IDs
+  d$cell_id <- paste0(sid, "_", d$cell_id)
+  s$cell_id <- paste0(sid, "_", s$cell_id)
+
+  m <- merge(
+    d[, c("cell_id", "doublet_score"), drop = FALSE],
+    s[, c("cell_id", "smooth_r2"), drop = FALSE],
+    by = "cell_id", all = TRUE
+  )
+  scqc_list[[sid]] <- m
+}
+
+if (length(missing_scqc) > 0) {
+  cat("Missing scQC files for", length(missing_scqc), "samples:\n  ",
+      paste(head(missing_scqc, 10), collapse = ", "),
+      if (length(missing_scqc) > 10) " ..." else "", "\n")
+}
+
+if (length(scqc_list) > 0) {
+  scqc_df <- bind_rows(scqc_list)
+  cat("scQC rows loaded:", nrow(scqc_df),
+      "- doublet_score range [", round(range(scqc_df$doublet_score, na.rm = TRUE), 3),
+      "], smooth_r2 range [",  round(range(scqc_df$smooth_r2, na.rm = TRUE), 3), "]\n")
+} else {
+  scqc_df <- NULL
+  cat("WARNING: no scQC metrics loaded\n")
+}
+```
+
+# Load Cluster/Metadata Patches
+
+Optional sidecar CSVs at `${INTERMEDIATE_DIR}/patches/*.csv`. Each must have
+`cell_id` as the first column; remaining columns are merged into obs at build
+time. This is the lightweight extension point — re-clustering jobs
+(`06c_recluster_integration.py`) and other derived-metadata patches drop their
+output here without modifying the canonical h5ad or intermediate pieces.
+
+```{r load_patches}
+cat("\n=== Loading patches ===\n\n")
+
+patches_dir <- file.path(INTERMEDIATE_DIR, "patches")
+patch_df <- NULL
+
+if (dir.exists(patches_dir)) {
+  patch_files <- list.files(patches_dir, pattern = "\\.csv$", full.names = TRUE)
+  cat("Patches dir:", patches_dir, "(", length(patch_files), "files)\n")
+
+  for (pf in patch_files) {
+    pdf <- read.csv(pf, stringsAsFactors = FALSE, check.names = FALSE)
+    if (!"cell_id" %in% colnames(pdf)) {
+      cat("  SKIP", basename(pf), "- no cell_id column\n")
+      next
+    }
+    new_cols <- setdiff(colnames(pdf), "cell_id")
+    cat("  +", basename(pf), ":", length(new_cols), "cols (",
+        paste(head(new_cols, 5), collapse = ", "),
+        if (length(new_cols) > 5) "..." else "", ")\n")
+
+    if (is.null(patch_df)) {
+      patch_df <- pdf
+    } else {
+      patch_df <- merge(patch_df, pdf, by = "cell_id", all = TRUE)
+    }
+  }
+  if (!is.null(patch_df)) {
+    cat("Patches assembled:", nrow(patch_df), "rows x", ncol(patch_df) - 1, "cols\n")
+  }
+} else {
+  cat("No patches directory at", patches_dir, "\n")
+}
+```
+
+# Build Seurat Object
+
+Constructs a minimal Seurat object from the h5ad counts. Seurat computes
+`nCount_RNA` and `nFeature_RNA` at object creation time — because we built
+from the compartment-filtered counts matrix, these QC values are intrinsic
+to the compartment cells (not inherited from the whole-assembly object).
+
+```{r build_seurat}
+cat("\n=== Building Seurat object ===\n\n")
+
+seurat_obj <- CreateSeuratObject(
+  counts       = counts_mat,
+  project      = paste0("integ_", COMPARTMENT),
+  min.cells    = 0,
+  min.features = 0
+)
+cat("Seurat:", ncol(seurat_obj), "cells x", nrow(seurat_obj), "genes\n")
+
+cells <- colnames(seurat_obj)
+
+# Percent mitochondrial - computed on compartment cells
+mt_pattern <- "^MT-"
+mt_genes <- grep(mt_pattern, rownames(seurat_obj), value = TRUE, ignore.case = TRUE)
+if (length(mt_genes) > 0) {
+  seurat_obj[["percent_mt"]] <- PercentageFeatureSet(seurat_obj, pattern = mt_pattern)
+  cat("Computed percent_mt across", length(mt_genes), "mitochondrial genes\n")
+} else {
+  cat("No mitochondrial genes matched '", mt_pattern, "'\n", sep = "")
+}
+
+# Merge h5ad obs columns (these reflect compartment cells by construction)
+obs_aligned <- obs_df[cells, , drop = FALSE]
+cols_from_obs <- setdiff(colnames(obs_aligned), colnames(seurat_obj@meta.data))
+for (col in cols_from_obs) {
+  seurat_obj@meta.data[[col]] <- obs_aligned[[col]]
+}
+cat("Added", length(cols_from_obs), "columns from h5ad obs\n")
+
+# Assembly metadata (sample_id, patient_id, position, etc.) - already filtered
+asm_cols <- setdiff(colnames(cell_meta_comp),
+                    c(cell_id_col, colnames(seurat_obj@meta.data)))
+for (col in asm_cols) {
+  seurat_obj@meta.data[[col]] <- cell_meta_comp[cells, col]
+}
+cat("Added", length(asm_cols), "columns from assembly cell_metadata\n")
+
+# Contamination columns - force overwrite of the three canonical ones from the
+# contamination source of truth
+priority_cols <- intersect(c("cluster_annotation", "compartment", "leiden_1.0"),
+                           colnames(contam_comp))
+other_cols    <- setdiff(colnames(contam_comp),
+                         c(contam_id_col, colnames(seurat_obj@meta.data)))
+contam_cols   <- unique(c(priority_cols, other_cols))
+for (col in contam_cols) {
+  seurat_obj@meta.data[[col]] <- contam_comp[cells, col]
+}
+cat("Added", length(contam_cols), "columns from contamination CSV\n")
+
+# Kumar consensus label
+if (!is.null(kumar_df)) {
+  m <- match(cells, kumar_df$cell_id)
+  seurat_obj$kumar_consensus_label <- kumar_df$consensus_label[m]
+  n_matched <- sum(!is.na(seurat_obj$kumar_consensus_label))
+  cat("Kumar consensus_label matched:", n_matched, "of", length(cells), "cells\n")
+}
+
+# scQC metrics: doublet_score + smooth_r2
+if (!is.null(scqc_df)) {
+  m <- match(cells, scqc_df$cell_id)
+  seurat_obj$doublet_score <- scqc_df$doublet_score[m]
+  seurat_obj$smooth_r2     <- scqc_df$smooth_r2[m]
+  cat("scQC metrics matched:",
+      sum(!is.na(seurat_obj$doublet_score)), "doublet,",
+      sum(!is.na(seurat_obj$smooth_r2)),     "smooth_r2 of",
+      length(cells), "cells\n")
+}
+
+# Patch sidecars (cluster overrides, derived metadata)
+if (!is.null(patch_df)) {
+  m <- match(cells, patch_df$cell_id)
+  patch_cols <- setdiff(colnames(patch_df), "cell_id")
+  for (col in patch_cols) {
+    seurat_obj@meta.data[[col]] <- patch_df[[col]][m]
+  }
+  cat("Patch columns merged:", length(patch_cols), "(",
+      paste(head(patch_cols, 6), collapse = ", "),
+      if (length(patch_cols) > 6) "..." else "", ")\n")
+}
+
+# Coerce every leiden-like column to a numerically-ordered factor up front so
+# that every downstream consumer (UMAP label order, marker grouping, DoHeatmap
+# columns) sees clusters in 0,1,2,...,N order instead of "0","1","10","11","2".
+all_leiden_cols <- grep("^leiden", colnames(seurat_obj@meta.data), value = TRUE)
+for (lc in all_leiden_cols) {
+  seurat_obj@meta.data[[lc]] <- order_cluster_factor(seurat_obj@meta.data[[lc]])
+}
+if (length(all_leiden_cols) > 0) {
+  cat("Ordered", length(all_leiden_cols), "leiden columns:",
+      paste(all_leiden_cols, collapse = ", "), "\n")
+}
+
+# Identify leiden column for default plotting. Patched columns (from sidecar
+# CSVs in patches/) take precedence over the h5ad's native leiden columns —
+# the patches are the reason we ran the recluster job in the first place.
+leiden_col <- NULL
+leiden_candidates <- c(
+  "leiden_n30_r1.0", "leiden_n30_r1.5", "leiden_n30_r0.6", "leiden_n30_r2.0",
+  "leiden_1.0", "leiden_1_0", "leiden", "clusters"
+)
+for (cand in leiden_candidates) {
+  if (cand %in% colnames(seurat_obj@meta.data)) {
+    leiden_col <- cand
+    break
+  }
+}
+if (is.null(leiden_col)) {
+  cat("NOTE: no leiden column found - default cluster plots will be skipped\n")
+} else {
+  cat("Leiden column:", leiden_col, "-",
+      length(levels(seurat_obj@meta.data[[leiden_col]])), "clusters\n")
+}
+
+# Attach latent + UMAP reductions
+latent_sub <- latent_mat[cells, , drop = FALSE]
+umap_sub   <- umap_mat[cells, , drop = FALSE]
+
+seurat_obj[["scvi"]] <- CreateDimReducObject(
+  embeddings = as.matrix(latent_sub),
+  key = "scvi_",
+  assay = "RNA"
+)
+seurat_obj[["umap"]] <- CreateDimReducObject(
+  embeddings = as.matrix(umap_sub),
+  key = "UMAP_",
+  assay = "RNA"
+)
+cat("Added scvi (", ncol(latent_sub), "D) and umap (2D) reductions\n", sep = "")
+```
+
+# Normalize and Join Layers
+
+```{r normalize}
+cat("\n=== Normalizing and joining layers ===\n\n")
+
+gc()
+seurat_obj <- NormalizeData(seurat_obj, verbose = FALSE)
+cat("Normalization complete\n")
+
+gc()
+seurat_obj <- JoinLayers(seurat_obj)
+cat("JoinLayers complete\n")
+gc()
+```
+
+# Summary Statistics
+
+```{r summary_stats}
+cat("\n============================================================================\n")
+cat("Summary for", COMPARTMENT, "(", CONFIG_LABEL, ")\n")
+cat("============================================================================\n\n")
+
+n_cells_f <- ncol(seurat_obj)
+n_genes_f <- nrow(seurat_obj)
+cat("Total cells: ", n_cells_f, "\n")
+cat("Total genes: ", n_genes_f, "\n")
+
+if ("sample_id" %in% colnames(seurat_obj@meta.data)) {
+  cat("\nCells per sample:\n")
+  print(sort(table(seurat_obj$sample_id), decreasing = TRUE))
+}
+
+if ("patient_id" %in% colnames(seurat_obj@meta.data)) {
+  cat("\nCells per patient:\n")
+  print(table(seurat_obj$patient_id))
+}
+
+if (!is.null(leiden_col)) {
+  cat("\nCluster sizes (", leiden_col, "):\n", sep = "")
+  print(table(seurat_obj@meta.data[[leiden_col]]))
+}
+
+if ("cluster_annotation" %in% colnames(seurat_obj@meta.data)) {
+  cat("\ncluster_annotation counts:\n")
+  print(sort(table(seurat_obj$cluster_annotation), decreasing = TRUE))
+}
+```
+
+# UMAP Visualizations {.tabset}
+
+## By Leiden Cluster
+
+```{r umap_leiden, fig.width=14, fig.height=10}
+if (!is.null(leiden_col)) {
+  Idents(seurat_obj) <- leiden_col
+  DimPlot(seurat_obj, reduction = "umap", group.by = leiden_col,
+          label = TRUE, pt.size = 0.3, label.size = 4, raster = FALSE) +
+    theme(legend.position = "right")
+} else {
+  cat("No leiden column available\n")
+}
+```
+
+## By Patient
+
+```{r umap_patient, fig.width=12, fig.height=8}
+if ("patient_id" %in% colnames(seurat_obj@meta.data)) {
+  DimPlot(seurat_obj, reduction = "umap", group.by = "patient_id",
+          pt.size = 0.3, raster = FALSE, shuffle = TRUE)
+} else {
+  cat("patient_id not available\n")
+}
+```
+
+## By Sample
+
+```{r umap_sample, fig.width=14, fig.height=10}
+if ("sample_id" %in% colnames(seurat_obj@meta.data)) {
+  DimPlot(seurat_obj, reduction = "umap", group.by = "sample_id",
+          pt.size = 0.2, raster = FALSE) +
+    theme(legend.text = element_text(size = 6))
+} else {
+  cat("sample_id not available\n")
+}
+```
+
+## By Kumar consensus_label
+
+```{r umap_kumar, fig.width=14, fig.height=10}
+if ("kumar_consensus_label" %in% colnames(seurat_obj@meta.data)) {
+  DimPlot(seurat_obj, reduction = "umap",
+          group.by = "kumar_consensus_label",
+          label = TRUE, repel = TRUE,
+          pt.size = 0.3, alpha = 0.5, raster = FALSE) +
+    NoLegend()
+} else {
+  cat("Kumar consensus_label not available\n")
+}
+```
+
+## By cluster_annotation
+
+```{r umap_cluster_annot, fig.width=14, fig.height=10}
+if ("cluster_annotation" %in% colnames(seurat_obj@meta.data)) {
+  DimPlot(seurat_obj, reduction = "umap",
+          group.by = "cluster_annotation",
+          label = TRUE, repel = TRUE,
+          pt.size = 0.3, alpha = 0.5, raster = FALSE) +
+    NoLegend()
+} else {
+  cat("cluster_annotation not available\n")
+}
+```
+
+# QC Metric Overlays {.tabset}
+
+QC metrics below are computed from the compartment-filtered counts matrix
+(`nCount_RNA`, `nFeature_RNA`, `percent_mt` via `PercentageFeatureSet()`).
+Color scales use the 95th percentile of values within this compartment,
+so ranges do not leak from the whole-assembly distribution.
+
+## UMI Counts
+
+```{r qc_umi, fig.width=12, fig.height=8}
+q95_counts <- quantile(seurat_obj$nCount_RNA, 0.95, na.rm = TRUE)
+FeaturePlot(seurat_obj, features = "nCount_RNA",
+            max.cutoff = q95_counts, pt.size = 0.2, alpha = 0.5, raster = FALSE) +
+  scale_color_viridis(option = "viridis", direction = -1)
+```
+
+## Genes Detected
+
+```{r qc_genes, fig.width=12, fig.height=8}
+q05_features <- quantile(seurat_obj$nFeature_RNA, 0.05, na.rm = TRUE)
+q95_features <- quantile(seurat_obj$nFeature_RNA, 0.95, na.rm = TRUE)
+FeaturePlot(seurat_obj, features = "nFeature_RNA",
+            min.cutoff = q05_features, max.cutoff = q95_features,
+            pt.size = 0.2, alpha = 0.5, raster = FALSE) +
+  scale_color_viridis(option = "viridis")
+```
+
+## Percent Mitochondrial
+
+```{r qc_mt, fig.width=12, fig.height=8}
+if ("percent_mt" %in% colnames(seurat_obj@meta.data)) {
+  q95_mt <- quantile(seurat_obj$percent_mt, 0.95, na.rm = TRUE)
+  FeaturePlot(seurat_obj, features = "percent_mt",
+              max.cutoff = q95_mt,
+              pt.size = 0.2, alpha = 0.5, raster = FALSE) +
+    scale_color_viridis(option = "magma")
+} else {
+  cat("percent_mt not computed (no MT- genes in this compartment)\n")
+}
+```
+
+## Doublet Score
+
+```{r qc_doublet, fig.width=12, fig.height=8}
+if ("doublet_score" %in% colnames(seurat_obj@meta.data) &&
+    sum(!is.na(seurat_obj$doublet_score)) > 0) {
+  q95_d <- quantile(seurat_obj$doublet_score, 0.95, na.rm = TRUE)
+  FeaturePlot(seurat_obj, features = "doublet_score",
+              max.cutoff = q95_d,
+              pt.size = 0.2, alpha = 0.5, raster = FALSE,
+              order = TRUE) +
+    scale_color_viridis(option = "magma")
+} else {
+  cat("doublet_score not loaded (check scqc/doublet_scores.csv per sample)\n")
+}
+```
+
+## Smooth R² (BigSur)
+
+```{r qc_smooth_r2, fig.width=12, fig.height=8}
+if ("smooth_r2" %in% colnames(seurat_obj@meta.data) &&
+    sum(!is.na(seurat_obj$smooth_r2)) > 0) {
+  q05_s <- quantile(seurat_obj$smooth_r2, 0.05, na.rm = TRUE)
+  FeaturePlot(seurat_obj, features = "smooth_r2",
+              min.cutoff = q05_s,
+              pt.size = 0.2, alpha = 0.5, raster = FALSE,
+              order = TRUE) +
+    scale_color_viridis(option = "viridis")
+} else {
+  cat("smooth_r2 not loaded (check scqc/discordance_scores.csv per sample)\n")
+}
+```
+
+# Multi-Resolution Marker Analysis
+
+```{r multi_res_markers, fig.width=14, fig.height=10}
+cat("\n=== Multi-Resolution Marker Analysis ===\n\n")
+
+# Pulls in both upstream leiden_* and any patches that wrote columns
+# matching leiden_*. Patch columns added via 06c_recluster_integration.py
+# show up automatically here.
+resolution_cols <- grep("^leiden_", colnames(seurat_obj@meta.data), value = TRUE)
+if (length(resolution_cols) == 0 && !is.null(leiden_col)) {
+  resolution_cols <- leiden_col
+}
+cat("Clustering columns:", paste(resolution_cols, collapse = ", "), "\n\n")
+
+# Top markers per cluster: 3 keeps the panel readable.
+TOP_N_PER_CLUSTER <- 3
+
+# DoHeatmap downsample size — individual-cell heatmaps stay legible up to a few
+# thousand cells per panel; beyond that the per-cell columns collapse to noise.
+HEATMAP_CELL_DOWNSAMPLE <- 5000
+
+# Past this many clusters, even DoHeatmap's grouped columns become a pixel
+# mess. Fall back to an average-expression tile heatmap (clusters as columns).
+TILE_FALLBACK_CLUSTER_THRESHOLD <- 50
+
+all_resolution_markers <- list()
+
+plot_marker_panel <- function(seurat_obj, res_col, top_markers) {
+  features <- unique(top_markers$feature)
+  n_clusters <- length(unique(seurat_obj@meta.data[[res_col]]))
+  Idents(seurat_obj) <- res_col
+
+  if (n_clusters <= TILE_FALLBACK_CLUSTER_THRESHOLD) {
+    cells_ds <- sample(colnames(seurat_obj),
+                       size = min(HEATMAP_CELL_DOWNSAMPLE, ncol(seurat_obj)))
+    p <- DoHeatmap(seurat_obj[, cells_ds],
+                   features = features,
+                   group.by = res_col,
+                   slot     = "data",
+                   size     = 3,
+                   raster   = FALSE) +
+      labs(subtitle = sprintf("%s: %d clusters, top %d markers/cluster (n=%d cells)",
+                              res_col, n_clusters, TOP_N_PER_CLUSTER, length(cells_ds)))
+    return(p)
+  }
+
+  # Tile fallback: average expression heatmap (clusters as columns, features as
+  # rows). Used only when cluster count makes per-cell DoHeatmap unreadable.
+  avg <- AverageExpression(seurat_obj, features = features,
+                           assays = "RNA", slot = "data",
+                           verbose = FALSE)$RNA
+  avg_z <- t(scale(t(as.matrix(avg))))
+  avg_z[is.na(avg_z)] <- 0
+  avg_z[avg_z >  3]   <-  3
+  avg_z[avg_z < -3]   <- -3
+
+  df <- as.data.frame(as.table(avg_z))
+  colnames(df) <- c("feature", "cluster", "z")
+  df$feature <- factor(df$feature, levels = features)
+
+  ggplot(df, aes(x = cluster, y = feature, fill = z)) +
+    geom_tile() +
+    scale_fill_viridis(option = "magma", name = "z(avg expr)") +
+    theme_minimal(base_size = 8) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          panel.grid = element_blank()) +
+    labs(x = res_col, y = NULL,
+         subtitle = sprintf("%s: %d clusters → tile fallback", res_col, n_clusters))
+}
+
+for (i in seq_along(resolution_cols)) {
+  res_col <- resolution_cols[i]
+  cat("---\nResolution", i, "of", length(resolution_cols), ":", res_col, "\n")
+
+  # Numeric-order cluster levels so heatmap columns and marker groups stay
+  # ordered 0,1,2,...,N instead of alphabetical 0,1,10,11,2,20.
+  seurat_obj@meta.data[[res_col]] <- order_cluster_factor(seurat_obj@meta.data[[res_col]])
+  cluster_levels <- levels(seurat_obj@meta.data[[res_col]])
+  Idents(seurat_obj) <- seurat_obj@meta.data[[res_col]]
+  n_clusters <- length(cluster_levels)
+  cat("  Clusters:", n_clusters, "\n")
+
+  markers <- presto::wilcoxauc(seurat_obj, assay = "data")
+  cat("  Marker tests:", nrow(markers), "\n")
+
+  sig_markers <- markers %>%
+    filter(padj < 0.05, logFC > 0) %>%
+    mutate(group = factor(as.character(group), levels = cluster_levels)) %>%
+    arrange(group, desc(logFC))
+  cat("  Significant (padj<0.05, logFC>0):", nrow(sig_markers), "\n")
+
+  top_markers <- sig_markers %>%
+    group_by(group) %>%
+    slice_max(order_by = logFC, n = TOP_N_PER_CLUSTER) %>%
+    ungroup() %>%
+    arrange(group, desc(logFC))
+
+  all_resolution_markers[[res_col]] <- markers
+  gc()
+
+  if (nrow(top_markers) > 0) {
+    tryCatch({
+      print(plot_marker_panel(seurat_obj, res_col, top_markers))
+    }, error = function(e) cat("  panel failed:", e$message, "\n"))
+  }
+  cat("\n")
+}
+
+cat("Multi-resolution marker analysis complete\n")
+```
+
+# Top Markers at Default Resolution {.tabset}
+
+```{r top_markers_setup}
+default_res_col <- if (!is.null(leiden_col)) leiden_col else resolution_cols[1]
+cat("Default resolution column:", default_res_col, "\n")
+
+top_markers <- NULL
+if (!is.null(default_res_col) && default_res_col %in% names(all_resolution_markers)) {
+  top_markers <- all_resolution_markers[[default_res_col]] %>%
+    filter(padj < 0.05, logFC > 0) %>%
+    group_by(group) %>%
+    slice_max(order_by = logFC, n = TOP_N_PER_CLUSTER) %>%
+    ungroup()
+}
+```
+
+## Markers Panel
+
+```{r dotplot_default, fig.width=16, fig.height=12}
+if (!is.null(top_markers) && nrow(top_markers) > 0) {
+  tryCatch({
+    print(plot_marker_panel(seurat_obj, default_res_col, top_markers))
+  }, error = function(e) cat("panel error:", e$message, "\n"))
+} else {
+  cat("No top markers available\n")
+}
+```
+
+## Marker Table
+
+```{r marker_table}
+if (!is.null(top_markers) && nrow(top_markers) > 0) {
+  top_markers %>%
+    select(group, feature, logFC, auc, padj, pct_in, pct_out) %>%
+    arrange(group, desc(logFC)) %>%
+    head(100) %>%
+    knitr::kable(digits = 3,
+                 caption = paste0("Top markers for ", COMPARTMENT, " (", default_res_col, ")"))
+}
+```
+
+# Cell Type Annotation Marker Analysis
+
+Uses `cluster_annotation` (from the contamination CSV) as the grouping
+variable. This catches cases where distinct annotated populations were
+merged into a single Leiden cluster at the report's default resolution.
+
+```{r celltype_markers, fig.width=14, fig.height=10}
+celltype_markers <- NULL
+
+if ("cluster_annotation" %in% colnames(seurat_obj@meta.data) &&
+    sum(!is.na(seurat_obj$cluster_annotation)) > 0) {
+
+  Idents(seurat_obj) <- "cluster_annotation"
+  celltype_markers <- presto::wilcoxauc(seurat_obj, assay = "data")
+  seurat_obj@misc$celltype_markers <- celltype_markers
+
+  top_ct <- celltype_markers %>%
+    filter(auc > 0.6, pct_in > 25) %>%
+    group_by(group) %>%
+    slice_max(order_by = auc, n = 15) %>%
+    arrange(group, desc(auc))
+
+  cat("\nTop 10 markers per cluster_annotation:\n")
+  top_ct %>%
+    group_by(group) %>%
+    slice_head(n = 10) %>%
+    select(group, feature, auc, pct_in, pct_out) %>%
+    print(n = 50)
+
+  # UMAP by cluster_annotation (restated here alongside markers for panel flow)
+  p_ct <- DimPlot(seurat_obj,
+                  group.by = "cluster_annotation",
+                  raster = FALSE,
+                  label = TRUE,
+                  repel = TRUE,
+                  pt.size = 0.4,
+                  alpha = 0.5) + NoLegend()
+  print(p_ct)
+
+  # Heatmap markers: top-N per annotation, capped at ~60 total
+  n_ct <- length(unique(na.omit(seurat_obj$cluster_annotation)))
+  per_type <- ceiling(60 / max(n_ct, 1))
+
+  markers_for_hm <- top_ct %>%
+    group_by(group) %>%
+    slice_head(n = per_type) %>%
+    pull(feature) %>%
+    unique()
+
+  cat("\nHeatmap markers:", length(markers_for_hm), "\n")
+
+  if (length(markers_for_hm) > 0) {
+    cells_ds <- sample(colnames(seurat_obj), size = min(7500, ncol(seurat_obj)))
+    cells_ds_prop <- tryCatch(
+      subset(seurat_obj, downsample = 1500) %>% colnames(),
+      error = function(e) cells_ds
+    )
+
+    tryCatch({
+      p_hm <- DoHeatmap(seurat_obj[, cells_ds],
+                        features = markers_for_hm,
+                        group.by = "cluster_annotation",
+                        slot = "data", size = 3)
+      print(p_hm)
+    }, error = function(e) cat("Random heatmap failed:", e$message, "\n"))
+
+    tryCatch({
+      p_hm_prop <- DoHeatmap(seurat_obj[, cells_ds_prop],
+                             features = markers_for_hm,
+                             group.by = "cluster_annotation",
+                             slot = "data", size = 3) + NoLegend()
+      print(p_hm_prop)
+    }, error = function(e) cat("Proportional heatmap failed:", e$message, "\n"))
+  }
+} else {
+  cat("cluster_annotation not available - skipping cell type marker analysis\n")
+}
+```
+
+# Cluster Heatmap (Default Resolution)
+
+```{r cluster_heatmap, fig.width=14, fig.height=12}
+if (!is.null(default_res_col) && default_res_col %in% names(all_resolution_markers)) {
+  def_markers <- all_resolution_markers[[default_res_col]]
+
+  top_cluster <- def_markers %>%
+    filter(auc > 0.55, pct_in > 20, logFC > 0) %>%
+    group_by(group) %>%
+    slice_max(order_by = auc, n = 10) %>%
+    arrange(group, desc(auc))
+
+  n_clusters <- length(unique(seurat_obj@meta.data[[default_res_col]]))
+  per_cluster <- ceiling(50 / max(n_clusters, 1))
+
+  hm_feats <- top_cluster %>%
+    group_by(group) %>%
+    slice_head(n = per_cluster) %>%
+    pull(feature) %>%
+    unique()
+
+  cat("Cluster heatmap features:", length(hm_feats),
+      "across", n_clusters, "clusters\n")
+
+  if (length(hm_feats) > 0) {
+    cells_hm <- sample(colnames(seurat_obj), size = min(5000, ncol(seurat_obj)))
+    Idents(seurat_obj) <- default_res_col
+    tryCatch({
+      p <- DoHeatmap(seurat_obj[, cells_hm],
+                     features = hm_feats,
+                     group.by = default_res_col,
+                     slot = "data", size = 3)
+      print(p)
+    }, error = function(e) cat("Cluster heatmap failed:", e$message, "\n"))
+  }
+}
+```
+
+# Save Outputs
+
+```{r save_outputs}
+cat("\n=== Saving outputs ===\n\n")
+
+OUT_BASE <- file.path(OUTDIR, COMPARTMENT, CONFIG_LABEL)
+dir.create(file.path(OUT_BASE, "markers_by_resolution"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUT_BASE, "metadata"),              recursive = TRUE, showWarnings = FALSE)
+
+# Unified metadata
+meta_path <- file.path(OUT_BASE, "metadata", "unified_metadata.csv")
+write.csv(seurat_obj@meta.data, meta_path, row.names = TRUE)
+cat("Metadata saved:", meta_path, "\n")
+
+# Per-resolution markers
+for (res_col in names(all_resolution_markers)) {
+  fn <- paste0("markers_", res_col, ".csv")
+  fp <- file.path(OUT_BASE, "markers_by_resolution", fn)
+  write.csv(all_resolution_markers[[res_col]], fp, row.names = FALSE)
+  cat("Saved:", fn, "\n")
+}
+
+# Combined long-form markers
+if (length(all_resolution_markers) > 0) {
+  combined <- bind_rows(
+    lapply(names(all_resolution_markers), function(r) {
+      all_resolution_markers[[r]] %>% mutate(resolution_col = r, .before = 1)
+    })
+  )
+  write.csv(combined,
+            file.path(OUT_BASE, "markers_by_resolution", "all_markers_all_resolutions.csv"),
+            row.names = FALSE)
+  cat("Combined markers saved\n")
+}
+
+# cluster_annotation markers
+if (!is.null(celltype_markers)) {
+  ca_path <- file.path(OUT_BASE, "markers_by_resolution", "markers_cluster_annotation.csv")
+  write.csv(celltype_markers, ca_path, row.names = FALSE)
+  cat("Annotation markers saved:", ca_path, "\n")
+}
+```
+
+# Session Info
+
+```{r session_info}
+cat("\n============================================================================\n")
+cat("Compartment Integration Report -", COMPARTMENT, "(", CONFIG_LABEL, ") - COMPLETE\n")
+cat("============================================================================\n")
+cat("Cells:  ", ncol(seurat_obj), "\n")
+cat("Genes:  ", nrow(seurat_obj), "\n")
+cat("Output: ", OUT_BASE, "\n")
+cat("============================================================================\n")
+
+sessionInfo()
+```

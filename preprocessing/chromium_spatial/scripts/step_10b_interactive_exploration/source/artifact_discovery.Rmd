@@ -1,0 +1,1425 @@
+---
+title: "Step 10b: Artifact Discovery via Manifold Incoherence"
+author: "Spatial HBCA Resource"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: show
+    theme: flatly
+params:
+  PROJECT_ROOT: ""
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 12,
+  fig.height = 8,
+  dpi = 300
+)
+```
+
+# Overview
+
+**Hypothesis**: Artifacts possess raw UMI counts but lack manifold structure. Under SNN smoothing, their signal collapses (negative delta), whereas real cells stabilize or denoise (delta ≈ 0 or positive).
+
+**Method**:
+1. **Cell-level detection**: 1D GMM on Δ = Smooth R² - Raw R²
+2. **Cluster-level filtering**: Elbow detection on % artifact enrichment per cluster
+
+**Input**: Step 10a discordance metrics (pearson_r2, N=400)
+
+**Output**: `artifact_barcodes.txt` + `artifact_enriched_clusters.txt` for Steps 10c/10d
+
+---
+
+# Section 0: Load All Data
+
+## 0.1 Libraries
+
+```{r libraries}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+  library(mclust)
+  library(zoo)
+  library(yaml)
+  library(here)
+  library(ggrepel)
+  library(cowplot)
+})
+
+theme_set(theme_bw(base_size = 12))
+```
+
+## 0.2 Configuration
+
+```{r config}
+# PROJECT_ROOT from params (pipeline) or here() (interactive)
+PROJECT_ROOT <- params$PROJECT_ROOT
+if (PROJECT_ROOT == "") {
+  PROJECT_ROOT <- here::here()
+}
+
+config_path <- file.path(PROJECT_ROOT, "project/01_Preprocessing/config")
+if (!dir.exists(config_path)) {
+  stop("PROJECT_ROOT incorrect: ", PROJECT_ROOT)
+}
+
+cat("PROJECT_ROOT:", PROJECT_ROOT, "\n\n")
+
+# Load module configs
+module_config <- yaml::read_yaml(file.path(config_path, "module_configs.yaml"))
+
+# Load Step 10b config from algorithm_params with defaults
+if ("step_10b_artifact_discovery" %in% names(module_config$modules)) {
+  cfg <- module_config$modules$step_10b_artifact_discovery$algorithm_params
+} else {
+  # Fallback defaults (should never be used in production)
+  cfg <- list(
+    metric = "pearson_r2",
+    n_features = "N400",
+    conditions = list(raw = "raw_scaled", smooth = "smooth_scaled"),
+    clustering = list(
+      fine_res = "leiden_scvi_5.0",
+      coarse_res = "leiden_scvi_0.3"
+    ),
+    gmm_params = list(
+      min_components = 2,
+      max_components = 3,
+      model_type = "V",
+      posterior_threshold = 0.5
+    ),
+    coarse_elbow = list(
+      search_ceiling_sd_multiplier = 1.0,
+      min_cluster_size = 50,
+      downsample_threshold = 1000,
+      loess_target_neighbors = 50
+    ),
+    fine_enrichment = list(
+      min_enrichment_search = 10.0,
+      loess_span_bounds = list(min = 0.2, max = 0.5, neighbors = 10)
+    )
+  )
+}
+
+cat("=== Configuration ===\n")
+cat("Metric:", cfg$metric, "| N features:", cfg$n_features, "\n")
+cat("Clustering: Fine =", cfg$clustering$fine_res, "| Coarse =", cfg$clustering$coarse_res, "\n")
+cat("GMM: G=", cfg$gmm_params$min_components, "-", cfg$gmm_params$max_components,
+    " | Model=", cfg$gmm_params$model_type,
+    " | Posterior threshold=", cfg$gmm_params$posterior_threshold, "\n", sep = "")
+cat("Coarse Elbow: Min cluster size =", cfg$coarse_elbow$min_cluster_size,
+    "| SD multiplier =", cfg$coarse_elbow$search_ceiling_sd_multiplier, "\n\n")
+```
+
+## 0.3 Load Manifest & Paths
+
+```{r manifest}
+manifest_path <- file.path(PROJECT_ROOT, "project/01_Preprocessing/config/preprocessing_manifest.yaml")
+preprocessing_manifest <- yaml::read_yaml(manifest_path)
+
+# Step 10a
+if (!"step_10a_add_residual_normalized_data" %in% names(preprocessing_manifest)) {
+  stop("Step 10a not found in manifest")
+}
+
+step_10a <- preprocessing_manifest$step_10a_add_residual_normalized_data
+if (step_10a$status != "pass") {
+  stop("Step 10a status: ", step_10a$status)
+}
+
+# Paths
+SEURAT_PATH <- step_10a$outputs$integrated_with_bigsur
+DISCORDANCE_BASE <- file.path(dirname(dirname(SEURAT_PATH)), "discordance/metrics")
+METADATA_PATH <- file.path(PROJECT_ROOT, "project/01_Preprocessing/outputs/09_IntegrationPreview/metadata/unified_metadata.csv")
+
+cat("=== Input Paths ===\n")
+cat("Seurat:", SEURAT_PATH, "\n")
+cat("Discordance base:", DISCORDANCE_BASE, "\n")
+cat("Metadata:", METADATA_PATH, "\n\n")
+
+# Validate
+if (!file.exists(SEURAT_PATH)) stop("Seurat object not found")
+if (!file.exists(METADATA_PATH)) stop("Metadata not found")
+```
+
+## 0.4 Load Seurat Object & Extract Metadata
+
+```{r load_seurat}
+cat("=== Loading Seurat Object ===\n")
+cat("Loading from:", SEURAT_PATH, "\n")
+
+seu <- readRDS(SEURAT_PATH)
+
+cat("Cells:", ncol(seu), "\n")
+cat("Assays:", paste(names(seu@assays), collapse = ", "), "\n")
+cat("Size (GB):", round(object.size(seu) / 1e9, 2), "\n\n")
+
+# Calculate percent.mt if not present
+if (!"percent.mt" %in% colnames(seu@meta.data)) {
+  cat("Calculating percent.mt...\n")
+  seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
+  cat("✓ percent.mt calculated\n")
+} else {
+  cat("✓ percent.mt already present\n")
+}
+cat("\n")
+
+# Extract QC metrics
+qc_cols <- c("nCount_RNA", "nFeature_RNA", "percent.mt")
+qc_data <- seu@meta.data %>%
+  select(any_of(qc_cols)) %>%
+  tibble::rownames_to_column("cell_id")
+
+# Extract UMAP
+if ("umap" %in% names(seu@reductions)) {
+  umap_coords <- Embeddings(seu, reduction = "umap")
+  umap_data <- data.frame(
+    cell_id = rownames(umap_coords),
+    UMAP_1 = umap_coords[, 1],
+    UMAP_2 = umap_coords[, 2]
+  )
+  cat("✓ UMAP extracted\n")
+} else {
+  umap_data <- data.frame(cell_id = colnames(seu))
+  warning("UMAP not found")
+}
+
+# Extract clustering
+leiden_cols <- grep("^leiden_scvi_", colnames(seu@meta.data), value = TRUE)
+clustering_data <- seu@meta.data %>%
+  select(any_of(leiden_cols)) %>%
+  tibble::rownames_to_column("cell_id")
+
+cat("✓ QC metrics extracted:", paste(intersect(qc_cols, colnames(qc_data)), collapse = ", "), "\n")
+cat("✓ Clustering extracted:", paste(leiden_cols, collapse = ", "), "\n\n")
+
+# Merge Seurat metadata
+seurat_metadata <- qc_data %>%
+  left_join(umap_data, by = "cell_id") %>%
+  left_join(clustering_data, by = "cell_id")
+
+cat("Seurat metadata ready:", nrow(seurat_metadata), "cells ×", ncol(seurat_metadata) - 1, "columns\n")
+cat("Seurat object retained in memory for downstream analysis\n\n")
+```
+
+## 0.5 Load Discordance Metrics
+
+```{r load_discordance}
+cat("=== Loading Discordance Metrics ===\n")
+
+# Construct paths
+raw_path <- file.path(DISCORDANCE_BASE, cfg$metric, paste0(cfg$conditions$raw, ".csv"))
+smooth_path <- file.path(DISCORDANCE_BASE, cfg$metric, paste0(cfg$conditions$smooth, ".csv"))
+
+if (!file.exists(raw_path)) stop("Raw CSV not found: ", raw_path)
+if (!file.exists(smooth_path)) stop("Smooth CSV not found: ", smooth_path)
+
+# Load
+raw_df <- read.csv(raw_path, stringsAsFactors = FALSE)
+smooth_df <- read.csv(smooth_path, stringsAsFactors = FALSE)
+
+# Extract N400 column and calculate delta
+metrics_df <- data.frame(
+  cell_id = raw_df$cell_id,
+  raw_r2 = raw_df[[cfg$n_features]],
+  smooth_r2 = smooth_df[[cfg$n_features]],
+  stringsAsFactors = FALSE
+)
+metrics_df$delta <- metrics_df$smooth_r2 - metrics_df$raw_r2
+
+# Calculate MAD-scaled delta (robust z-score)
+delta_median <- median(metrics_df$delta, na.rm = TRUE)
+delta_mad <- mad(metrics_df$delta, na.rm = TRUE)
+metrics_df$delta_mad_scaled <- (metrics_df$delta - delta_median) / delta_mad
+
+cat("Loaded:", nrow(metrics_df), "cells\n")
+cat("Delta range: [", round(min(metrics_df$delta, na.rm = TRUE), 3),
+    ", ", round(max(metrics_df$delta, na.rm = TRUE), 3), "]\n", sep = "")
+cat("MAD-scaled delta range: [", round(min(metrics_df$delta_mad_scaled, na.rm = TRUE), 2),
+    ", ", round(max(metrics_df$delta_mad_scaled, na.rm = TRUE), 2), "]\n\n", sep = "")
+```
+
+## 0.6 Load Step 09 Metadata & Merge All
+
+```{r merge_all}
+cat("=== Merging All Data ===\n")
+
+# Load Step 09 metadata
+step09_metadata <- read.csv(METADATA_PATH, stringsAsFactors = FALSE)
+cat("Step 09 metadata:", nrow(step09_metadata), "cells\n")
+
+# Merge: metrics + Seurat metadata + Step 09 metadata
+analysis_data <- metrics_df %>%
+  left_join(seurat_metadata, by = "cell_id") %>%
+  left_join(
+    step09_metadata %>% select(-matches("^leiden_scvi_|^UMAP")),
+    by = "cell_id"
+  )
+
+cat("\n✓ Analysis data ready:", nrow(analysis_data), "cells ×", ncol(analysis_data), "columns\n")
+
+# Verify both clustering resolutions exist
+required_clusterings <- c(cfg$clustering$fine_res, cfg$clustering$coarse_res)
+missing_clusterings <- setdiff(required_clusterings, colnames(analysis_data))
+
+if (length(missing_clusterings) > 0) {
+  stop("Missing required clustering columns: ", paste(missing_clusterings, collapse = ", "))
+}
+
+cat("Using fine resolution:", cfg$clustering$fine_res,
+    "(", length(unique(analysis_data[[cfg$clustering$fine_res]])), "clusters)\n")
+cat("Using coarse resolution:", cfg$clustering$coarse_res,
+    "(", length(unique(analysis_data[[cfg$clustering$coarse_res]])), "clusters)\n\n")
+```
+
+## 0.7 Setup Output Directories
+
+```{r output_dirs}
+OUTPUT_BASE <- file.path(PROJECT_ROOT, "project/01_Preprocessing/outputs/10b_InteractiveExploration")
+
+# Categorical directories (NOT timestamped)
+dir.create(file.path(OUTPUT_BASE, "figures"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "exports"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "reports"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "logs"), recursive = TRUE, showWarnings = FALSE)
+
+# Timestamped HTML report (like Step 09)
+timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+OUTPUT_HTML <- file.path(OUTPUT_BASE, "reports", paste0("artifact_discovery_", timestamp, ".html"))
+
+cat("Output base:", OUTPUT_BASE, "\n")
+cat("HTML report:", OUTPUT_HTML, "\n\n")
+```
+
+## 0.8 Exploratory UMAP Visualizations
+
+```{r umap_exploratory, fig.width=15, fig.height=10}
+cat("=== Exploratory UMAP Visualizations ===\n\n")
+
+# Prepare data with UMAP coordinates
+umap_data <- analysis_data %>%
+  filter(!is.na(UMAP_1), !is.na(UMAP_2), !is.na(raw_r2), !is.na(smooth_r2), !is.na(delta))
+
+# 1. UMAP colored by Raw R²
+p_umap_raw <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = raw_r2)) +
+  geom_point(size = 0.3, alpha = 0.6) +
+  scale_color_viridis_c(name = "Raw R²", option = "plasma") +
+  labs(title = "Raw R² (Raw Scaled)", x = "UMAP 1", y = "UMAP 2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+print(p_umap_raw)
+
+# 2. UMAP colored by Smooth R²
+p_umap_smooth <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = smooth_r2)) +
+  geom_point(size = 0.3, alpha = 0.6) +
+  scale_color_viridis_c(name = "Smooth R²", option = "plasma") +
+  labs(title = "Smooth R² (Smooth Scaled)", x = "UMAP 1", y = "UMAP 2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+print(p_umap_smooth)
+
+# 3. UMAP colored by Delta (Smooth - Raw)
+p_umap_delta <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = delta)) +
+  geom_point(size = 0.3, alpha = 0.6) +
+  scale_color_viridis_c(
+    name = "Δ (Smooth - Raw)",  option = "plasma") +
+  labs(title = "Delta (Smooth - Raw)", x = "UMAP 1", y = "UMAP 2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+print(p_umap_delta)
+
+# 4. Scatter: Raw vs. Smooth colored by Delta
+p_scatter_landscape <- ggplot(umap_data, aes(x = raw_r2, y = smooth_r2, color = delta)) +
+  geom_hex(bins = 80) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    scale_fill_viridis_c(trans = "log10", name = "Cells") +
+  labs(
+    title = "Raw vs. Smooth (colored by Δ)",
+    x = "Raw R²",
+    y = "Smooth R²"
+  ) +
+  coord_fixed() +
+  theme_bw(base_size = 12)
+print(p_scatter_landscape)
+
+# 5. Scatter: Delta vs. Raw R²
+p_scatter_delta_raw <- ggplot(umap_data, aes(x = raw_r2, y = delta)) +
+  geom_hex(bins = 80) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.8) +
+  scale_fill_viridis_c(trans = "log10", name = "Cells") +
+  labs(
+    title = "Δ vs. Raw R² (density)",
+    x = "Raw R²",
+    y = "Δ (Smooth - Raw)"
+  ) +
+  theme_bw(base_size = 12)
+print(p_scatter_delta_raw)
+
+# 6. Scatter: Delta vs. Smooth R²
+p_scatter_delta_smooth <- ggplot(umap_data, aes(x = smooth_r2, y = delta)) +
+  geom_hex(bins = 80) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.8) +
+  scale_fill_viridis_c(trans = "log10", name = "Cells") +
+  labs(
+    title = "Δ vs. Smooth R² (density)",
+    x = "Smooth R²",
+    y = "Δ (Smooth - Raw)"
+  ) +
+  theme_bw(base_size = 12)
+print(p_scatter_delta_smooth)
+
+# Arrange in grid
+library(patchwork)
+
+# Top row: 3 UMAPs
+umap_row <- p_umap_raw + p_umap_smooth + p_umap_delta
+
+# Bottom row: 3 scatter plots
+scatter_row <- p_scatter_delta_raw + p_scatter_delta_smooth + p_scatter_landscape
+
+# Combined
+p_exploratory <- umap_row / scatter_row
+
+print(p_exploratory)
+
+# Save
+ggsave(
+  file.path(OUTPUT_BASE, "figures/00_exploratory_umaps.png"),
+  p_exploratory,
+  width = 15,
+  height = 10,
+  dpi = 300
+)
+
+cat("✓ Exploratory UMAPs saved\n\n")
+```
+
+---
+
+# Section 1: Diagnostic Landscape
+
+```{r landscape, fig.width=10, fig.height=9}
+cat("=== Diagnostic Landscape ===\n\n")
+
+plot_data <- analysis_data %>%
+  filter(!is.na(raw_r2), !is.na(smooth_r2), is.finite(raw_r2), is.finite(smooth_r2))
+
+p_landscape <- ggplot(plot_data, aes(x = raw_r2, y = smooth_r2)) +
+  geom_hex(bins = 100) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 1) +
+  scale_fill_viridis_c(trans = "log10", name = "Cells") +
+  labs(
+    title = "Raw vs Smooth R²",
+    subtitle = paste(cfg$metric, "| N =", cfg$n_features),
+    x = paste("Raw R² (", cfg$conditions$raw, ")", sep = ""),
+    y = paste("Smooth R² (", cfg$conditions$smooth, ")", sep = "")
+  ) +
+  coord_fixed() +
+  theme_bw(base_size = 14)
+
+print(p_landscape)
+
+ggsave(file.path(OUTPUT_BASE, "figures/01_landscape.png"), p_landscape, width = 10, height = 9, dpi = 300)
+```
+
+---
+
+# Section 2: GMM Artifact Detection (Cell-Level)
+
+## 2.1 Fit GMM
+
+```{r gmm_fit}
+cat("\n=== GMM Fitting ===\n")
+
+gmm_data <- analysis_data %>%
+  filter(!is.na(delta), is.finite(delta)) %>%
+  pull(delta)
+
+cat("Valid cells:", length(gmm_data), "\n")
+cat("Delta - Mean:", round(mean(gmm_data), 4), "| Median:", round(median(gmm_data), 4), "\n\n")
+
+# Fit GMM
+gmm_fit <- Mclust(gmm_data,
+                  G = cfg$gmm_params$min_components:cfg$gmm_params$max_components,
+                  modelNames = cfg$gmm_params$model_type)
+
+cat("GMM Results:\n")
+cat("  G =", gmm_fit$G, "| BIC =", round(gmm_fit$bic, 2), "\n")
+
+component_stats <- data.frame(
+  component = 1:gmm_fit$G,
+  mean = gmm_fit$parameters$mean,
+  variance = gmm_fit$parameters$variance$sigmasq,
+  proportion = gmm_fit$parameters$pro
+)
+
+print(component_stats)
+cat("\n")
+```
+
+## 2.2 Identify Artifact Component
+
+```{r gmm_classify}
+cat("=== Artifact Classification (Global GMM) ===\n")
+
+# Identify artifact component: lowest mean AND must be negative
+# Identify artifact component: The component with the lowest mean Delta
+# (Artifacts always have lower Delta than real cells, regardless of absolute zero)
+artifact_component <- which.min(component_stats$mean)
+
+# Safety Check (Soft)
+if (component_stats$mean[artifact_component] > 0) {
+  warning(paste0(
+    "⚠️  The identified artifact component has a positive mean (", 
+    round(component_stats$mean[artifact_component], 3), 
+    "). Artifacts typically have negative Delta. Verify plots."
+  ))
+} else {
+  cat("✓ Artifact component identified (Mean < 0)\n")
+}
+
+cat("Artifact component:", artifact_component, "\n")
+cat("  Mean delta:", round(component_stats$mean[artifact_component], 4), "\n")
+cat("  Proportion:", round(component_stats$proportion[artifact_component], 3), "\n\n")
+
+# Classify cells
+analysis_data$gmm_classification <- NA_integer_
+analysis_data$gmm_posterior_artifact <- NA_real_
+
+valid_idx <- which(!is.na(analysis_data$delta) & is.finite(analysis_data$delta))
+analysis_data$gmm_classification[valid_idx] <- gmm_fit$classification
+analysis_data$gmm_posterior_artifact[valid_idx] <- gmm_fit$z[, artifact_component]
+
+# Flag artifacts (rename to is_artifact_global for clarity)
+analysis_data$is_artifact_global <-
+  (analysis_data$gmm_classification == artifact_component) &
+  (analysis_data$gmm_posterior_artifact > cfg$gmm_params$posterior_threshold) &
+  (analysis_data$delta < 0) &
+  !is.na(analysis_data$gmm_posterior_artifact) &
+  !is.na(analysis_data$delta)
+
+n_artifacts_global <- sum(analysis_data$is_artifact_global, na.rm = TRUE)
+pct_artifacts_global <- 100 * n_artifacts_global / nrow(analysis_data)
+
+cat("Global GMM artifacts:", n_artifacts_global, "(", round(pct_artifacts_global, 2), "%)\n")
+cat("Posterior threshold:", cfg$gmm_params$posterior_threshold, "\n")
+cat("Delta requirement: < 0\n\n")
+```
+
+## 2.3 Visualize GMM
+
+```{r gmm_plot, fig.width=12, fig.height=6}
+# Density curves
+x_seq <- seq(min(gmm_data), max(gmm_data), length.out = 500)
+
+density_df <- lapply(1:gmm_fit$G, function(k) {
+  data.frame(
+    x = x_seq,
+    density = gmm_fit$parameters$pro[k] *
+      dnorm(x_seq, mean = gmm_fit$parameters$mean[k],
+            sd = sqrt(gmm_fit$parameters$variance$sigmasq[k])),
+    component = paste("Component", k),
+    is_artifact = (k == artifact_component)
+  )
+}) %>% bind_rows()
+
+p_gmm <- ggplot() +
+  geom_histogram(data = data.frame(delta = gmm_data), aes(x = delta, y = after_stat(density)),
+                 bins = 100, fill = "gray80", alpha = 0.5) +
+  geom_line(data = density_df, aes(x = x, y = density, color = component, linetype = is_artifact),
+            size = 1.2) +
+  scale_linetype_manual(values = c("FALSE" = "solid", "TRUE" = "dashed"), guide = "none") +
+  geom_vline(xintercept = component_stats$mean[artifact_component],
+             color = "red", linetype = "dashed", size = 1) +
+  labs(
+    title = "GMM Classification of Delta Distribution",
+    subtitle = paste0("G = ", gmm_fit$G, " | Artifact component = ", artifact_component,
+                      " (mean = ", round(component_stats$mean[artifact_component], 3), ")"),
+    x = "Delta (Smooth R² - Raw R²)",
+    y = "Density",
+    color = "Component"
+  ) +
+  theme_bw(base_size = 14)
+
+print(p_gmm)
+
+ggsave(file.path(OUTPUT_BASE, "figures/02_gmm.png"), p_gmm, width = 12, height = 6, dpi = 300)
+```
+
+## 2.4 GMM Classification Visualizations
+
+```{r gmm_status_plots}
+cat("\n=== GMM Status Visualizations ===\n\n")
+
+# Prepare data with status labels
+status_data <- analysis_data %>%
+  filter(!is.na(UMAP_1), !is.na(UMAP_2)) %>%
+  mutate(
+    status_label = ifelse(is_artifact_global, "Artifact", "Non-artifact"),
+    status_label = factor(status_label, levels = c("Non-artifact", "Artifact"))
+  )
+
+# 1. UMAP colored by GMM status
+p_umap_status <- ggplot(status_data, aes(x = UMAP_1, y = UMAP_2, color = status_label)) +
+  geom_point(size = 0.3, alpha = 0.6) +
+  scale_color_manual(
+    name = "GMM Status",
+    values = c("Non-artifact" = "gray70", "Artifact" = "red")
+  ) +
+  labs(title = "UMAP: GMM Classification", x = "UMAP 1", y = "UMAP 2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+print(p_umap_status)
+
+# 2. Raw vs. Smooth colored by status
+p_scatter_status <- ggplot(status_data %>% filter(!is.na(raw_r2), !is.na(smooth_r2)),
+                           aes(x = raw_r2, y = smooth_r2, color = status_label)) +
+  geom_point(size = 0.5, alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+  scale_color_manual(
+    name = "GMM Status",
+    values = c("Non-artifact" = "gray70", "Artifact" = "red")
+  ) +
+  labs(
+    title = "Raw vs. Smooth (colored by GMM status)",
+    x = "Raw R²",
+    y = "Smooth R²"
+  ) +
+  coord_fixed() +
+  theme_bw(base_size = 12)
+print(p_scatter_status)
+
+# 3. Delta vs. Raw colored by status
+p_delta_raw_status <- ggplot(status_data %>% filter(!is.na(raw_r2), !is.na(delta)),
+                             aes(x = raw_r2, y = delta, color = status_label)) +
+  geom_point(size = 0.5, alpha = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+  scale_color_manual(
+    name = "GMM Status",
+    values = c("Non-artifact" = "gray70", "Artifact" = "red")
+  ) +
+  labs(
+    title = "Δ vs. Raw R² (colored by GMM status)",
+    x = "Raw R²",
+    y = "Δ (Smooth - Raw)"
+  ) +
+  theme_bw(base_size = 12)
+print(p_delta_raw_status)
+
+# Combined status plots
+library(patchwork)
+p_status_combined <- p_umap_status + p_scatter_status + p_delta_raw_status
+
+print(p_status_combined)
+
+# Save
+ggsave(
+  file.path(OUTPUT_BASE, "figures/02b_gmm_status_visualizations.png"),
+  p_status_combined,
+  width = 15,
+  height = 5,
+  dpi = 300
+)
+
+cat("✓ GMM status visualizations saved\n\n")
+```
+
+---
+
+# Section 3: Hierarchical Artifact Detection (Coarse → Fine)
+
+## 3.3 Per-Cluster Elbow Detection (DISABLED)
+
+```{r per_cluster_elbow, fig.width=16, fig.height=24}
+cat("\n=== Local Elbow Detection: DISABLED ===\n")
+cat("Rationale: GMM-only detection provides cleaner separation.\n")
+cat("Local elbow was flagging disproportionate cells in healthy clusters.\n")
+cat("(22,814 local vs 5,072 GMM with only 912 overlap)\n\n")
+
+# Set placeholder columns for downstream compatibility
+analysis_data$is_artifact_local <- FALSE
+analysis_data$elbow_delta_coarse <- NA_real_
+
+cat("is_artifact_local = FALSE for all cells\n")
+cat("elbow_delta_coarse = NA for all cells\n\n")
+
+# =============================================================================
+# COMMENTED OUT: Original per-cluster elbow detection code
+# Retained for reference/potential future re-enablement
+# =============================================================================
+
+# # 1. Setup
+# major_cluster_col <- cfg$clustering$coarse_res
+#
+# if (!major_cluster_col %in% colnames(analysis_data)) {
+#   stop("Clustering column not found.")
+# }
+#
+# # Define Search Bounds
+# # Floor: The mean of the global artifact component (center of the debris cloud)
+# # Ceiling: 0.1 (just entering the healthy biological variation zone)
+# search_floor <- component_stats$mean[artifact_component]
+# search_ceiling <- 0.1
+#
+# cat("Using clustering:", major_cluster_col, "\n")
+# cat("Search Range:", round(search_floor, 4), "to", search_ceiling, "\n")
+#
+# # Get clusters
+# clusters <- unique(analysis_data[[major_cluster_col]][!is.na(analysis_data[[major_cluster_col]])])
+#
+# # 2. Run Detection
+# elbow_results_coarse <- lapply(clusters, function(clust) {
+#   # Filter to cluster and Bounded Range
+#   cluster_cells <- analysis_data %>%
+#     filter(!!sym(major_cluster_col) == clust,
+#            !is.na(delta),
+#            delta >= search_floor,   # Ignore deep tail
+#            delta <= search_ceiling) # Ignore healthy plateau
+#
+#
+#   # Rank Data (Ascending: Artifact Mean -> Healthy)
+#   fit_data <- cluster_cells %>%
+#     arrange(delta) %>%
+#     mutate(rank = row_number()) %>%
+#     select(rank, delta)
+#
+#   # --- GEOMETRIC ELBOW (Kneedle) ---
+#
+#   # 1. Define Chord (Start to End of the bounded region)
+#   min_pt <- fit_data[1, ]
+#   max_pt <- fit_data[nrow(fit_data), ]
+#
+#   # 2. Vector of the Chord
+#   chord_vec <- c(max_pt$rank - min_pt$rank, max_pt$delta - min_pt$delta)
+#
+#   # 3. Project vectors from Start to all points
+#   vec_x <- fit_data$rank - min_pt$rank
+#   vec_y <- fit_data$delta - min_pt$delta
+#
+#   # 4. Calculate Perpendicular Distance
+#   cross_prod <- vec_x * chord_vec[2] - vec_y * chord_vec[1]
+#   line_len <- sqrt(sum(chord_vec^2))
+#   dist <- abs(cross_prod) / line_len
+#
+#   # 5. Find Maximum Distance
+#   elbow_idx <- which.max(dist)
+#
+#   # Extract
+#   elbow_delta <- fit_data$delta[elbow_idx]
+#   elbow_rank <- fit_data$rank[elbow_idx] # Rank within the filtered subset
+#
+#   data.frame(
+#     cluster = clust,
+#     elbow_delta = elbow_delta,
+#     elbow_rank = elbow_rank,
+#     status = "success"
+#   )
+# }) %>% bind_rows()
+#
+# cat("Clusters analyzed:", nrow(elbow_results_coarse), "\n")
+# cat("Successful fits:", sum(elbow_results_coarse$status == "success"), "\n\n")
+#
+# # 3. Merge & Flag
+# if ("elbow_delta" %in% colnames(analysis_data)) analysis_data$elbow_delta <- NULL
+#
+# analysis_data <- analysis_data %>%
+#   left_join(elbow_results_coarse %>% select(cluster, elbow_delta_coarse = elbow_delta),
+#             by = setNames("cluster", major_cluster_col))
+#
+# analysis_data$is_artifact_local <-
+#   !is.na(analysis_data$elbow_delta_coarse) &
+#   !is.na(analysis_data$delta) &
+#   analysis_data$delta < analysis_data$elbow_delta_coarse
+#
+# # --- VISUALIZATION ---
+#
+# # A. Calculate Removal Stats
+# removal_stats <- analysis_data %>%
+#   filter(!is.na(!!sym(major_cluster_col))) %>%
+#   group_by(!!sym(major_cluster_col)) %>%
+#   summarise(
+#     n_total = n(),
+#     n_removed = sum(is_artifact_local, na.rm=TRUE),
+#     pct_removed = 100 * n_removed / n_total,
+#     elbow_val = unique(elbow_delta_coarse)
+#   ) %>%
+#   rename(cluster = !!sym(major_cluster_col)) %>%
+#   arrange(desc(pct_removed))
+#
+# # B. Plot Thresholds
+# p_thresh <- ggplot(removal_stats, aes(x=reorder(cluster, elbow_val), y=elbow_val)) +
+#   geom_col(fill="steelblue") +
+#   geom_hline(yintercept = search_floor, linetype="dotted", color="red") +
+#   geom_hline(yintercept = search_ceiling, linetype="dotted", color="gray40") +
+#   labs(title="Per-Cluster Elbow Thresholds", subtitle="Dotted lines show search range", x="Cluster", y="Delta Cutoff") +
+#   theme_bw() + theme(axis.text.x = element_text(angle=45, hjust=1))
+#
+# # C. Plot Removal Rates
+# p_rates <- ggplot(removal_stats, aes(x=reorder(cluster, -pct_removed), y=pct_removed)) +
+#   geom_col(fill="firebrick") +
+#   labs(title="Percentage Removed per Cluster", x="Cluster", y="% Artifacts") +
+#   theme_bw() + theme(axis.text.x = element_text(angle=45, hjust=1))
+#
+# # D. UMAP Comparison (Provenance)
+# umap_removal_data <- analysis_data %>%
+#   filter(!is.na(UMAP_1), !is.na(UMAP_2)) %>%
+#   mutate(
+#     removal_category = case_when(
+#       is_artifact_global & is_artifact_local ~ "Both methods",
+#       is_artifact_global & !is_artifact_local ~ "GMM only",
+#       !is_artifact_global & is_artifact_local ~ "Per-cluster elbow only",
+#       TRUE ~ "Not removed"
+#     ),
+#     removal_category = factor(removal_category, levels = c("Not removed", "GMM only", "Per-cluster elbow only", "Both methods"))
+#   )
+#
+# p_umap_removal <- ggplot(umap_removal_data, aes(x = UMAP_1, y = UMAP_2, color = removal_category)) +
+#   geom_point(size = 0.3, alpha = 0.5) +
+#   scale_color_manual(
+#     name = "Removal Status",
+#     values = c(
+#       "Not removed" = "gray80",
+#       "GMM only" = "orange",
+#       "Per-cluster elbow only" = "blue",
+#       "Both methods" = "red"
+#     )
+#   ) +
+#   labs(title = "UMAP: Removal Method Comparison", x = "UMAP 1", y = "UMAP 2") +
+#   theme_minimal(base_size = 12) +
+#   guides(color = guide_legend(override.aes = list(size = 3)))
+#
+# # E. Elbow Curves (All Clusters Overlaid)
+# curve_plot_data <- analysis_data %>%
+#   filter(!is.na(!!sym(major_cluster_col)), delta >= search_floor, delta <= search_ceiling) %>%
+#   select(cluster = !!sym(major_cluster_col), delta) %>%
+#   group_by(cluster) %>%
+#   arrange(delta) %>%
+#   mutate(
+#     rank = row_number(),
+#     norm_rank = row_number() / n()
+#   ) %>%
+#   slice(unique(round(seq(1, n(), length.out = 200))))
+#
+# plot_elbows <- curve_plot_data %>%
+#   inner_join(elbow_results_coarse %>% select(cluster, elbow_delta), by="cluster") %>%
+#   group_by(cluster) %>%
+#   filter(abs(delta - elbow_delta) == min(abs(delta - elbow_delta))) %>%
+#   slice(1)
+#
+# p_curves <- ggplot() +
+#   geom_line(data = curve_plot_data,
+#             aes(x = norm_rank, y = delta, color = cluster, group = cluster),
+#             alpha = 0.5, size = 0.8) +
+#   geom_point(data = plot_elbows,
+#              aes(x = norm_rank, y = delta),
+#              color = "black", shape = 4, size = 3, stroke = 1.5) +
+#   labs(
+#     title = "Elbow Detection Curves (All Clusters Overlaid)",
+#     subtitle = "Normalized Rank (0-1) vs Delta. 'X' marks the calculated Artifact threshold.",
+#     y = "Delta",
+#     x = "Normalized Rank (within search window)"
+#   ) +
+#   theme_bw(base_size = 14) +
+#   theme(legend.position = "right") +
+#   guides(color = guide_legend(ncol = 1, override.aes = list(size = 2)))
+#
+# # Combine
+# top_row <- cowplot::plot_grid(p_thresh, p_rates, ncol=2)
+# final_plot <- cowplot::plot_grid(top_row, p_umap_removal, p_curves, ncol=1, rel_heights = c(1, 1.2, 2))
+#
+# print(final_plot)
+#
+# ggsave(file.path(OUTPUT_BASE, "figures/03b_per_cluster_elbows.png"),
+#        final_plot, width = 16, height = 24)
+#
+# cat("Local detection complete. Summary:\n")
+# print(head(removal_stats, 5))
+```
+
+## 3.2 Union Flag (Total Artifacts)
+
+```{r union_flag}
+cat("=== Creating Total Artifact Flag (GMM Only - Local Elbow Disabled) ===\n")
+
+# GMM only (local elbow is disabled, is_artifact_local = FALSE for all cells)
+analysis_data$is_artifact_total <-
+  analysis_data$is_artifact_global | analysis_data$is_artifact_local
+
+# Summary
+n_global <- sum(analysis_data$is_artifact_global, na.rm = TRUE)
+n_local <- sum(analysis_data$is_artifact_local, na.rm = TRUE)  # Should be 0
+n_total <- sum(analysis_data$is_artifact_total, na.rm = TRUE)
+
+cat("Global GMM artifacts:", n_global, "\n")
+cat("Local Elbow artifacts:", n_local, "(disabled)\n")
+cat("Total artifacts:     ", n_total, " (",
+    round(100 * n_total / nrow(analysis_data), 2), "%)\n\n", sep = "")
+
+# Simplified UMAP (GMM only since local elbow is disabled)
+overlap_data <- analysis_data %>%
+  filter(!is.na(UMAP_1), !is.na(UMAP_2)) %>%
+  mutate(
+    status = ifelse(is_artifact_global, "Artifact (GMM)", "Passed"),
+    status = factor(status, levels = c("Passed", "Artifact (GMM)"))
+  )
+
+p_overlap <- ggplot(overlap_data, aes(x = UMAP_1, y = UMAP_2, color = status)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(
+    name = "Status",
+    values = c(
+      "Passed" = "gray80",
+      "Artifact (GMM)" = "red"
+    )
+  ) +
+  labs(title = "UMAP: GMM Artifact Detection (Local Elbow Disabled)") +
+  theme_minimal(base_size = 12) +
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 1)))
+
+print(p_overlap)
+
+ggsave(
+  file.path(OUTPUT_BASE, "figures/03b_gmm_artifacts.png"),
+  p_overlap,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+cat("Total artifact flag created (GMM only)\n\n")
+```
+
+## 3.3 Delta Distribution by Coarse Clusters
+
+```{r delta_by_coarse, fig.width=14, fig.height=11}
+cat("=== Delta Distribution by Coarse Clusters ===\n")
+
+coarse_col <- cfg$clustering$coarse_res
+
+# Prepare data
+violin_data <- analysis_data %>%
+  filter(!is.na(!!sym(coarse_col)), !is.na(delta), is.finite(delta),
+         !is.na(delta_mad_scaled), is.finite(delta_mad_scaled)) %>%
+  group_by(!!sym(coarse_col)) %>%
+  mutate(
+    cluster_size = n(),
+    median_delta = median(delta, na.rm = TRUE),
+    median_delta_mad = median(delta_mad_scaled, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  arrange(median_delta) %>%
+  mutate(cluster_label = factor(!!sym(coarse_col),
+                                levels = unique(!!sym(coarse_col))))
+
+n_clusters <- length(unique(violin_data[[coarse_col]]))
+cat("Coarse clusters:", n_clusters, "\n")
+
+# Violin plot - Raw delta
+p_violin_raw <- ggplot(violin_data, aes(x = cluster_label, y = delta, fill = median_delta)) +
+  geom_violin(scale = "width", trim = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.8) +
+  scale_fill_gradient2(
+    name = "Median Δ",
+    low = "blue", mid = "gray90", high = "red",
+    midpoint = 0
+  ) +
+  labs(
+    title = "Delta Distribution by Coarse Clusters (Raw)",
+    subtitle = paste0("Clustering: ", coarse_col, " (ordered by median Δ)"),
+    x = "Cluster",
+    y = "Δ (Smooth - Raw)"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_violin_raw)
+
+# Violin plot - MAD-scaled delta
+p_violin_mad <- ggplot(violin_data, aes(x = cluster_label, y = delta_mad_scaled, fill = median_delta_mad)) +
+  geom_violin(scale = "width", trim = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.8) +
+  geom_hline(yintercept = c(-3, 3), linetype = "dotted", color = "gray40", size = 0.5) +
+  scale_fill_gradient2(
+    name = "Median Δ (MAD)",
+    low = "blue", mid = "gray90", high = "red",
+    midpoint = 0
+  ) +
+  labs(
+    title = "Delta Distribution by Coarse Clusters (MAD-scaled)",
+    subtitle = paste0("Clustering: ", coarse_col, " (±3 MAD reference lines)"),
+    x = "Cluster",
+    y = "Δ (MAD-scaled)"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_violin_mad)
+
+# Combined plot
+library(patchwork)
+p_violin_combined <- p_violin_raw / p_violin_mad
+
+print(p_violin_combined)
+
+# Save
+ggsave(
+  file.path(OUTPUT_BASE, "figures/03c_delta_by_coarse_clusters.png"),
+  p_violin_combined,
+  width = 14,
+  height = 11,
+  dpi = 300
+)
+
+cat("✓ Violin plots saved (raw + MAD-scaled)\n\n")
+```
+
+## 3.4 Fine-Resolution Cluster Enrichment (Using Union Flag)
+
+```{r fine_enrichment}
+cat("\n=== Fine-Resolution Cluster Enrichment Analysis ===\n")
+cat("Strategy: Identify trash clusters using TOTAL artifacts (global + local)\n\n")
+
+fine_col <- cfg$clustering$fine_res
+cat("Using fine clustering:", fine_col, "\n")
+
+# Calculate enrichment using UNION flag (is_artifact_total)
+cluster_stats_fine <- analysis_data %>%
+  group_by(!!sym(fine_col)) %>%
+  summarise(
+    n_cells = n(),
+    n_artifacts = sum(is_artifact_total, na.rm = TRUE),  # KEY: Use union flag
+    pct_artifact = 100 * n_artifacts / n_cells,
+    .groups = "drop"
+  ) %>%
+  rename(cluster_id = !!sym(fine_col)) %>%
+  arrange(desc(pct_artifact))
+
+cat("Fine clusters:", nrow(cluster_stats_fine), "\n")
+cat("Enrichment range:", round(min(cluster_stats_fine$pct_artifact), 2), "% -",
+    round(max(cluster_stats_fine$pct_artifact), 2), "%\n\n")
+
+cat("Top 10 enriched clusters:\n")
+print(head(cluster_stats_fine, 10), row.names = FALSE)
+cat("\n")
+```
+
+## 3.5 Fine Enrichment Elbow Detection
+
+```{r fine_elbow}
+cat("=== Fine Enrichment Elbow Detection ===\n")
+
+# Rank by enrichment (descending: high to low)
+cluster_stats_fine <- cluster_stats_fine %>%
+  arrange(desc(pct_artifact)) %>%
+  mutate(rank = row_number())
+
+# Define search bounds
+min_enrichment_threshold <- cfg$fine_enrichment$min_enrichment_search
+search_end_idx <- max(which(cluster_stats_fine$pct_artifact >= min_enrichment_threshold))
+search_end_idx <- min(search_end_idx, ceiling(nrow(cluster_stats_fine) * 0.5))
+
+if (search_end_idx < 5) {
+  # Fallback: use quantile-based threshold
+  elbow_threshold_fine <- quantile(cluster_stats_fine$pct_artifact, 0.75, na.rm = TRUE)
+  elbow_rank_fine <- min(which(cluster_stats_fine$pct_artifact >= elbow_threshold_fine))
+  cat("⚠️  Insufficient search range, using 75th percentile threshold\n")
+} else {
+  # Extract search region
+  search_data <- cluster_stats_fine[1:search_end_idx, ]
+  
+  # Loess smoothing (adaptive span)
+  x_vals <- seq_len(nrow(search_data))
+  span_bounds <- cfg$fine_enrichment$loess_span_bounds
+  span_value <- min(span_bounds$max, max(span_bounds$min, span_bounds$neighbors / length(x_vals)))
+  
+  loess_fit <- loess(search_data$pct_artifact ~ x_vals, span = span_value)
+  smoothed <- predict(loess_fit, x_vals)
+  
+  # Calculate derivatives
+  first_diff <- diff(smoothed)
+  second_diff <- diff(first_diff)
+  
+  # Find steepest drop (most negative second derivative for descending curve)
+  elbow_in_search <- which.min(second_diff) + 2
+  elbow_in_search <- min(elbow_in_search, nrow(search_data))
+  
+  elbow_rank_fine <- search_data$rank[elbow_in_search]
+  elbow_threshold_fine <- search_data$pct_artifact[elbow_in_search]
+  
+  # Store smoothed values
+  cluster_stats_fine$pct_smoothed <- NA_real_
+  cluster_stats_fine$pct_smoothed[1:search_end_idx] <- smoothed
+}
+
+cat("Search range: Top", search_end_idx, "clusters (>=",
+    round(min_enrichment_threshold, 2), "% enrichment)\n")
+cat("Elbow detected at rank:", elbow_rank_fine, "\n")
+cat("Elbow threshold:", round(elbow_threshold_fine, 2), "%\n")
+cat("Clusters above elbow:", sum(cluster_stats_fine$pct_artifact >= elbow_threshold_fine), "\n\n")
+```
+
+## 3.6 Visualize Fine Enrichment
+
+```{r fine_enrichment_plot, fig.width=14, fig.height=6}
+# Rank curve
+p_rank_fine <- ggplot(cluster_stats_fine, aes(x = rank, y = pct_artifact)) +
+  geom_line(color = "gray40") +
+  geom_point(color = "gray40", size = 1.5) +
+  geom_line(aes(y = pct_smoothed), color = "blue", size = 1.2, na.rm = TRUE) +
+  geom_hline(yintercept = elbow_threshold_fine, color = "red", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = elbow_rank_fine, color = "red", linetype = "dotted") +
+  annotate("text", x = elbow_rank_fine, y = max(cluster_stats_fine$pct_artifact) * 0.9,
+           label = paste0("Elbow\n", round(elbow_threshold_fine, 2), "%"),
+           hjust = -0.1, color = "red", size = 4) +
+  labs(
+    title = "Fine Cluster Enrichment Rank Curve",
+    subtitle = paste0("Using ", fine_col, " | Enrichment calculated from TOTAL artifacts"),
+    x = "Cluster Rank",
+    y = "% Artifact Cells"
+  ) +
+  theme_bw(base_size = 14)
+
+# Bar plot
+cluster_stats_fine$above_elbow <- cluster_stats_fine$pct_artifact >= elbow_threshold_fine
+
+p_bar_fine <- ggplot(cluster_stats_fine, aes(x = reorder(cluster_id, -pct_artifact),
+                                             y = pct_artifact, fill = above_elbow)) +
+  geom_col() +
+  geom_hline(yintercept = elbow_threshold_fine, color = "red", linetype = "dashed", size = 1) +
+  scale_fill_manual(values = c("FALSE" = "gray60", "TRUE" = "firebrick"), name = "Above Elbow") +
+  labs(
+    title = "Fine Cluster Artifact Enrichment",
+    x = "Cluster ID (ranked)",
+    y = "% Artifact"
+  ) +
+  theme_bw(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
+
+p_combined_fine <- cowplot::plot_grid(p_rank_fine, p_bar_fine, ncol = 2)
+print(p_combined_fine)
+
+ggsave(file.path(OUTPUT_BASE, "figures/03d_fine_cluster_enrichment.png"),
+       p_combined_fine, width = 14, height = 6, dpi = 300)
+```
+
+## 3.7 Flag Trash Clusters
+
+```{r flag_trash_clusters}
+trash_clusters <- cluster_stats_fine %>%
+  filter(pct_artifact >= elbow_threshold_fine) %>%
+  pull(cluster_id)
+
+analysis_data$is_trash_cluster <-
+  analysis_data[[fine_col]] %in% trash_clusters
+
+n_cells_trash <- sum(analysis_data$is_trash_cluster, na.rm = TRUE)
+
+cat("Flagged trash clusters:", length(trash_clusters), "\n")
+cat("Cells in trash clusters:", n_cells_trash,
+    "(", round(100 * n_cells_trash / nrow(analysis_data), 2), "%)\n\n")
+```
+
+---
+
+# Section 4: Validation
+
+## 4.1 UMAP Validation
+
+```{r umap_validation, fig.width=16, fig.height=10}
+umap_data <- analysis_data %>% filter(!is.na(UMAP_1), !is.na(UMAP_2))
+
+# Global artifacts
+p1 <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = is_artifact_global)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c("FALSE" = "gray80", "TRUE" = "blue")) +
+  labs(title = "Global Artifacts (GMM)", color = "Artifact") +
+  coord_fixed() +
+  theme_bw()
+print(p1)
+
+# Local artifacts
+p2 <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = is_artifact_local)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c("FALSE" = "gray80", "TRUE" = "orange")) +
+  labs(title = "Local Artifacts (Coarse Elbow)", color = "Artifact") +
+  coord_fixed() +
+  theme_bw()
+print(p2)
+
+# Total artifacts (union)
+p3 <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = is_artifact_total)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c("FALSE" = "gray80", "TRUE" = "firebrick")) +
+  labs(title = "Total Artifacts (Union)", color = "Artifact") +
+  coord_fixed() +
+  theme_bw()
+print(p3)
+
+# Trash clusters
+p4 <- ggplot(umap_data, aes(x = UMAP_1, y = UMAP_2, color = is_trash_cluster)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c("FALSE" = "gray80", "TRUE" = "darkred")) +
+  labs(title = "Trash Clusters (Fine Enrichment)", color = "Trash") +
+  coord_fixed() +
+  theme_bw()
+print(p4)
+
+
+seu$is_debris <- umap_data$is_artifact_total == TRUE | 
+  umap_data$is_trash_cluster == TRUE
+
+UMAPPlot(seu, group.by = "is_debris", shuffle = TRUE, raster = FALSE,
+         alpha = 0.4, pt.size = 0.3)
+UMAPPlot(seu, split.by = "is_debris", group.by = "HBCATransferredLabels.Kumar_2023", label = TRUE, raster = FALSE,
+         alpha = 0.4, pt.size = 0.3) + NoLegend()
+
+p_umap <- cowplot::plot_grid(p1, p2, p3, p4, ncol = 2)
+print(p_umap)
+
+
+
+ggsave(file.path(OUTPUT_BASE, "figures/04_umap_validation.png"), p_umap,
+       width = 16, height = 10, dpi = 300)
+```
+
+## 4.2 UMI Comparison
+
+```{r UMI, fig.width=10, fig.height=8}
+seu@meta.data$delta <- analysis_data$delta
+UMI_data <- seu@meta.data %>%
+  filter(!is.na(nCount_RNA), !is.na(delta))
+
+p_UMI <- ggplot(UMI_data, aes(x = nCount_RNA, y = delta)) +
+  geom_hex(bins = 80) +
+  scale_fill_viridis_c(trans = "log10") +
+  labs(
+    title = "UMIs vs Delta") +
+  theme_bw(base_size = 14) + scale_x_log10()
+
+print(p_UMI)
+
+ggsave(file.path(OUTPUT_BASE, "figures/05_UMI.png"), p_UMI,
+       width = 10, height = 8, dpi = 300)
+
+```
+
+## 4.3 QC Metrics
+
+```{r qc, fig.width=14, fig.height=5}
+qc_data <- analysis_data %>%
+  select(is_artifact_total, nCount_RNA, nFeature_RNA, percent.mt) %>%
+  filter(!is.na(is_artifact_total)) %>%
+  pivot_longer(cols = c(nCount_RNA, nFeature_RNA, percent.mt), names_to = "metric", values_to = "value")
+
+# Calculate q95 bounds for each metric (global across both groups)
+qc_bounds <- qc_data %>%
+  group_by(metric) %>%
+  summarize(
+    q95 = quantile(value, 0.99, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Filter data to q95 range for clearer visualization
+qc_data_filtered <- qc_data %>%
+  left_join(qc_bounds, by = "metric") %>%
+  filter(value <= q95)
+
+p_qc <- ggplot(qc_data_filtered, aes(x = is_artifact_total, y = value, fill = is_artifact_total)) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.1, outlier.shape = NA) +
+  # Add q95 horizontal reference line
+  geom_hline(data = qc_bounds, aes(yintercept = q95),
+             linetype = "dashed", color = "black", linewidth = 0.5, alpha = 0.7) +
+  scale_fill_manual(values = c("FALSE" = "gray60", "TRUE" = "firebrick")) +
+  facet_wrap(~ metric, scales = "free_y", ncol = 3) +
+  labs(title = "QC Metrics: Total Artifacts vs Non-Artifact (filtered to Q99)",
+       x = "Artifact (Total)", y = "Value",
+       caption = "Dashed line = 95th percentile; values above Q99 excluded for clarity") +
+  theme_bw(base_size = 14)
+
+print(p_qc)
+
+ggsave(file.path(OUTPUT_BASE, "figures/06_qc.png"), p_qc, width = 14, height = 5, dpi = 300)
+```
+
+---
+
+# Section 5: Export & Provenance
+
+## 5.1 Primary Outputs
+
+```{r export_primary}
+cat("\n=== Finalizing Decisions & Provenance ===\n")
+
+# Define resolution columns dynamically
+fine_col <- cfg$clustering$fine_res
+coarse_col <- cfg$clustering$coarse_res
+
+# 1. Construct Decision Table with Waterfall Provenance
+final_decisions <- analysis_data %>%
+  mutate(
+    # UNION LOGIC: Remove if flagged by ANY method
+    to_remove = is_artifact_global | is_artifact_local | is_trash_cluster,
+    
+    # DETAILED PROVENANCE: Why was it removed?
+    # NOTE: Local elbow detection disabled - only GMM and trash cluster reasons remain
+    removal_reason = case_when(
+      # Hierarchical priority: Most severe first
+      is_trash_cluster ~ "TrashCluster_FinePocket",
+      is_artifact_global ~ "Global_Incoherence_GMM",
+      # is_artifact_global & is_artifact_local ~ "Both_Global_Local",  # Disabled
+      # is_artifact_local ~ "Local_Outlier_CoarseElbow",  # Disabled
+      TRUE ~ "Pass"
+    ),
+    
+    # Traceability metadata
+    gmm_posterior = round(gmm_posterior_artifact, 4),
+    coarse_cluster = !!sym(coarse_col),
+    coarse_elbow = round(elbow_delta_coarse, 4),
+    fine_cluster = !!sym(fine_col)
+  ) %>%
+  select(
+    # Identifiers
+    cell_id, sample_id, patient_id,
+    # Decision
+    to_remove, removal_reason,
+    # Metrics
+    delta, raw_r2, smooth_r2, delta_mad_scaled,
+    # Flags (for debugging)
+    is_artifact_global, is_artifact_local, is_trash_cluster,
+    # GMM details
+    gmm_classification, gmm_posterior,
+    # Coarse elbow details
+    coarse_cluster, coarse_elbow,
+    # Fine cluster details
+    fine_cluster,
+    # QC comparisons
+    nCount_RNA, nFeature_RNA, percent.mt, scDblFinder_score
+  )
+
+cat("✓ Decision table ready:", nrow(final_decisions), "cells\n")
+cat("  To remove:", sum(final_decisions$to_remove),
+    "(", round(100 * sum(final_decisions$to_remove) / nrow(final_decisions), 2), "%)\n\n")
+
+# 2. Export Artifact Barcodes (Primary List for Step 10c/10d)
+artifact_barcodes <- final_decisions %>%
+  filter(to_remove) %>%
+  pull(cell_id)
+
+writeLines(artifact_barcodes, file.path(OUTPUT_BASE, "exports/artifact_barcodes.txt"))
+cat("✓ artifact_barcodes.txt (n =", length(artifact_barcodes), ")\n")
+
+# 3. Export Trash Clusters List
+writeLines(as.character(trash_clusters),
+           file.path(OUTPUT_BASE, "exports/trash_clusters.txt"))
+cat("✓ trash_clusters.txt (n =", length(trash_clusters), ")\n")
+
+# 4. Export Manifest Update (for Central Cell Status CSV)
+manifest_update <- final_decisions %>%
+  transmute(
+    cell_id = cell_id,
+    sample_id = sample_id,
+    patient_id = patient_id,
+    step_10b_manifold_pass = !to_remove,  # TRUE = Keep, FALSE = Remove
+    step_10b_removal_reason = removal_reason
+  )
+
+write.csv(manifest_update,
+          file.path(OUTPUT_BASE, "exports/step10b_manifest_update.csv"),
+          row.names = FALSE)
+cat("✓ step10b_manifest_update.csv (for central manifest integration)\n")
+
+# 5. Export Full Decision Matrix (for debugging)
+write.csv(final_decisions,
+          file.path(OUTPUT_BASE, "exports/full_decision_matrix.csv"),
+          row.names = FALSE)
+cat("✓ full_decision_matrix.csv (", nrow(final_decisions), " cells ×",
+    ncol(final_decisions), " columns)\n", sep = "")
+
+# 6. Export Coarse Elbow Thresholds - DISABLED (local elbow detection removed)
+# if (exists("elbow_results_coarse") && nrow(elbow_results_coarse) > 0) {
+#   coarse_thresholds <- elbow_results_coarse %>%
+#     filter(status == "success") %>%
+#     select(cluster, elbow_delta, elbow_rank, status) %>%
+#     rename(!!coarse_col := cluster)
+#
+#   write.csv(
+#     coarse_thresholds,
+#     file.path(OUTPUT_BASE, "exports/coarse_elbow_thresholds.csv"),
+#     row.names = FALSE
+#   )
+#   cat("coarse_elbow_thresholds.csv (", nrow(coarse_thresholds), " clusters)\n", sep = "")
+# }
+cat("coarse_elbow_thresholds.csv: SKIPPED (local elbow disabled)\n")
+
+cat("\n")
+```
+
+## 5.2 Summary Report
+
+```{r summary_report}
+# Breakdown by removal reason
+reason_summary <- final_decisions %>%
+  group_by(removal_reason) %>%
+  summarise(
+    n_cells = n(),
+    pct = round(100 * n() / nrow(final_decisions), 2),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_cells))
+
+cat("=== Removal Reason Breakdown ===\n")
+print(reason_summary, row.names = FALSE)
+cat("\n")
+
+# Summary YAML
+summary_report <- list(
+  timestamp = as.character(Sys.time()),
+  config = list(
+    metric = cfg$metric,
+    n_features = cfg$n_features,
+    fine_resolution = cfg$clustering$fine_res,
+    coarse_resolution = cfg$clustering$coarse_res
+  ),
+  gmm_global = list(
+    G = gmm_fit$G,
+    artifact_component = artifact_component,
+    artifact_mean = component_stats$mean[artifact_component],
+    posterior_threshold = cfg$gmm_params$posterior_threshold,
+    n_flagged = sum(final_decisions$is_artifact_global, na.rm = TRUE)
+  ),
+  # coarse_elbow_local DISABLED - local elbow detection removed
+  coarse_elbow_local = list(
+    status = "disabled",
+    reason = "Local elbow flagged disproportionate cells in healthy clusters",
+    n_flagged = 0
+  ),
+  fine_enrichment = list(
+    total_clusters = nrow(cluster_stats_fine),
+    trash_clusters = length(trash_clusters),
+    elbow_threshold = round(elbow_threshold_fine, 2),
+    n_cells_in_trash = sum(final_decisions$is_trash_cluster, na.rm = TRUE)
+  ),
+  final_decision = list(
+    total_cells = nrow(final_decisions),
+    to_remove = sum(final_decisions$to_remove),
+    to_keep = sum(!final_decisions$to_remove),
+    pct_removed = round(100 * sum(final_decisions$to_remove) / nrow(final_decisions), 2),
+    reason_breakdown = setNames(reason_summary$n_cells, reason_summary$removal_reason)
+  )
+)
+
+write_yaml(summary_report, file.path(OUTPUT_BASE, "exports/summary.yaml"))
+cat("✓ summary.yaml saved\n\n")
+```
+
+---

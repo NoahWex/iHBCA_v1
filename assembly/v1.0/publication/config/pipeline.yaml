@@ -1,0 +1,171 @@
+# =============================================================================
+# iHBCA v1.0 PIPELINE CONFIGURATION
+# =============================================================================
+# Single source of truth for all I/O paths in the assembly pipeline.
+# All paths are relative to the repository root unless noted otherwise.
+#
+# This file is loaded by publication/scripts/ihbca/loaders.py and
+# publication/run/load_config.sh. Scripts should not hardcode paths.
+# =============================================================================
+
+project:
+  name: "iHBCA v1.0"
+  schema_version: "5.3.2"
+  target: "hca"  # hca | cxg
+
+# ---------------------------------------------------------------------------
+# GLOBAL PATHS
+# ---------------------------------------------------------------------------
+
+paths:
+
+  # Mapping / lookup tables
+  mappings:
+    gene_symbol_to_ensembl: "publication/mappings/gene_symbol_to_ensembl_full.tsv"
+    gene_symbol_to_ensembl_v24: "publication/mappings/gene_symbol_to_ensembl_v24.tsv"
+    gene_symbol_to_ensembl_legacy: "publication/mappings/gene_symbol_to_ensembl.tsv"
+    hancestro_ethnicity: "publication/mappings/hancestro_ethnicity_mapping.tsv"
+    efo_assay: "publication/mappings/efo_assay_mapping.tsv"
+    hsapdv_age: "publication/mappings/hsapdv_age_mapping.tsv"
+    cxg_approved_genes: "publication/mappings/cxg_approved_genes.txt"
+    gencode_v24: "publication/mappings/gencode_v24_gene_annotations.tsv"
+    level15_to_cl: "publication/mappings/level15_to_cl_mapping.csv"
+
+  # Configuration files
+  config:
+    dataset_registry: "publication/config/source_dataset_registry.yaml"
+    dataset_metadata: "publication/config/dataset_metadata.yaml"
+    l1_harmonized_donor: "publication/config/metadata_stages/L1_harmonized_donor.csv"
+
+  # Inputs from external_studies harmonization pipeline
+  inputs:
+    harmonized_metadata: "external_studies/harmonization/outputs/harmonized_metadata/harmonized_donor_metadata.csv"
+
+  # Output directories
+  outputs:
+    source_datasets: "publication/outputs/source_datasets"
+    integrated_objects: "publication/outputs/integrated_objects"
+    validation_reports: "publication/outputs/validation_reports"
+    entry_sheets: "publication/outputs/entry_sheets"
+    entry_sheets_donor: "publication/outputs/entry_sheets/tier1_donor"
+    entry_sheets_sample: "publication/outputs/entry_sheets/tier1_sample"
+    entry_sheets_xlsx: "publication/outputs/entry_sheets/tier1_xlsx"
+
+# ---------------------------------------------------------------------------
+# SOURCE STUDIES
+# ---------------------------------------------------------------------------
+# Per-study I/O paths, classification, and optional study-specific mappings.
+#
+# type: cxg     = downloaded from CxG, has existing ontology columns
+# type: non_cxg = assembled from published data, needs ontology backfill
+
+studies:
+
+  gray:
+    type: cxg
+    cells: 52681
+    donors: 16
+    output_filename: "gray2022.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/gray/intermediates"
+      published: "external_studies/outputs/gray/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_gray.csv"
+
+  kumar:
+    type: cxg
+    cells: 714331
+    donors: 126
+    output_filename: "kumar2023.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/kumar/intermediates"
+      published: "external_studies/outputs/kumar/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_kumar.csv"
+
+  murrow:
+    type: non_cxg
+    cells: 86136
+    donors: 28
+    output_filename: "murrow2022.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/murrow/intermediates"
+      published: "external_studies/outputs/murrow/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_murrow.csv"
+      cl_crosswalk: "publication/mappings/cl_term_crosswalk_murrow.csv"
+
+  nee:
+    type: non_cxg
+    cells: 230100
+    donors: 22
+    output_filename: "nee2023.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/nee/intermediates"
+      published: "external_studies/outputs/nee/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_nee.csv"
+      cl_crosswalk: "publication/mappings/cl_term_crosswalk_nee.csv"
+
+  twigger:
+    type: cxg
+    cells: 110744
+    donors: 16
+    output_filename: "twigger2022.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/twigger/intermediates"
+      published: "external_studies/outputs/twigger/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_twigger.csv"
+
+  reed:
+    type: cxg
+    cells: 803283
+    donors: 55
+    output_filename: "reed2024.h5ad"
+    inputs:
+      intermediates: "external_studies/outputs/reed/intermediates"
+      published: "external_studies/outputs/reed/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_reed.csv"
+      donor_translation: "publication/mappings/donor_id_translation_reed.csv"
+
+  pal:
+    type: non_cxg
+    cells: 131288
+    donors: 22
+    output_filename: "pal2021.h5ad"
+    sub_studies:
+      - name: pal_norm_epi
+        intermediates: "external_studies/outputs/pal_norm_epi/intermediates"
+        published: "external_studies/outputs/pal_norm_epi/published"
+      - name: pal_norm_total
+        intermediates: "external_studies/outputs/pal_norm_total/intermediates"
+        published: "external_studies/outputs/pal_norm_total/published"
+      - name: pal_norm_b1
+        intermediates: "external_studies/outputs/pal_norm_b1/intermediates"
+        published: "external_studies/outputs/pal_norm_b1/published"
+    mappings:
+      sra_run_table: "publication/mappings/sra_run_table_pal.csv"
+      cl_crosswalk: "publication/mappings/cl_term_crosswalk_pal.csv"
+      donor_translation: "publication/mappings/donor_id_translation_pal.csv"
+
+# ---------------------------------------------------------------------------
+# INTEGRATED OBJECT
+# ---------------------------------------------------------------------------
+
+integrated:
+  output_filename: "all-breast-cells.h5ad"
+  sketch_filename: "all-breast-cells-sketch.h5ad"
+  cells: 2119033
+  donors: 287
+  # Author share inputs (external to repo — set via CLI --ihbca-root or env)
+  inputs:
+    gene_data: "author_share/scVI_gene_data.csv"
+    embeddings: "author_share/X_scVI100.csv"
+    umap: "author_share/X_scVI100_UMAP.csv"
+    annotations: "author_share/ihbca_level1.5_annotations.csv"
+  lineage_splits:
+    epithelial: "breast-epithelial-lineage.h5ad"
+    stromal: "breast-stromal-lineage.h5ad"
+    immune: "breast-immune-lineage.h5ad"

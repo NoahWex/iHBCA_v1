@@ -1,0 +1,29 @@
+# =============================================================================
+# PAL NORM B1 STUDY CONFIGURATION
+# =============================================================================
+
+study_name: pal_norm_b1
+source_path: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormB1Total.rds"
+ihbca_dataset: "Pal"
+
+cell_id_format:
+  pattern: "B1_{donor}_{barcode}-1"
+  has_suffix: true
+  example: "B1_0894_AAACCTGAGACTAGGC-1"
+  notes: "Pal substudy - BRCA1 carriers (B1 prefix)"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues:
+  - PAL_DONOR_COLLISION  # Donor 0123 collides with MH0023
+
+exclude_donors:
+  - "0123"  # Must be excluded - collides with MH0023
+
+shared_reference: "../pal_shared/donor_mapping.yaml"
+
+notes: |
+  Very complex - Pal substudy 3 of 3 (BRCA1 carriers + normal).
+  59,766 cells. See pal_shared/ for donor mapping.
+  Testable conditions to be determined during discovery phase.

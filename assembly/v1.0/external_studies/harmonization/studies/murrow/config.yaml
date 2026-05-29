@@ -1,0 +1,22 @@
+# =============================================================================
+# MURROW STUDY CONFIGURATION
+# =============================================================================
+
+study_name: murrow
+source_path: "${SOURCE_COMPONENT_STUDIES}/murrow_l1_original.rds"
+ihbca_dataset: "Murrow"
+
+cell_id_format:
+  pattern: "{batch}_{barcode}-1"
+  has_suffix: true
+  example: "V3.RMs_AAACCCAAGAGGATGA-1"
+  notes: "Dots in batch prefix"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues: []
+
+notes: |
+  Simple study - proof of concept candidate.
+  Testable conditions to be determined during discovery phase.

@@ -1,0 +1,416 @@
+meta:
+  compartment: Stromal
+  base_resolution: '0.3'
+  fibroblast_resolution: '0.5'
+  experiment: Stromal_clean
+
+# Canonical full names for L1.5 labels in this compartment.
+vocabulary:
+  Fibroblast:
+    full_name: Fibroblast (interstitial)
+    label_short: Fb
+    lineage: Fibroblast
+    notes: Canonical interstitial fibroblast (FBLN1/CCDC80/LUM/CXCL12+; DCN/COL1A1/COL1A2 in FLEX)
+  Fibroblast_activated:
+    full_name: Fibroblast (POSTN+ activated)
+    label_short: Fb_Activated
+    lineage: Fibroblast
+    notes: POSTN+/IGF1+/PDGFRB+ activated fibroblast; ADAM12/ADAMTS12 in FLEX. Provisional — pending scVI marker confirmation
+  Fibroblast_SFRP4:
+    full_name: Fibroblast (SFRP4+ hormone-responsive)
+    label_short: Fb_SFRP4
+    lineage: Fibroblast
+    notes: SFRP4+/ESR1+/PGR+ Wnt-antagonist hormone-responsive fibroblast. Override at res 0.7 cluster c10 (corrected from c9 per fibroblast multi-marker review 2026-04-26)
+  Endothelial:
+    full_name: Endothelial (blood; arterial + vein, capillary split out)
+    label_short: EC
+    lineage: Endothelial
+    notes: Blood endothelial — PECAM1/VWF/AQP1/CD93/MMRN2; FLEX adds RAPGEF3/EGFL7/PTPRB.
+      Vein (ACKR1+SELP+SELE+CCL14) and arterial (SOX17+SEMA3G+GJA5+HEY1) populations
+      remain merged; capillary split out at res 0.7 c7 (see overrides).
+  Vas-capillary:
+    full_name: Vascular endothelial — capillary
+    label_short: Vas-cap
+    lineage: Endothelial
+    notes: Capillary endothelium — RBP7+CD93+CAPN2+ADGRL4+FABP4+LPL+EGFL7+ADGRF5+ARHGEF15
+      (lipid transport via capillary, capillary-specific EC markers). Override at res
+      0.7 cluster c7 — 75.4% of FLEX VE-labeled cells in c7 are L2S Vas-capillary
+      (2516 / 3338); see overrides block.
+  "Lymphatic Endothelial":
+    full_name: Lymphatic Endothelial
+    label_short: LEC
+    lineage: Endothelial
+    notes: FLT4 (VEGFR3)/TBX1/MRC1/CAVIN2/ANGPT2; distinct from blood EC
+  Pericyte:
+    full_name: Pericyte (incl. smooth muscle)
+    label_short: PV
+    lineage: Pericyte
+    notes: ACTA2+/NOTCH3+/MCAM+/PDGFRB+; res-0.5 c10 smooth muscle merged here (cannot distinguish without FLEX pericyte signature)
+  Adipocyte:
+    full_name: Adipocyte
+    label_short: Adipo
+    lineage: Adipocyte
+    notes: ADIPOQ/ADH1B/LPL/PLIN1/PLIN4/PNPLA2 — definitive adipocyte
+artifact_vocabulary:
+  Immune_artifact: { full_name: "Stromal nucleus capturing immune RNA (PDCD1+/GZMK+ contamination at stromal-immune boundary)" }
+
+base:
+  '0':
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    confidence: high
+    notes: 'Nuclear: FBLN1(4.6,74%), CCDC80(4.0,67%), MMP2(3.3,66%), LUM(3.4,78%), CXCL12(2.5,84%). Cyto: FBLN1(3.7,87%),
+      CCDC80(3.0,84%), MMP2(2.8,84%), CXCL12(1.7,95%), LUM(2.2,89%). FLEX: DCN(3.8,85%), COL1A2(3.5,94%), COL6A3(3.2,89%),
+      TNXB(3.0,90%), COL1A1(3.4,93%). Canonical interstitial fibroblast: FBLN1/CCDC80/LUM in Xenium; DCN/COL1A1/COL1A2 in
+      FLEX. CXCL12 marks resting/interstitial fibroblast niche. Triple-concordant.
+
+      '
+  '1':
+    label: Fibroblast_activated
+    label_short: Fb_Activated
+    lineage: Fibroblast
+    confidence: medium
+    notes: 'Nuclear: POSTN(6.2,82%), IGF1(5.1,73%), LUM(4.9,92%), PDGFRB(4.0,83%), PDGFRA(4.2,75%). Cyto: POSTN(4.9,85%),
+      IGF1(3.7,81%), LUM(3.3,96%), PDGFRB(3.2,85%), ITM2C(3.0,71%). FLEX: ADAM12(3.5,77%), PLXDC1(3.1,79%), COL3A1(2.8,95%),
+      POSTN(3.4,63%), ADAMTS12(2.5,72%). POSTN+ activated fibroblast. Distinct from c0 in Concord space by POSTN/PDGFRB signal
+      in the 280-gene panel. ADAM12/ADAMTS12 in FLEX suggest remodeling activity, but these markers are absent from the Xenium
+      panel. Label is PROVISIONAL: at scVI res=5.0, 45 fibroblast sub-states exist and split heterogeneously across c0 and
+      c1 — the Concord split does not correspond to a clean scVI boundary. True label pending scVI marker extraction (run_scvi_fib_markers_stromal.sh).
+      Do NOT use "CAF" — CAF requires cancer context.
+
+      '
+  '2':
+    label: Endothelial
+    label_short: EC
+    lineage: Endothelial
+    confidence: high
+    notes: 'Nuclear: PECAM1(8.4,81%), VWF(9.0,79%), AQP1(6.6,84%), CD93(8.1,71%), MMRN2(7.9,66%). Cyto: AQP1(5.0,85%), PECAM1(5.7,79%),
+      VWF(6.1,75%), CD93(5.0,65%), MMRN2(5.1,57%). FLEX: NPDC1(4.8,89%), PECAM1(6.6,85%), VWF(7.3,84%), RAPGEF3(6.0,85%),
+      EGFL7(6.6,81%), PTPRB(6.6,79%). Blood endothelial: PECAM1/VWF/AQP1/MMRN2 confirmed all three layers. FLEX adds RAPGEF3/EGFL7/PTPRB
+      (endothelial-specific signaling). Triple-concordant.
+
+      '
+  '3':
+    label: Pericyte
+    label_short: PV
+    lineage: Pericyte
+    confidence: high
+    notes: 'Nuclear: ACTA2(6.1,90%), MYLK(6.0,69%), MYH11(6.4,48%), CAV1(2.9,71%), AVPR1A(6.1,37%), PDGFRB(high). Cyto: ACTA2(3.4,91%),
+      MYLK(3.7,70%), MYH11(4.3,53%), CAV1(2.1,82%). FLEX: NOTCH3(5.8,77%), MCAM(4.3,80%), TAGLN(3.9,87%), ACTA2(5.4,76%),
+      TINAGL1(4.2,79%), CSRP1(3.8,82%). Pericyte: NOTCH3 (pericyte TF, LFC=5.8) and MCAM/CD146 (pericyte surface marker, LFC=4.3)
+      are exclusive to c3 in FLEX across all stromal clusters. Xenium panel lacks both NOTCH3 and MCAM — FLEX extends the
+      call. Nuclear: PDGFRB + CAV1 present; fibroblast markers (FBLN1, CCDC80, DCN) absent — rules out fibroblast identity.
+      Contractile markers (ACTA2/MYH11/MYLK) are shared with smooth muscle but expected in pericytes. Distinguished from smooth
+      muscle by FLEX pericyte signature (NOTCH3/MCAM exclusive to c3); smooth muscle emerges as a discrete Xenium-only cluster
+      at res=0.5 (c10) lacking the FLEX pericyte signature entirely.
+
+      '
+  '4':
+    label: Adipocyte
+    label_short: Adipo
+    lineage: Adipocyte
+    confidence: high
+    notes: 'Nuclear: ADIPOQ(11.7,90%), ADH1B(8.0,89%), LPL(7.2,84%), SCD(7.2,62%), FASN(6.5,62%). Cyto: ADIPOQ(9.7,97%), ADH1B(7.3,98%),
+      LPL(6.9,97%), FASN(6.9,87%), AKR1C1(6.0,91%). FLEX: PLIN1(8.8,99%), PLIN4(8.9,98%), PNPLA2(5.7,98%), GPD1(8.2,96%),
+      ADIPOQ(7.8,94%). Definitive adipocyte: ADIPOQ confirmed all three layers. FLEX extends with lipid droplet structural
+      proteins (PLIN1/PLIN4) and lipolysis machinery (PNPLA2/GPD1). Triple-concordant.
+
+      '
+  '5':
+    label: Lymphatic Endothelial
+    label_short: LEC
+    lineage: Endothelial
+    confidence: high
+    notes: 'Nuclear: CAVIN2(6.1,74%), MRC1(8.5,63%), CD9(6.1,64%), CCND1(4.6,67%), CAV1(3.1,74%). Cyto: CAVIN2(6.5,89%), CD9(5.7,73%),
+      MRC1(5.4,67%), ANGPT2(5.8,54%), RAMP2(3.9,70%). FLEX: FLT4(6.4,84%), TBX1(6.6,82%), DOCK5(5.0,86%), PPFIBP1(3.6,90%),
+      KALRN(3.6,85%). FLT4 (VEGFR3) in FLEX is the definitive lymphatic marker. TBX1 is a lymphatic transcription factor.
+      Nuclear: MRC1 (LYVE1 pathway, mannose receptor), CAVIN2 (caveolin-related, expressed in lymphatics), ANGPT2 (lymphangiogenesis).
+      Triple-concordant. Distinct from blood EC (c2): no VWF/CD93/MMRN2/EGFL7; FLT4 vs PECAM1-dominant.
+
+      '
+  '6':
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    confidence: high
+    notes: 'Nuclear: FBLN1(3.5,67%), CCDC80(2.8,57%), CXCL12(0.4,63%), MMP2(1.1,44%). Cyto: FBLN1(3.1,85%), CCDC80(2.6,83%),
+      MMP2(1.6,76%), CXCL12(1.0,90%). FLEX: COL1A2(3.0,94%), COL1A1(3.0,91%), DCN(2.8,85%), COL3A1(2.6,88%), MMP2(2.5,76%).
+      Second fibroblast population: same FBLN1/CCDC80/DCN/COL1A1 identity as c0 but lower LFC vs c0 (these two differ from
+      each other, not from other lineages). Consistent with two fibroblast subtypes that partially overlap in marker space.
+      Both assigned Fibroblast at L0.5; see fibroblast_detail section for res=0.5 split.
+
+      '
+xenium_only:
+  resolution: '0.3'
+  note: 'FLEX cells absent from c7–c14. Per corrected CPU-neighbor 2x2 marker review (2026-04-20), all clusters show PDCD1+GZMK
+    immune contamination: T-cell exhaustion/effector markers (PDCD1=PD-1, GZMK=Granzyme K) in Xenium stromal nuclei indicate
+    ambient T-cell RNA capture at the stromal–immune boundary. These clusters carried incorrect labels in earlier annotation
+    passes derived from mismatched RAPIDS-neighbor cluster numbering; corrected numbering revealed the immune contamination
+    pattern. All c7–c14 are classified as artifacts at L0.5. Smooth muscle and adipocyte cells present in the compartment
+    are captured at res=0.5 (Smooth_Muscle c10) or within res=0.3 c3–c4.
+
+    '
+  '7':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX). Ambient T-cell RNA in stromal nucleus.
+  '8':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '9':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '10':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '11':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '12':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '13':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+  '14':
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: PDCD1+GZMK immune contamination. Xenium-only (no FLEX).
+fibroblast_detail:
+  resolution: '0.5'
+  principle: 'At res=0.5, the two res=0.3 fibroblast clusters (c0+c6) resolve into four populations distinguished by SFRP4
+    expression, PDGFRA/B ratio, and AKR1C3 steroidogenic activity. All retain Fibroblast label at L0.5; may warrant L2.0s
+    subdivision. A Smooth_Muscle cluster also emerges at res=0.5 (c10); see smooth_muscle_detail section below.
+
+    '
+  fib_interstitial:
+    cluster: '1'
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    notes: 'Nuclear: FBLN1(4.0,77%), CCDC80(3.7,72%), LUM(3.8,86%), MMP2(3.4,72%), CXCL12(3.0,91%), PDGFRA(3.2,69%). FLEX:
+      DCN(3.7,91%), C1S(3.0,87%), COL6A3(2.9,94%), MMP2(3.2,83%), FBLN1(3.4,78%). PDGFRA+ interstitial fibroblast. C1S (complement
+      C1s) in FLEX consistent with immune-interacting fibroblast subset. CXCL12-hi.
+
+      '
+  fib_sfrp4:
+    cluster: '4'
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    notes: 'Nuclear: FBLN1(3.2,67%), CCDC80(2.4,56%), SFRP4(3.4,32%), MMP2(1.4,51%). Cyto: FBLN1(3.1,86%), CCDC80(2.4,82%),
+      MMP2(2.0,80%), SFRP4(3.1,48%), CXCL12(0.7,90%). FLEX: ADAM33(2.0,86%), COL1A2(1.7,89%), COL1A1(1.8,89%), TNXB(1.4,83%).
+      SFRP4+ fibroblast; SFRP4 marks a distinct stromal subpopulation in breast tissue. Lower CXCL12 than c1. FLEX: ADAM33
+      (ADAM metalloprotease, stromal remodeling).
+
+      '
+  fib_pdgfrab:
+    cluster: '5'
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    notes: 'Nuclear: PDGFRA(3.9,79%), PDGFRB(3.4,83%), LUM(3.8,90%), IGF1(3.4,67%), CXCL12(2.2,87%). Cyto: PDGFRB(2.3,80%),
+      PDGFRA(2.5,77%), ITM2C(2.3,67%), IGF1(2.1,72%), LUM(2.2,93%). FLEX: LAMB1(1.7,74%), COL3A1(1.7,89%), PLXDC1(1.8,65%),
+      COL6A3(1.6,88%). PDGFRA+/PDGFRB+ dual-positive fibroblast; lower FBLN1/CCDC80 than c1/c4. IGF1+ consistent with signaling-active
+      fibroblast. Bridging fibroblast–CAF state?
+
+      '
+  fib_akr1c3:
+    cluster: '8'
+    label: Fibroblast
+    label_short: Fb
+    lineage: Fibroblast
+    notes: 'Nuclear: AKR1C3(defining marker), LUM, FBLN1. AKR1C3 (aldo-keto reductase family 1 member C3; converts androstenedione
+      to testosterone, also involved in estrogen metabolism) defines this cluster. LUM/FBLN1 confirm interstitial fibroblast
+      identity. AKR1C3 is absent from clusters c1/c4/c5 at this resolution — exclusive marker at res=0.5. Steroidogenically
+      active fibroblast subtype; candidate for spatial proximity analysis near hormone-responsive epithelium. Xenium-only
+      (no FLEX cells at this resolution). Fibroblast at L0.5; may warrant L2.0s subdivision.
+
+      '
+smooth_muscle_detail:
+  resolution: '0.5'
+  note: 'At res=0.3, smooth muscle signal is subsumed within the c7–c14 artifact clusters (which show PDCD1+GZMK contamination).
+    At res=0.5, smooth muscle separates into a clean Xenium-only cluster (c10) with canonical ACTG2/MYH11/ACTA2 markers.
+
+    '
+  '10':
+    label: Pericyte
+    label_short: PV
+    lineage: Pericyte
+    notes: 'ACTG2/MYH11/ACTA2-dominant contractile cluster. No FLEX cells — NOTCH3/MCAM cannot be verified. Merged with Pericyte
+      (c3) at L0.5; cannot distinguish smooth muscle from pericyte without the FLEX pericyte signature.
+
+      '
+overrides:
+  resolution: '0.7'
+  principle: 'At res=0.7, two non-base biological splits land: (1) fibroblast subpopulations resolve into three labeled
+    clusters — SFRP4+ hormone-responsive (c10), POSTN+ activated (c11, clean), and a contamination-flagged activated cluster
+    (c9, retained but flagged for endothelial leakage); (2) endothelial cells split into a capillary-dominant subcluster
+    (c7) and a vein/arterial-mixed remainder (c0). Capillary override is data-driven: 75.4% of FLEX VE-labeled cells in
+    c7 are L2S Vas-capillary (2516/3338) per cross-reference with the Track C FLEX annotation yaml. Vein and arterial remain
+    merged in c0 (vein 76.4%, arterial 20.1%) — separability of those two is below threshold for cluster-based override.
+    Fibroblast cluster numbering corrected 2026-04-26 per fibroblast multi-marker review (Spatial_HBCA_Xenium/.dev/fig3_render_20260426/):
+    prior assignment of Fibroblast_SFRP4 to c9 was incorrect — the SFRP4-high cluster is c10 (Xen mean 1.45/pct 82%, FLEX
+    mean 0.73/pct 48%; ESR1 mean 0.37, MGP mean 0.78 FLEX). Cluster 9 carries POSTN/ACTA2/PDGFRB activated signature plus
+    PECAM1/VWF endothelial leakage (boundary/doublet artifact); retained as Fibroblast_activated but flagged for QC. Cluster
+    11 is a clean second activated cluster (POSTN 0.88, ADAM12 0.86 FLEX, no endothelial leakage). SFRP4 override remains
+    triple-concordant (nuclear + FLEX). All three fibroblast calls confirmed in both Xenium nuclear and FLEX assays.
+
+    '
+  '7':
+    label: Vas-capillary
+    label_short: Vas-cap
+    lineage: Endothelial
+    confidence: high
+    base_label_overridden: Endothelial
+    evidence:
+      l2s_concordance:
+      - 'FLEX cells in c7 with VE L2S labels: 3338'
+      - 'Vas-capillary: 2516 (75.4%)'
+      - 'Vas-vein: 566 (17.0%)'
+      - 'Vas-arterial: 256 (7.7%)'
+      flex_top_markers:
+      - 'RBP7, ABLIM3, NOSTRIN, TIMP4, RAMP3, ADGRG1, CAPN2, KIAA1217, ADGRL4, ARHGEF15,
+        LITAF, FLT4, MYO5C, FABP4, LPL, EGFL7, CD93, ADGRF5, SOX17 (per Track C L2S yaml)'
+      panel_genes_present:
+      - CD93
+      - SOX17
+    notes: 'Capillary endothelium split from base Endothelial bucket. RBP7+FABP4+LPL define
+      lipid-transport capillary signature; CD93+ADGRL4 are capillary-enriched EC markers
+      (CD93 is panel-resolvable). Vein and arterial populations remain merged in the c0
+      remainder — at res=0.7 those two are not cleanly separable in the joint Concord
+      latent (silhouette in 2D UMAP = 0.14 across all 3 VE states; arterial dilutes across
+      c0 and c14 rather than concentrating). Capillary is the only VE state with a clear
+      cluster-level concordance gate at this resolution.
+
+      '
+  '9':
+    label: Fibroblast_activated
+    label_short: Fb_Activated
+    lineage: Fibroblast
+    confidence: medium
+    base_label_overridden: Fibroblast
+    qc_flag: endothelial_contamination_review
+    evidence:
+      nuclear:
+      - 'POSTN: mean=0.76, pct=47.7% (POSTN+ activated signature)'
+      - 'ACTA2: mean=0.66, pct=52.9%'
+      - 'PDGFRB: mean=0.90, pct=71.8%'
+      - 'IGF1: mean=0.50, pct=45.6%'
+      - 'PECAM1: mean=0.33, pct=36.5% (CONTAMINATION FLAG: endothelial leakage)'
+      - 'VWF: mean=0.28, pct=31.4% (CONTAMINATION FLAG: endothelial leakage)'
+      flex:
+      - 'POSTN: mean=0.29, pct=22.4%'
+      - 'ADAM12: mean=0.46, pct=35.9%'
+      - 'PLXDC1: mean=0.66, pct=53.6%'
+      - 'PDGFRB: mean=0.76, pct=64.3%'
+      panel_genes_present:
+      - POSTN
+      - ACTA2
+      - PDGFRB
+      - PECAM1
+      - VWF
+    notes: 'POSTN+/ACTA2+/PDGFRB+ activated fibroblast with PECAM1/VWF endothelial leakage. Nuclear PECAM1 0.33 / VWF 0.28
+      are 26x higher than other fibroblast clusters at res=0.7, suggesting boundary/doublet capture or ambient endothelial
+      RNA. Retained as Fibroblast_activated for downstream DA but flagged for QC review. PRIOR LABEL Fibroblast_SFRP4 was
+      incorrect — cluster 9 SFRP4 mean is 0.20 nuclear / 0.15 FLEX (pct 18.6% / 12.2%), does not meet SFRP4-high threshold.
+      See fibroblast multi-marker review 2026-04-26 for evidence chain.
+
+      '
+  '10':
+    label: Fibroblast_SFRP4
+    label_short: Fb_SFRP4
+    lineage: Fibroblast
+    confidence: high
+    base_label_overridden: Fibroblast
+    evidence:
+      nuclear:
+      - 'SFRP4: mean=1.45, pct=82.0% (highest SFRP4 of any stromal cluster at res=0.7)'
+      - 'ESR1: mean=0.37, pct=40.7% (hormone receptor)'
+      - 'PGR: mean=0.21, pct=23.2%'
+      - 'FBLN1: mean=0.96, pct=73.9% (shared fibroblast marker)'
+      - 'CCDC80: mean=0.83, pct=65.5%'
+      - 'PECAM1: mean=0.004, pct=0.6% (clean — no endothelial contamination)'
+      - 'VWF: mean=0.002, pct=0.3% (clean)'
+      flex:
+      - 'SFRP4: mean=0.73, pct=47.8% (confirmed in full transcriptome)'
+      - 'ESR1: mean=0.20, pct=21.9%'
+      - 'MGP: mean=0.78, pct=53.2%'
+      - 'FAP: mean=0.14, pct=14.8%'
+      - 'FBLN1: mean=0.93, pct=58.4%'
+      panel_genes_present:
+      - SFRP4
+      - ESR1
+      - PGR
+    notes: 'Hormone-responsive SFRP4+ fibroblast — corrected cluster assignment 2026-04-26 (was incorrectly assigned to c9
+      in prior overrides; multi-marker review across both Xenium nuclear and FLEX confirmed c10 is the true SFRP4-high cluster).
+      ESR1+/PGR+ co-expression with SFRP4 marks a stromal population responsive to estrogen/progesterone signaling — distinct
+      from the fibro-SFRP4 state in Kumar et al. 2023 (which did not describe ESR1 co-expression). SFRP4 (Wnt antagonist)
+      in a hormone-responsive stromal context suggests cross-talk between hormone and Wnt signaling pathways in the breast
+      stroma. Candidate for spatial proximity analysis near epithelium (CellCharter niche work). Panel-gene scoring for this
+      state: SFRP4 + ESR1 + PGR (all available).
+
+      '
+  '11':
+    label: Fibroblast_activated
+    label_short: Fb_Activated
+    lineage: Fibroblast
+    confidence: high
+    base_label_overridden: Fibroblast
+    evidence:
+      nuclear:
+      - 'POSTN: mean=0.88, pct=57.1% (clean POSTN+ activated signature)'
+      - 'ACTA2: mean=0.28, pct=28.3%'
+      - 'PDGFRB: mean=0.55, pct=56.2%'
+      - 'PDGFRA: mean=0.52, pct=53.4%'
+      - 'PECAM1: mean=0.001, pct=0.1% (clean — no endothelial contamination)'
+      - 'VWF: mean=0.001, pct=0.1% (clean)'
+      flex:
+      - 'POSTN: mean=0.64, pct=43.9%'
+      - 'ADAM12: mean=0.86, pct=61.3% (highest ADAM12 of any stromal cluster)'
+      - 'PLXDC1: mean=0.72, pct=57.9%'
+      - 'PDGFRB: mean=0.55, pct=52.9%'
+      panel_genes_present:
+      - POSTN
+      - ACTA2
+      - PDGFRB
+    notes: 'Clean POSTN+/ADAM12+ activated fibroblast. ADAM12 (FLEX) at 0.86 / 61.3% is the highest of any stromal cluster,
+      indicating active matrix remodeling. No PECAM1/VWF endothelial contamination (in contrast to c9). Promoted to Fibroblast_activated
+      override 2026-04-26 from default Fibroblast assignment. Candidate for joint Milo DA grouped with c1 (res=0.3) activated
+      fibroblasts. Evidence chain: fibroblast multi-marker review (Spatial_HBCA_Xenium/.dev/fig3_render_20260426/temp_fibroblast_markers_summary.csv).
+
+      '
+final_labels:
+- Fibroblast
+- Fibroblast_activated
+- Fibroblast_SFRP4
+- Endothelial
+- Vas-capillary
+- Pericyte
+- Adipocyte
+- Lymphatic Endothelial
+artifact_labels:
+- Immune_artifact

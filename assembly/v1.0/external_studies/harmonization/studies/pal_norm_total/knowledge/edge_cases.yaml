@@ -1,0 +1,285 @@
+# =============================================================================
+# PAL NORM_TOTAL - EDGE CASES AND KNOWN ISSUES
+# =============================================================================
+# Documented exceptions specific to pal_norm_total study.
+# See also: .claude/rules/integration-assessment/knowledge.md for global issues.
+# =============================================================================
+
+study: pal_norm_total
+last_updated: 2026-01-20
+
+# =============================================================================
+# CELL ID MAPPING ISSUES
+# =============================================================================
+
+cell_id_mapping:
+  - id: "pal-unmatched-total"
+    category: "partial_match"
+    severity: "documented"
+
+    description: |
+      Approximately 12% of cells in the native Pal NormTotal object are not
+      found in the iHBCA Pal subset.
+
+    affected:
+      cells: 6440
+      total: 54332
+      percentage: 11.9
+
+    root_cause: |
+      Different filtering criteria between original Pal analysis and iHBCA
+      integration. The native Pal object contains cells that were filtered
+      out during Reed et al.'s iHBCA integration process.
+
+    evidence:
+      - "Native object has 54,332 cells"
+      - "iHBCA Pal subset has 124,790 cells total across all 3 substudies"
+      - "~12% of NormTotal cells have no match in iHBCA"
+
+    resolution: "Document and proceed"
+    impact: |
+      Unmatched cells will be excluded from canonical DA analysis. This is
+      acceptable as long as the filtering does not systematically bias
+      particular cell types or conditions.
+
+    verification_needed:
+      - "Check if unmatched cells are distributed evenly across donors"
+      - "Check if unmatched cells are distributed evenly across menopausal groups"
+      - "Check if unmatched cells cluster in specific cell types"
+
+# =============================================================================
+# METADATA QUALITY ISSUES
+# =============================================================================
+
+metadata_quality:
+  - id: "pal-parity-confounding"
+    category: "confounded_variable"
+    severity: "skip_condition"
+
+    description: |
+      Parity (parous vs nulliparous) is confounded with menopausal status
+      in the Pal study design.
+
+    evidence:
+      pre_menopausal:
+        nulliparous: 5
+        parous: 3
+      post_menopausal:
+        nulliparous: 2
+        parous: 3
+      note: "Most pre-menopausal samples are from younger nulliparous women"
+
+    original_author_statement: |
+      The original authors explicitly noted they could not decipher
+      independent parity effects due to this confounding.
+
+    resolution: "Skip parity DA tests for all Pal substudies"
+
+    applies_to:
+      - "pal_norm_total"
+      - "pal_norm_epi"
+      - "pal_norm_b1"
+
+  - id: "pal-no-age-contrast"
+    category: "insufficient_contrast"
+    severity: "skip_condition"
+
+    description: |
+      Age is partially confounded with menopausal status and does not
+      provide independent testable contrast within menopausal groups.
+
+    evidence:
+      pre_meno_age_range: "19-48"
+      post_meno_age_range: "48-69"
+      overlap: "N-0123 (pre, 48) vs N-0021 (post, 48)"
+
+    resolution: "Skip age_binary DA tests for pal_norm_total"
+
+# =============================================================================
+# CELL ID FORMAT ISSUES
+# =============================================================================
+
+cell_id_format:
+  - id: "pal-type-field-mismatch"
+    category: "format_clarification"
+    severity: "documentation"
+
+    description: |
+      In the original analysis code, samples are named with `-total` suffix
+      (e.g., N-0019-total), but the actual cell IDs in the Seurat object
+      use `mix` as the type field.
+
+    evidence:
+      code_naming: "N-0019-total"
+      cell_id_format: "N_0019_mix_BARCODE-1"
+
+    resolution: |
+      When parsing cell IDs, expect `mix` in the type field for NormTotal
+      cells, not `total`. The `-total` suffix is only used in the sample
+      naming convention.
+
+    verification_needed:
+      - "Confirm type field is 'mix' in actual RDS object cell names"
+
+# =============================================================================
+# SAMPLE COMPOSITION ISSUES
+# =============================================================================
+
+sample_composition:
+  - id: "pal-normtotal-sample-differences"
+    category: "documentation"
+    severity: "informational"
+
+    description: |
+      NormTotal uses different samples than NormEpi, particularly for
+      post-menopausal subjects.
+
+    details:
+      norm_total_only:
+        - "N-0019"
+        - "N-0021"
+        - "N-0092"
+        - "N-0230.17"
+        - "N-0288"
+      norm_epi_only:
+        - "N-0280"
+        - "N-0408"
+        - "N-1469"
+      shared:
+        - "N-0064"
+        - "N-0093"
+        - "N-0123"
+        - "N-0169"
+        - "N-0233"
+        - "N-0275"
+        - "N-0342"
+        - "N-0372"
+
+    impact: |
+      NormTotal has 2 additional post-menopausal samples compared to NormEpi,
+      providing better statistical power for menopausal_status tests.
+
+# =============================================================================
+# DA TESTING CONSTRAINTS
+# =============================================================================
+
+da_testing:
+  testable_conditions:
+    - condition: "menopausal_status"
+      testable: true
+      groups:
+        pre: 8
+        post: 5
+      notes: "Primary condition of interest"
+
+  untestable_conditions:
+    - condition: "parity_binary"
+      reason: "Confounded with menopausal_status"
+      reference: "pal-parity-confounding"
+
+    - condition: "age_binary"
+      reason: "Insufficient independent contrast"
+      reference: "pal-no-age-contrast"
+
+    - condition: "risk_status"
+      reason: "All samples are normal (N-*), no BRCA1 carriers"
+      notes: "BRCA1 samples (B1-*) are only in pal_norm_b1"
+
+# =============================================================================
+# VERIFICATION CHECKLIST
+# =============================================================================
+
+verification_checklist:
+  track_2:
+    - item: "Confirm cell count matches 54,332"
+      status: "pending"
+
+    - item: "Confirm cell ID format includes 'mix' type field"
+      status: "pending"
+
+    - item: "Characterize distribution of unmatched cells"
+      status: "pending"
+
+    - item: "Verify menopausal status assignments match code"
+      status: "pending"
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+
+open_questions:
+
+  cell_id_type_field:
+    question: "Confirm cell IDs use 'mix' type field, not 'total'?"
+    context: |
+      Documentation indicates that despite sample naming using "-total" suffix,
+      actual cell IDs may use "mix" as the type field.
+
+      Expected: N_0019_mix_BARCODE-1
+      Not: N_0019_total_BARCODE-1
+
+      This is critical for cell ID parsing.
+    resolve_by: "Track 2 - examine colnames(obj)"
+    status: OPEN
+    priority: HIGH
+
+  cell_id_format_verification:
+    question: "What is the complete cell ID format?"
+    context: |
+      Expected pattern: N_{donor}_{type}_{barcode}-1
+      Need UNSUPERVISED analysis to confirm:
+      - Separator characters
+      - Number of components
+      - Barcode format (16bp ACGT)
+      - Type field value (mix vs total)
+    resolve_by: "Track 2 - pattern analysis"
+    status: OPEN
+
+  unmatched_cells_distribution:
+    question: "Are the 11.9% unmatched cells evenly distributed?"
+    context: |
+      6,440 cells don't match iHBCA Pal subset.
+      Need to check:
+      - Distribution across donors
+      - Distribution across menopausal groups
+      - Cell type composition of unmatched cells
+      - Any systematic bias?
+    resolve_by: "Track 2 - cell ID comparison with iHBCA"
+    status: OPEN
+
+  cell_count_verification:
+    question: "Confirm total cell count is 54,332"
+    context: |
+      knowledge.md lists 54,332 cells for NormTotal.
+      Verify this matches ncol(SeuratObject_NormTotal.rds).
+    resolve_by: "Track 2 - ncol(obj)"
+    status: OPEN
+
+  metadata_columns_in_rds:
+    question: "What metadata columns exist in RDS @meta.data?"
+    context: |
+      Need to verify:
+      - Is menopausal_status present (or 'meno')?
+      - Is donor/specimen ID present?
+      - What column naming convention is used?
+    resolve_by: "Track 2 - colnames(obj@meta.data)"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do cells distribute across 13 samples?"
+    context: |
+      13 samples: 8 pre-menopausal, 5 post-menopausal
+      Need per-sample cell counts to understand
+      menopausal group balance.
+    resolve_by: "Track 2 - table(obj$sample_column)"
+    status: OPEN
+
+  menopausal_assignment_verification:
+    question: "Does RDS menopausal_status match R script assignments?"
+    context: |
+      R script (line 130) hardcodes post-menopausal samples:
+      - N_0342_total, N_0372_total, N_0021_total, N_0275_total, N_0288_total
+
+      Need to verify RDS metadata matches these assignments.
+    resolve_by: "Track 2 - cross-reference with R script"
+    status: OPEN

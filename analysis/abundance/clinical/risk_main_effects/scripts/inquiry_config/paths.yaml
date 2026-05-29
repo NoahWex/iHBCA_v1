@@ -1,0 +1,45 @@
+# paths.yaml — risk_main_effects_20260507 inquiry
+# Same Milo substrate as parity_x_risk_20260504. Donor metadata is the DERIVED
+# version that has the risk_class column added by prep_derive_risk_class.R.
+
+inputs:
+  # Re-pointed 2026-05-10 per CP2v2 §A2 promotion (Call 4) — Bundle is self-contained for reviewer reproduction.
+  milo: /share/crsp/lab/dalawson/nwechter/iHBCA_publication/publication/analysis/abundance/clinical/milo/v1_milo_full.rds
+  patch_milor: /share/crsp/lab/dalawson/nwechter/iHBCA_publication/publication/analysis/abundance/clinical/utils/patch_milor.R
+  atlas_h5ad: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/publication/outputs/integrated_objects/all-breast-cells.h5ad
+  components_root: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components
+  pseudobulk_aggregate_py: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Annotation/dev/full_object_markers_20260421/scripts/pseudobulk_aggregate_full_object.py
+  labels: /share/crsp/lab/dalawson/nwechter/iHBCA_publication/publication/analysis/annotation/labels_full.csv
+  # NOTE: derived metadata, written by scripts/prep_derive_risk_class.R into
+  # this inquiry's config/. Run that script ONCE before launching Stage A.
+  donor_metadata: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/config/derived_donor_metadata.csv
+  gene_mapping: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/iHBCA_upload/publication/mappings/gene_symbol_to_ensembl.tsv
+  dissoc_table: kumar_dissoc.csv
+
+framework:
+  scripts_root: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/scripts
+  run_root: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/run
+
+inquiry_root: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507
+
+outputs:
+  stageA: outputs/stageA_cohorts
+  stageB: outputs/stageB_exploration
+  stageC: outputs/stageC_contrasts
+  stageD: outputs/stageD_da_results
+  stageE: outputs/stageE_per_l2_summary.csv
+  stageF1: outputs/stageF1_nhoodgroups
+  stageF2: outputs/stageF2_pseudobulk
+  stageF3: outputs/stageF3_markers
+  stageG: outputs/stageG_per_finding_context.csv
+  stageH: outputs/stageH_findings_table.csv
+  stageI0: outputs/stageI0_per_study_breakdown.csv
+  stageI1: outputs/stageI1_cascade_table.csv
+  reports: reports
+  logs: logs
+
+container:
+  path: /dfs7/singularity_containers/rcic/JHUB3/Rocky8_jupyter_base_R4.3.3_Spatial.sif
+  r_libs_user: /pub/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library
+  account: dalawson_lab
+  partition: standard

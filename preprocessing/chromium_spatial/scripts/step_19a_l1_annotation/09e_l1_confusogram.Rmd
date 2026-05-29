@@ -1,0 +1,310 @@
+---
+title: "L1 Confusogram — `r params$compartment`"
+subtitle: "cluster_annotation vs SingleR L1 raw vs harmonized L1.0"
+params:
+  compartment: "Epithelial"
+  singler_csv: ""       # per-compartment singler_l1_predictions_{compartment}.csv
+  harmonized_csv: ""    # per-compartment OR concatenated harmonized_l1_labels.csv
+  seurat_rds: ""        # per-compartment Seurat; empty for 'all' mode
+  cluster_annotation_csv: ""  # used when seurat_rds is empty (for 'all' mode)
+  outdir: ""
+  dry_run: false
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 12, fig.height = 10)
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+  library(pheatmap)
+})
+
+COMPARTMENT       <- params$compartment
+SINGLER_CSV       <- params$singler_csv
+HARMONIZED_CSV    <- params$harmonized_csv
+SEURAT_RDS        <- params$seurat_rds
+CLUSTER_ANNO_CSV  <- params$cluster_annotation_csv
+OUTDIR            <- params$outdir
+DRY_RUN           <- isTRUE(params$dry_run)
+dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
+```
+
+# Parameters
+
+```{r params_echo}
+cat("Compartment:          ", COMPARTMENT, "\n")
+cat("SingleR CSV:          ", SINGLER_CSV, "\n")
+cat("Harmonized CSV:       ", HARMONIZED_CSV, "\n")
+cat("Seurat RDS:           ", SEURAT_RDS, "\n")
+cat("cluster_annotation CSV:", CLUSTER_ANNO_CSV, "\n")
+cat("Output dir:           ", OUTDIR, "\n")
+cat("Dry run:              ", DRY_RUN, "\n")
+```
+
+# Validation
+
+```{r validate}
+# Either seurat_rds OR cluster_annotation_csv must be provided (not both empty)
+has_seurat <- nzchar(SEURAT_RDS) && file.exists(SEURAT_RDS)
+has_csv    <- nzchar(CLUSTER_ANNO_CSV) && file.exists(CLUSTER_ANNO_CSV)
+
+required_core <- list(
+  singler_csv    = SINGLER_CSV,
+  harmonized_csv = HARMONIZED_CSV
+)
+
+missing_items <- character(0)
+for (nm in names(required_core)) {
+  f <- required_core[[nm]]
+  ok <- file.exists(f)
+  cat(sprintf("  [%s] %-20s %s\n", if (ok) "OK " else "MISS", nm, f))
+  if (!ok) missing_items <- c(missing_items, nm)
+}
+
+cat(sprintf("  [%s] %-20s %s\n",
+            if (has_seurat) "OK " else "--",
+            "seurat_rds", SEURAT_RDS))
+cat(sprintf("  [%s] %-20s %s\n",
+            if (has_csv) "OK " else "--",
+            "cluster_anno_csv", CLUSTER_ANNO_CSV))
+
+if (!has_seurat && !has_csv) {
+  missing_items <- c(missing_items, "seurat_rds_or_cluster_annotation_csv")
+}
+
+if (length(missing_items) > 0) {
+  stop("Missing required inputs: ", paste(missing_items, collapse = ", "))
+}
+
+if (DRY_RUN) {
+  cat("\nVALIDATION PASSED (dry run) — exiting before heavy loads\n")
+  knitr::knit_exit()
+}
+```
+
+# Load All Three Label Sets
+
+Pattern source: `annotation_confusogram.Rmd:37-109`. The L1 harmonized CSV
+uses the new schema (`pruned_label`, `L1.0`, `L1.0_Long`), so the join
+columns are updated accordingly.
+
+```{r load-data}
+# 1. cluster_annotation source
+if (has_seurat) {
+  cat("Loading Seurat for cluster_annotation...\n")
+  srt <- readRDS(SEURAT_RDS)
+  srt <- UpdateSeuratObject(srt)
+  meta <- data.frame(
+    cell_id            = colnames(srt),
+    cluster_annotation = srt$cluster_annotation,
+    stringsAsFactors   = FALSE
+  )
+  rm(srt); gc()
+} else {
+  cat("Loading cluster_annotation CSV:", CLUSTER_ANNO_CSV, "\n")
+  ca <- read.csv(CLUSTER_ANNO_CSV, stringsAsFactors = FALSE)
+  id_col <- intersect(c("cell_id", "X", "barcode"), colnames(ca))[1]
+  if (is.na(id_col)) id_col <- colnames(ca)[1]
+  meta <- data.frame(
+    cell_id            = ca[[id_col]],
+    cluster_annotation = ca$cluster_annotation,
+    stringsAsFactors   = FALSE
+  )
+}
+cat("  cluster_annotation:", length(unique(meta$cluster_annotation)), "types\n")
+
+# 2. SingleR L1 raw predictions
+singler <- read.csv(SINGLER_CSV, stringsAsFactors = FALSE)
+cat("  SingleR L1 pruned:",
+    length(unique(singler$pruned_label[!is.na(singler$pruned_label)])), "types\n")
+
+# 3. Harmonized L1
+harmonized <- read.csv(HARMONIZED_CSV, stringsAsFactors = FALSE)
+cat("  Harmonized L1.0:", length(unique(harmonized$L1.0)), "types\n")
+
+# Join all three on cell_id
+df <- meta %>%
+  left_join(singler[, c("cell_id", "pruned_label", "raw_label")], by = "cell_id") %>%
+  left_join(harmonized[, c("cell_id", "L1.0", "L1.0_Long")],      by = "cell_id")
+
+# Restrict the 'all' mode concat to the cells covered by this SingleR run
+if (!has_seurat) {
+  df <- df %>% filter(!is.na(pruned_label))
+}
+
+cat("\nJoined:", nrow(df), "cells\n")
+cat("All three labels present:", sum(complete.cases(df[, c("cluster_annotation", "pruned_label", "L1.0")])), "cells\n")
+
+# Short display names (pattern source: annotation_confusogram.Rmd:67-109)
+SHORT_NAMES <- c(
+  # iHBCA L1 (11 types)
+  "Fibroblast"                            = "Fibro",
+  "Basal-myoepithelial"                   = "Basal",
+  "Vascular endothelial"                  = "VascEndo",
+  "Luminal adaptive secretory precursor"  = "LumSec",
+  "Luminal hormone sensing"               = "LumHR",
+  "Perivascular"                          = "Peri",
+  "T-lymphocyte"                          = "T-lymph",
+  "B-lymphocyte"                          = "B-lymph",
+  "Myeloid"                               = "Myeloid",
+  "Lymphatic endothelial"                 = "LymphEndo",
+  "Lactocyte"                             = "Lacto",
+  # Override types (v2: Adipocyte, Mast, Keratinocyte)
+  "Adipocyte"                             = "Adipo",
+  "Mast"                                  = "Mast",
+  "Mast cell"                             = "Mast",
+  "Keratinocyte"                          = "Kerat"
+)
+
+shorten <- function(labels) {
+  out <- SHORT_NAMES[labels]
+  out[is.na(out)] <- labels[is.na(out)]
+  out
+}
+```
+
+# Helpers
+
+Pattern source: `annotation_confusogram.Rmd:118-139`.
+
+```{r diagonal-order-helper}
+diagonal_order <- function(mat_norm) {
+  dominant_col <- apply(mat_norm, 1, function(x) colnames(mat_norm)[which.max(x)])
+  dominant_val <- apply(mat_norm, 1, max)
+
+  col_order <- names(sort(colSums(mat_norm > 0.5), decreasing = TRUE))
+  col_order <- unique(c(col_order, colnames(mat_norm)))
+
+  row_df <- data.frame(
+    row     = rownames(mat_norm),
+    dom_col = dominant_col,
+    dom_val = dominant_val,
+    stringsAsFactors = FALSE
+  )
+  row_df$col_rank <- match(row_df$dom_col, col_order)
+  row_df <- row_df[order(row_df$col_rank, -row_df$dom_val), ]
+
+  list(row_order = row_df$row, col_order = col_order)
+}
+
+plot_confusion <- function(mat_norm, title, fill_color, out_csv) {
+  ord <- diagonal_order(mat_norm)
+  mat <- mat_norm[ord$row_order, ord$col_order]
+  rownames(mat) <- shorten(rownames(mat))
+  colnames(mat) <- shorten(colnames(mat))
+
+  mat_display <- matrix(
+    ifelse(mat > 0.01, sprintf("%.0f", mat * 100), ""),
+    nrow = nrow(mat), dimnames = dimnames(mat)
+  )
+
+  pheatmap(
+    mat,
+    cluster_rows    = FALSE, cluster_cols = FALSE,
+    display_numbers = mat_display,
+    number_color    = "black",
+    fontsize_number = 7,
+    fontsize_row    = 9, fontsize_col = 9,
+    color           = colorRampPalette(c("white", fill_color))(100),
+    breaks          = seq(0, 1, length.out = 101),
+    main            = title,
+    legend          = FALSE
+  )
+
+  write.csv(as.data.frame.matrix(mat_norm), out_csv)
+}
+```
+
+# Panel A — cluster_annotation -> SingleR L1 raw
+
+Pattern source: `annotation_confusogram.Rmd:142-174`.
+
+```{r panel-a, fig.width=12, fig.height=10}
+df_complete <- df %>% filter(!is.na(pruned_label))
+xtab_a <- table(df_complete$cluster_annotation, df_complete$pruned_label)
+xtab_a_norm <- sweep(xtab_a, 1, rowSums(xtab_a), "/")
+xtab_a_norm[is.nan(xtab_a_norm)] <- 0
+
+plot_confusion(
+  xtab_a_norm,
+  title     = "cluster_annotation -> SingleR L1 (raw)",
+  fill_color = "#08519C",
+  out_csv    = file.path(OUTDIR, sprintf("confusogram_cluster_vs_singler_%s.csv",
+                                         COMPARTMENT))
+)
+```
+
+# Panel B — SingleR L1 -> Harmonized L1.0
+
+Pattern source: `annotation_confusogram.Rmd:178-204`.
+
+```{r panel-b, fig.width=10, fig.height=10}
+xtab_b <- table(df_complete$pruned_label, df_complete$L1.0)
+xtab_b_norm <- sweep(xtab_b, 1, rowSums(xtab_b), "/")
+xtab_b_norm[is.nan(xtab_b_norm)] <- 0
+
+plot_confusion(
+  xtab_b_norm,
+  title      = "SingleR L1 -> Harmonized L1.0 (voted + overrides)",
+  fill_color = "#B2182B",
+  out_csv    = file.path(OUTDIR, sprintf("confusogram_singler_vs_harmonized_%s.csv",
+                                         COMPARTMENT))
+)
+```
+
+# Panel C — cluster_annotation -> Harmonized L1.0
+
+Pattern source: `annotation_confusogram.Rmd:209-235`.
+
+```{r panel-c, fig.width=12, fig.height=10}
+xtab_c <- table(df$cluster_annotation, df$L1.0)
+xtab_c_norm <- sweep(xtab_c, 1, rowSums(xtab_c), "/")
+xtab_c_norm[is.nan(xtab_c_norm)] <- 0
+
+plot_confusion(
+  xtab_c_norm,
+  title      = "cluster_annotation -> Harmonized L1.0 (end-to-end)",
+  fill_color = "#2CA25F",
+  out_csv    = file.path(OUTDIR, sprintf("confusogram_cluster_vs_harmonized_%s.csv",
+                                         COMPARTMENT))
+)
+```
+
+# Summary
+
+```{r summary}
+cat("=== Annotation Pipeline Summary —", COMPARTMENT, "===\n\n")
+
+cat("cluster_annotation (preprocessing):\n")
+print(sort(table(df$cluster_annotation, useNA = "ifany"), decreasing = TRUE))
+
+cat("\nSingleR L1 pruned (iHBCA 11 types):\n")
+print(sort(table(df$pruned_label, useNA = "ifany"), decreasing = TRUE))
+
+cat("\nHarmonized L1.0:\n")
+print(sort(table(df$L1.0, useNA = "ifany"), decreasing = TRUE))
+
+# Agreement
+agree <- mean(df_complete$pruned_label == df_complete$L1.0, na.rm = TRUE)
+cat(sprintf("\nSingleR L1 == Harmonized L1.0 (when labels line up): %.1f%%\n",
+            100 * agree))
+
+# Override summary
+OVERRIDE_TYPES <- c("Adipo", "Mast", "Kerat")
+for (ot in OVERRIDE_TYPES) {
+  n <- sum(df$L1.0 == ot, na.rm = TRUE)
+  if (n > 0) {
+    singler_dist <- sort(table(df$pruned_label[df$L1.0 == ot]), decreasing = TRUE)
+    cat(sprintf("\n%s (override): %d cells — was assigned by SingleR to:\n", ot, n))
+    print(singler_dist)
+  }
+}
+```

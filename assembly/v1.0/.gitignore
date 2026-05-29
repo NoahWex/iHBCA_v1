@@ -1,0 +1,29 @@
+# Data files
+*.h5ad
+*.rds
+*.mtx
+*.mtx.gz
+
+# Large reference files
+*.gtf
+publication/mappings/hgnc_complete_set.txt
+
+# Outputs
+**/outputs/
+
+# Logs
+*.out
+*.err
+**/logs/
+
+# OS / editor
+.DS_Store
+._*
+Thumbs.db
+*~
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

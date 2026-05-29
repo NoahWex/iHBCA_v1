@@ -1,0 +1,303 @@
+# =============================================================================
+# NEE STUDY - EDGE CASES
+# =============================================================================
+# Documented exceptions, issues, and their resolutions.
+# =============================================================================
+
+study: nee
+last_updated: 2026-01-20
+
+edge_cases:
+  # ---------------------------------------------------------------------------
+  # NEE_BRCA_MISLABELING - OPEN (requires fix)
+  # ---------------------------------------------------------------------------
+  - id: NEE_BRCA_MISLABELING
+    severity: HIGH
+    status: OPEN
+    discovered: "Prior knowledge (knowledge.md)"
+    confirmed_date: 2026-01-20
+
+    description: |
+      8 of 11 Control donors are mislabeled as HR (High Risk) in iHBCA metadata.
+      The original Nee study has 11 Controls + 11 BRCA1 carriers, but iHBCA
+      metadata shows 3 AR + 19 HR.
+
+    affected_cells:
+      count: null  # To be determined from Track 2
+      fraction: null  # Approximately 8/22 donors * their cells
+      donors:
+        expected_ar:
+          - "Ctrl-* prefix donors (11 total)"
+        incorrectly_labeled_hr:
+          - "8 of 11 Controls"
+        notes: "Specific donor mapping requires cell ID extraction"
+
+    root_cause: |
+      Upstream iHBCA integration error. The original Nee study clearly separates
+      "Non-Carrier" (Control) from "BRCA1+/mut" (BRCA1 carrier) in supplemental
+      Table 1. However, during iHBCA integration, 8 Controls were misassigned
+      as HR.
+
+      The cell ID format in Nee preserves BRCA status in the prefix:
+      - "Ctrl-*" = Control (should be AR)
+      - "BRCA1-*" = BRCA1 carrier (should be HR)
+
+      This allows independent verification and correction.
+
+    resolution: |
+      Extract risk_status from cell ID pattern instead of using iHBCA metadata:
+
+      ```r
+      nee_cells$risk_status_fixed <- case_when(
+        grepl("^Ctrl-", nee_cells$cell_id) ~ "AR",
+        grepl("^BRCA1-", nee_cells$cell_id) ~ "HR",
+        TRUE ~ NA_character_
+      )
+      ```
+
+      Expected result after fix:
+      - 11 AR donors (Non-Carrier 1-11)
+      - 11 HR donors (BRCA1+/mut 1-11)
+
+    verification: |
+      After applying fix:
+      1. Count unique donors per risk_status
+         - AR: should be 11
+         - HR: should be 11
+      2. Verify cell counts match supplemental Table 1
+      3. Cross-reference donor IDs with supplemental mapping
+
+    evidence:
+      supplemental_table_1: |
+        Table 1 in NEE_41588_2023_1298_MOESM4_ESM.xlsx shows:
+        - Rows 1-11 for scRNAseq are "Non-Carrier N"
+        - Rows following are "BRCA1+/mut N"
+        - "Patient No." column is definitive source of BRCA status
+
+      ihbca_reported: |
+        According to knowledge.md, iHBCA metadata shows:
+        - AR: 3 donors
+        - HR: 19 donors
+
+      discrepancy: |
+        8 donors (11 - 3) are misclassified
+        This is consistent with "8 of 11 Controls labeled as HR"
+
+  # ---------------------------------------------------------------------------
+  # NEE_CELL_ID_FORMAT - INFORMATIONAL
+  # ---------------------------------------------------------------------------
+  - id: NEE_CELL_ID_FORMAT
+    severity: LOW
+    status: DOCUMENTED
+    discovered: "Supplemental extraction 2026-01-20"
+
+    description: |
+      Nee cell IDs encode BRCA status in a prefix, which is unusual among
+      iHBCA component studies. This is actually beneficial as it provides
+      a ground truth for BRCA status independent of metadata.
+
+    cell_id_pattern:
+      format: "{brca_prefix}-{donor_info}_{barcode}"
+      examples:
+        - "Ctrl-WD37026_AACTCCCGTCGCATAT"
+        - "BRCA1-M1161181A_ACGGGTCTCAATCTGT"
+      prefixes:
+        "Ctrl-": "Control / Non-Carrier / AR"
+        "BRCA1-": "BRCA1 carrier / HR"
+
+    notes: |
+      This pattern allows:
+      1. Independent verification of BRCA status
+      2. Fix for iHBCA mislabeling issue
+      3. Donor extraction from cell ID
+
+      Needs verification in Track 2 to confirm exact format.
+
+  # ---------------------------------------------------------------------------
+  # NEE_LIMITED_MENOPAUSAL_DATA - INFORMATIONAL
+  # ---------------------------------------------------------------------------
+  - id: NEE_LIMITED_MENOPAUSAL_DATA
+    severity: LOW
+    status: DOCUMENTED
+    discovered: "Supplemental extraction 2026-01-20"
+
+    description: |
+      Only 2 donors have explicit menopausal status recorded in supplemental
+      data. Most scRNAseq samples have "-" (no data) for Menstrual Status.
+
+    affected_cells:
+      count: null  # Most of 230,100 cells
+      fraction: null  # ~90% missing menopausal data
+      donors: "20 of 22 scRNAseq donors"
+
+    root_cause: |
+      Original study did not systematically collect menopausal status for
+      all donors. The 2 donors with data are:
+      - "Menopausal - Age 47"
+      - "Menopausal - Age 39"
+
+    resolution: |
+      Menopausal status is NOT testable for Nee study.
+      Do not include menopausal_status in DA tests for this study.
+
+    verification: |
+      Confirm that Nee is excluded from menopausal_status DA testing.
+
+  # ---------------------------------------------------------------------------
+  # NEE_PATIENT_ID_ALIASES - INFORMATIONAL
+  # ---------------------------------------------------------------------------
+  - id: NEE_PATIENT_ID_ALIASES
+    severity: LOW
+    status: DOCUMENTED
+    discovered: "Supplemental extraction 2026-01-20"
+
+    description: |
+      Several donors have multiple ID aliases in the Patient ID column,
+      separated by " / ". This may complicate donor matching if different
+      IDs are used in different data sources.
+
+    examples:
+      - "CA278 / C017L"
+      - "CA287 / C019CDR"
+      - "CA639 / C051CDR"
+      - "CA075 / C002SCR"
+      - "CA818 / CE_97 / C078SCR"  # 3 aliases
+
+    resolution: |
+      When matching donors:
+      1. First try exact match
+      2. If no match, try matching any alias (split by " / ")
+      3. Document which alias was used for the match
+
+    notes: |
+      The "(indN)" suffix in some IDs (e.g., "WD37026 (ind1)") indicates
+      an internal study identifier. May need special handling.
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+
+open_questions:
+
+  cell_id_format_verification:
+    question: "Does the cell ID prefix pattern (Ctrl-* vs BRCA1-*) hold for ALL 230,100 cells?"
+    context: |
+      Knowledge.md documents that cell IDs encode BRCA status via prefix.
+      This is the basis for fixing the BRCA mislabeling issue.
+      MUST verify:
+      - ALL cell IDs start with either Ctrl- or BRCA1-
+      - No other patterns exist
+      - Count cells per prefix matches expected (11 AR donors, 11 HR donors)
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+
+  cell_id_full_format:
+    question: "What is the complete cell ID format beyond the prefix?"
+    context: |
+      Examples from knowledge.md:
+      - "Ctrl-WD37026_AACTCCCGTCGCATAT"
+      - "BRCA1-M1161181A_ACGGGTCTCAATCTGT"
+
+      Appears to be: {brca_prefix}-{patient_id}_{barcode}
+
+      MUST discover through UNSUPERVISED analysis:
+      - Identify all separators
+      - Count components
+      - Verify barcode is 16bp ACGT
+      - Determine if patient_id matches Table 1 Patient ID column
+    resolve_by: "Track 2 - unsupervised pattern analysis"
+    status: OPEN
+
+  patient_id_to_cell_mapping:
+    question: "How do Table 1 Patient IDs map to cell ID components?"
+    context: |
+      Table 1 Patient IDs include aliases: "CA278 / C017L", "CA818 / CE_97 / C078SCR"
+      Cell IDs appear to use one of these IDs (e.g., "Ctrl-WD37026")
+
+      Need to verify:
+      - Which Patient ID variant appears in cell IDs
+      - Do "(indN)" suffixes appear in cell IDs?
+      - Can we reliably map cells to donors via this component?
+    resolve_by: "Track 2 - cross-reference Patient ID variants with cell ID components"
+    status: OPEN
+
+  metadata_column_mapping:
+    question: "How do supplemental Table 1 columns map to RDS @meta.data?"
+    context: |
+      Supplemental has: Patient No., Patient ID, Age, Ancestry, Number of Cells,
+      BRCA1 Mutation, Chemo, Radiation, Hormone Therapy, BMI, Co-Morbidities,
+      Cancer History, Diagnosis, Application, Tissue Source, Menstrual Status,
+      Parity, Age at Menarche, Age of first birth, Family History
+
+      RDS column names may differ. Need explicit mapping table.
+    resolve_by: "Track 2 - colnames(obj@meta.data) comparison"
+    status: OPEN
+
+  parity_format_parsing:
+    question: "How should the GPMA parity format be parsed for DA testing?"
+    context: |
+      Parity uses obstetric notation: G3P2M1A0
+      - G = Gravida (total pregnancies)
+      - P = Para (live births)
+      - M = Miscarriages
+      - A = Abortions
+
+      For parity_binary: P > 0 = parous, P = 0 = nulliparous
+
+      Need to verify:
+      - Same format in RDS?
+      - Coverage in RDS metadata?
+      - 4 donors have explicit "G0P0M0A0" (nulliparous)
+    resolve_by: "Track 2 - verify parity column exists and parse"
+    status: OPEN
+
+  age_as_testable_condition:
+    question: "Confirm age range enables age_binary testing"
+    context: |
+      Table 1 ages for scRNAseq samples: 18-71 (one "-" value)
+      Good contrast expected for age_binary (cutoff typically 50)
+
+      Need to verify:
+      - Age present in RDS metadata
+      - Distribution above/below cutoff
+      - Handle the 1 missing age value
+    resolve_by: "Track 2 - verify age column and distribution"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do 230,100 cells distribute across 22 donors?"
+    context: |
+      Table 1 has Number of Cells column for each scRNAseq donor.
+      Range: 3,779 (CA843) to 21,051 (WD58673)
+      Need to verify these counts match RDS.
+    resolve_by: "Track 2 - table(obj$donor_column)"
+    status: OPEN
+
+# -----------------------------------------------------------------------------
+# NOTES
+# -----------------------------------------------------------------------------
+notes: |
+  ## Summary
+
+  Nee study has one major issue (BRCA mislabeling) that requires correction.
+  The fix is straightforward because cell IDs encode BRCA status.
+
+  ## Key Points for Implementation
+
+  1. **BRCA status from cell ID**: Extract from prefix (Ctrl- vs BRCA1-)
+  2. **Ignore iHBCA risk_status**: Use cell ID-derived status instead
+  3. **No menopausal testing**: Insufficient data
+  4. **Patient ID aliases**: May need flexible matching
+
+  ## Expected After Fix
+
+  - 11 AR donors: Ctrl-* cell IDs
+  - 11 HR donors: BRCA1-* cell IDs
+  - Total: 230,100 cells
+  - Testable conditions: age_binary, parity, risk_status (fixed)
+
+  ## Reference
+
+  - Supplemental extraction: `../extracted/supplemental_extraction.yaml`
+  - Source of truth: NEE_41588_2023_1298_MOESM4_ESM.xlsx, Table 1
+  - Knowledge base: `.claude/rules/integration-assessment/knowledge.md`

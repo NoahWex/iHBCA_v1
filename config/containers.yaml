@@ -1,0 +1,247 @@
+# ==============================================================================
+# Container Registry - Available HPC Singularity Containers
+# ==============================================================================
+# Central registry for all containers used in preprocessing and analysis.
+# Reference this file when declaring container requirements in experiments.
+#
+# Usage in experiment_metadata.yaml:
+#   container_requirements:
+#     annotation: Python_Spatial_2025Q2
+#     notebooks: R_Spatial_4.3.3
+# ==============================================================================
+
+version: "1.0"
+last_updated: "2025-12-16"
+
+# ==============================================================================
+# Container Definitions
+# ==============================================================================
+
+containers:
+
+  # ---------------------------------------------------------------------------
+  # R Containers
+  # ---------------------------------------------------------------------------
+
+  R_Spatial_4.3.3:
+    image: "/dfs7/singularity_containers/rcic/JHUB3/Rocky8_jupyter_base_R4.3.3_Spatial.sif"
+    user_lib: "/data/homezvol0/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library/"
+    description: "R 4.3.3 with spatial analysis packages"
+    packages:
+      r: "4.3.3"
+      seurat: true
+      bigsur: true
+      scdblFinder: true
+      rmarkdown: true
+      miloR: true
+    use_cases:
+      - QC and filtering (Steps 01, 03)
+      - Label transfer (Step 04)
+      - Notebook rendering
+      - MiloR DA analysis
+    # Legacy alias for backwards compatibility
+    legacy_name: R_env
+
+  # ---------------------------------------------------------------------------
+  # Python Containers
+  # ---------------------------------------------------------------------------
+
+  Python_Spatial_2025Q2:
+    image: "/dfs8/singularity_containers/rcic/devel/Jupyter_R_4.4.2_Giotto_Spatial_Python_2025Q2.sif"
+    description: "Python + R 4.4.2 with Giotto spatial tools (2025 Q2 build)"
+    packages:
+      python: "3.x"
+      scanpy: true
+      pandas: true
+      numpy: true
+      matplotlib: true
+      giotto: true
+      r: "4.4.2"
+      celltypist: "user_install"  # Not in container; install via PYTHONUSERBASE
+    use_cases:
+      - Cell filtering (Step 02)
+      - Integration preview (Steps 06, 07)
+      - General Python analysis
+      - CellTypist annotation (requires user install)
+    legacy_name: Python_env
+
+  Cellpose_BioDL_2025Q3:
+    image: "/dfs8/singularity_containers/rcic/devel/BioDL/Jupyter_CellPose_2025Q3.sif"
+    description: "Cellpose + tifffile for image segmentation and DAPI cropping"
+    gpu_capable: true
+    packages:
+      python: "3.x"
+      cellpose: true
+      tifffile: "2025.5.10"
+      pandas: true
+      numpy: "1.26.4"
+      pyyaml: "6.0.2"
+    missing_packages:
+      anndata: "not installed"
+      scanpy: "not installed"
+    use_cases:
+      - DAPI image cropping (L2a_crops)
+      - Cellpose nuclear segmentation priors (L2a_cellpose_priors)
+      - Image-based operations requiring tifffile
+    notes: |
+      Used by Nee_Xenium pipeline (pipeline.sh:191, check_cellpose_api.sh:15).
+      Python spatial container (Python_Spatial_2025Q2) does NOT have tifffile.
+      Use this container for any image I/O operations.
+
+  Python_scVI_GPU_2025Q3:
+    image: "/dfs8/singularity_containers/rcic/devel/BioDL/Jupyter_scGPT_GPU_2025Q3.sif"
+    description: "GPU-capable container with scVI and scib benchmarking"
+    gpu_capable: true
+    packages:
+      python: "3.x"
+      scvi_tools: "0.20.3"
+      scib: "1.1.7"
+      scanpy: "1.11.4"
+      anndata: "0.11.4"
+      celltypist: "user_install"  # Not in container; install via PYTHONUSERBASE
+      scib_metrics: "user_install"  # 0.5.6 at PYTHONUSERBASE below
+      pynndescent: true
+    user_packages:
+      pythonuserbase: "/data/homezvol0/nwechter/python_user_packages/scGPT_GPU_2025Q3"
+      installed:
+        - "scib-metrics==0.5.6"
+    use_cases:
+      - scVI integration (Steps 08, 17, 20)
+      - Integration benchmarking (scIB + LISI metrics)
+      - GPU-accelerated training
+    legacy_name: Python_scib_env
+
+  Python_Spatial_2025Q4E2:
+    image: "/dfs8/singularity_containers/rcic/devel/Jupyter_R_4.4.2_Spatial_2025Q4E2.sif"
+    description: "R 4.4.2 + Python 3.10 with spatial stack (torch, scanpy, squidpy, spatialdata). Latest spatial container (Feb 2026)."
+    packages:
+      python: "3.10.2"
+      r: "4.4.2"
+      torch: "2.9.1"
+      torchvision: "0.24.1"
+      scanpy: "1.11.4"
+      anndata: "0.11.4"
+      squidpy: "1.6.5"
+      spatialdata: "0.5.0"
+      spatialdata_io: "0.3.0"
+      napari_spatialdata: "0.6.0"
+    user_packages:
+      pythonuserbase: "/data/homezvol0/nwechter/python_user_packages/Spatial_2025Q4E2"
+      installed:
+        - "cellcharter==0.3.5"
+        - "torch-geometric==2.7.0"
+        - "pytorch-lightning==2.6.1"
+        - "torchgmm==0.1.4"
+        - "torchmetrics==1.9.0"
+        - "spatialdata-plot==0.2.12"
+    use_cases:
+      - CellCharter compositional unit analysis
+      - Spatial Python analysis with torch + scanpy + squidpy
+      - spatialdata workflows
+    notes: |
+      Largest spatial container (18.9GB). Use system Python at /opt/apps/python/3.10.2/bin.
+      CellCharter + torch-geometric installed via PYTHONUSERBASE (2026-03-16).
+      SLURM usage: bind PYTHONUSERBASE and set env before running.
+
+# ==============================================================================
+# Bind Mounts (Required for all containers)
+# ==============================================================================
+
+bind_mounts:
+  required:
+    - "/share/crsp/lab/dalawson/share"      # Raw data (CellRanger outputs)
+    - "/share/crsp/lab/dalawson/nwechter"   # Project directory
+    - "/scratch"                             # Temporary files
+    - "/data/homezvol0/nwechter"            # User home (for pip --user and R user libs)
+
+# ==============================================================================
+# User-Installed Python Packages (Conda/Mamba)
+# ==============================================================================
+# Singularity containers have read-only /home/jovyan and block HOME override.
+# RECOMMENDED: Use conda/mamba environments for user-installed packages.
+# Reference: https://rcic.uci.edu/software/user-installed.html
+
+conda_environments:
+  # Mamba module (faster than conda)
+  module: "mamba/24.3.0"
+
+  # Default environment location
+  env_location: "~/.conda/envs"
+
+  # Defined environments
+  environments:
+    celltypist_env:
+      description: "CellTypist annotation with scanpy"
+      conda_packages:
+        - python=3.10
+        - scanpy
+        - pandas
+        - numpy
+        - scikit-learn
+      pip_packages:
+        - celltypist  # PyPI only, not on conda-forge
+      channel: conda-forge
+      created: "2025-12-16"
+      use_cases:
+        - ihbca_annotation experiment
+        - Cell type annotation
+
+  setup: |
+    # One-time setup: Request interactive node
+    srun -c 2 -p free --pty /bin/bash -i
+
+    # Load mamba and create environment with dependencies
+    module load mamba/24.3.0
+    mamba create -n celltypist_env -c conda-forge python=3.10 scanpy pandas numpy scikit-learn -y
+
+    # Activate and pip install celltypist (PyPI only)
+    source activate celltypist_env
+    pip install celltypist
+
+    # Clean cache (saves disk space)
+    conda clean -a -f -y
+
+  slurm_usage: |
+    # Add to SLURM scripts (instead of singularity exec)
+    module load mamba/24.3.0
+    source activate celltypist_env
+    python3 your_script.py
+
+  interactive_usage: |
+    # For interactive work
+    module load mamba/24.3.0
+    source activate celltypist_env
+
+# ==============================================================================
+# Verification Commands
+# ==============================================================================
+# Use these to check package availability in containers
+
+verification_commands:
+  celltypist: "python3 -c \"import celltypist; print(f'celltypist {celltypist.__version__}')\""
+  scanpy: "python3 -c \"import scanpy; print(f'scanpy {scanpy.__version__}')\""
+  scvi: "python3 -c \"import scvi; print(f'scvi-tools {scvi.__version__}')\""
+  seurat: "Rscript -e \"packageVersion('Seurat')\""
+
+# ==============================================================================
+# Interactive Session Template
+# ==============================================================================
+# Copy-paste commands for interactive container testing
+
+interactive_session:
+  request_node: |
+    # Request interactive node (standard partition)
+    srun --pty --partition=standard --account=dalawson_lab --cpus-per-task=4 --mem=16G --time=01:00:00 /bin/bash
+
+  request_gpu_node: |
+    # Request interactive GPU node
+    srun --pty --partition=gpu --account=dalawson_lab --cpus-per-task=4 --mem=16G --gres=gpu:1 --time=01:00:00 /bin/bash
+
+  launch_container: |
+    # Launch container (replace CONTAINER_IMAGE with path from registry)
+    singularity exec \
+      -B /share/crsp/lab/dalawson/share \
+      -B /share/crsp/lab/dalawson/nwechter \
+      -B /scratch \
+      CONTAINER_IMAGE \
+      /bin/bash

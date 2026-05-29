@@ -1,0 +1,142 @@
+# =============================================================================
+# GRAY STUDY - EDGE CASES
+# =============================================================================
+# Documented exceptions, issues, and their resolutions.
+# =============================================================================
+
+study: gray
+last_updated: 2026-01-20
+
+edge_cases:
+  # ---------------------------------------------------------------------------
+  # GRAY_DONOR_MISMATCH - RESOLVED
+  # ---------------------------------------------------------------------------
+  - id: GRAY_DONOR_MISMATCH
+    severity: HIGH
+    status: RESOLVED
+    discovered: "Previous pipeline (create_cell_id_mapping.R)"
+    resolution_date: 2026-01-19
+
+    description: |
+      37% of cells (19,362 / 52,681) had incorrect donor assignment when
+      using the iHBCA metadata RM field instead of extracting from cell ID.
+
+    affected_cells:
+      count: 19362
+      fraction: 0.37
+      donors: ["RM-A", "RM-B", "RM-C", "RM-D"]
+      notes: "All 4 RM (Reductive Mammoplasty) donors were affected"
+
+    root_cause: |
+      The iHBCA metadata contains a field (likely 'RM' or similar) that was
+      used to assign donor identity. This field did not match the donor
+      prefix in the cell IDs for the RM-* samples.
+
+      Specifically, the RM-A/B/C/D donors' cells had metadata that pointed
+      to different donors than what the cell ID prefix indicated.
+
+    resolution: |
+      Extract donor identity from the cell ID prefix instead of using the
+      metadata field. The cell ID format is "{donor}_{barcode}" where donor
+      is one of: RM-A, RM-B, RM-C, RM-D, PM-A through PM-L.
+
+      Implementation:
+      1. Split cell ID by "_"
+      2. Take first component as donor
+      3. Ignore metadata donor/RM field
+
+    verification: |
+      After applying fix:
+      - All 52,681 cells should have valid donor assignment
+      - Expected 100% match rate to iHBCA
+
+    code_reference: |
+      Original fix in: .archive/2026-01-20_metadata_scripts/create_cell_id_mapping.R
+      Knowledge doc: .archive/2026-01-20_metadata_scripts/KNOWLEDGE_EXTRACTION.md:24-30
+
+  # ---------------------------------------------------------------------------
+  # GRAY_RM_D_MUTATION - INFORMATIONAL
+  # ---------------------------------------------------------------------------
+  - id: GRAY_RM_D_MUTATION
+    severity: LOW
+    status: DOCUMENTED
+    discovered: "Supplemental extraction 2026-01-20"
+
+    description: |
+      Donor RM-D (Individual_04) carries a RAD51C mutation despite having
+      "Reductive Mammoplasty" surgery (cosmetic, not prophylactic).
+
+    affected_cells:
+      count: null  # To be determined from Track 2
+      fraction: null  # Approximately 1/16 of total
+      donors: ["RM-D"]
+
+    root_cause: |
+      This is not an error - it's a real case where someone who happened to
+      have a genetic mutation elected for cosmetic breast reduction surgery
+      rather than prophylactic mastectomy.
+
+    resolution: |
+      Classify RM-D as HR (High Risk) based on genotype, not surgery type.
+      The surgery type (RM = Reductive Mammoplasty) is misleading for this donor.
+
+      For risk_status derivation:
+      - RM-A, RM-B, RM-C → AR (WT genotype)
+      - RM-D → HR (RAD51C mutation)
+      - PM-* → HR (various BRCA1/BRCA2 mutations)
+
+    verification: |
+      Ensure RM-D is included in HR group for risk_status DA tests.
+
+  # ---------------------------------------------------------------------------
+  # GRAY_MISSING_METADATA - INFORMATIONAL
+  # ---------------------------------------------------------------------------
+  - id: GRAY_MISSING_METADATA
+    severity: LOW
+    status: DOCUMENTED
+    discovered: "Supplemental extraction 2026-01-20"
+
+    description: |
+      Donors PM-F (Individual_10) and PM-L (Individual_16) have minimal
+      metadata - only genotype is available (BRCA1 n/a and BRCA2 n/a).
+
+    affected_cells:
+      count: null  # To be determined from Track 2
+      fraction: null  # Approximately 2/16 of total
+      donors: ["PM-F", "PM-L"]
+
+    root_cause: |
+      Original study did not collect complete clinical data for these donors.
+      The "(n/a)" notation in genotype means the specific mutation is unknown,
+      but the carrier status was confirmed.
+
+    resolution: |
+      - For age_binary: These cells will have NULL values
+      - For parity: These cells will have NULL values
+      - For risk_status: Both are HR (BRCA1/BRCA2 carriers confirmed)
+      - For menopausal_status: These cells will have NULL values
+
+      Implementation: Allow NULL values in harmonized output, document in
+      validation report that 2/16 donors (12.5%) have incomplete metadata.
+
+    verification: |
+      Confirm that cells from PM-F and PM-L are properly handled:
+      - Included in risk_status analysis (as HR)
+      - Excluded from age/parity/menopausal analyses (NULL)
+
+# -----------------------------------------------------------------------------
+# NOTES
+# -----------------------------------------------------------------------------
+notes: |
+  ## Summary
+
+  Gray is a relatively straightforward study with one major historical issue
+  (donor mismatch) that has been resolved. The resolution is documented and
+  the fix is simple: extract donor from cell ID prefix.
+
+  ## Key Points for Implementation
+
+  1. **Cell ID parsing**: Split by "_", take first component as donor
+  2. **Ignore metadata donor field**: Use only cell ID for donor assignment
+  3. **RM-D is HR**: Despite surgery type, classify by genotype
+  4. **Missing data**: 2 donors (PM-F, PM-L) have incomplete metadata

@@ -1,0 +1,34 @@
+# Canonical markers for Epithelial L0.5 dotplot — nuclear layer.
+# Derived from annotation_cascade.yaml evidence (2026-04-20).
+# Gene order = display order (most diagnostic first).
+# All genes confirmed present in 280-gene Xenium nuclear panel.
+
+BMYO:
+  - ACTA2
+  - MYH11
+  - MYLK
+  - ACTG2
+  - KRT5
+
+LASP:
+  - KIT
+  - PIGR
+  - SFRP1
+  - KRT7
+  - EPCAM
+
+LHS:
+  - FOXA1
+  - PGR
+  - GATA3
+  - MLPH
+  - ANKRD30A
+  - KRT8
+
+BYMO:
+  - KRT14
+  - DSP
+  - AQP3
+  - KLF5
+  - EGFR
+  - JUP

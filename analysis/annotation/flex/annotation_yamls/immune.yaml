@@ -1,0 +1,397 @@
+schema_version: 2_flex
+compartment: imm
+generated: 2026-04-27
+locked_date: 2026-04-27
+locked_by: nwechter
+source_pipeline: Spatial_HBCA_preprocessing/.dev/flex_annotation_20260427
+anchor_resolution: '1.0'
+resolutions_used: ['0.3', '0.5', '0.8', '1.0', '1.5', '3.0']
+resolution_cap: '3.0'
+
+note: |
+  Track C FLEX annotation (L2S labels). Anchor at leiden_1.0 (24 clusters); fine_cluster
+  overrides applied at 1.5 (Treg/CD4_Tcm split) and 3.0 (CD4 vs CD8 lineage split in c0,
+  cDC2/Mono_NC/Macro_FOLR2 split in c9). Resolution mixed across anchor + 1.5 + 3.0 per
+  V1 v2 pattern (mixed-resolution annotation precedented in V1 stromal + epithelial).
+  Cap raised from 1.5 to 3.0 after observing that 3.0 cleanly separates lineage in c0
+  (mixed naive T) — at 1.5 c0 stays one cluster, at 3.0 it splits into 2 CD4 sub-clusters
+  + 1 CD8_Resting + 1 CD8_Tem (KLRG1+PRF1+).
+  Evidence per cluster:
+    - ucell_top, ucell_top_score, ucell_runner_up, ucell_margin: UCell argmax against V1 yaml signatures
+    - limma_top_markers: top de novo markers from limma-voom (one-vs-rest, ~ library_id + condition)
+    - novelty_flags: low_confidence / tight_margin / marker_mismatch (informational, not auto-relabel)
+  All assigned_label values reviewed against structural diagnostics, V1 canonical+identity
+  marker heatmaps, top-marker heatmaps, label UMAP, and per-V1-label feature plots
+  (outputs/Immune/{structural,featureplots,annotation}/). review_status: locked.
+
+evidence_paths:
+  ucell_per_cluster: outputs/ucell/Immune_ucell_per_cluster.csv
+  ucell_per_cell: outputs/ucell/Immune_ucell_per_cell.csv
+  limma_top: outputs/limma/limma_top_markers_Immune_leiden_*.csv
+  limma_full: outputs/limma/limma_markers_Immune_leiden_*.csv
+  assignments: outputs/assignments/Immune_leiden_*_assignments.csv
+  concordance: outputs/concordance/Immune_resolution_concordance.csv
+  recommendations: outputs/concordance/Immune_resolution_recommendations.csv
+  structural_plots: outputs/Immune/structural/
+
+clusters_by_resolution:
+  '1.0':
+    c0:
+      n_cells: 6335
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.4309
+      ucell_runner_up: CD4_Th_like
+      ucell_margin: 0.0769
+      limma_top_markers: [ADAM23, LTK, SCART1, CD5, CD6, BCL11B, LTB, SPOCK2, THEMIS, IL7R, TCF7, SLAMF1, SCML4, CD3E, CD3D]
+      novelty_flags: [marker_mismatch]
+      assigned_label: CD4_Th_like
+      review_status: locked
+      review_notes: |
+        Pan-naive/CM T cluster at 1.0; at 1.5 stays single but at 3.0 cleanly splits into:
+          3.0_c1  (n=2935): CD4_Th_like — CTLA4+TCF7+CCR7, CD4(+1.54), CD8A(-0.52)
+          3.0_c11 (n=1720): CD4_Th_like — BATF+SELL+CCR7+TCF7, CD4(+1.02), CD8A(+1.31)
+          3.0_c16 (n=943):  CD8_Resting — CD8A(+3.58)+GZMK+CCL5+NKG7
+          3.0_c29 (n=515):  CD8_Tem     — KLRG1(+5.34)+PRF1(+5.15)+CD8A(+4.11), CD4(-1.43)
+        Anchor majority is CD4 (4655/6335 cells = 73%). Override at 3.0 for c16 → CD8_Resting
+        and c29 → CD8_Tem.
+    c1:
+      n_cells: 5948
+      ucell_top: Macro_FOLR2
+      ucell_top_score: 0.7609
+      ucell_runner_up: Macro_C1Q
+      ucell_margin: 0.4153
+      limma_top_markers: [MAMDC2, DNM1, MPPED2, MARCO, SCN9A, COLEC12, NEURL2, FXYD6, EMP1, CCL8, PAPSS2, FCER2, LYVE1, LILRB5, FAM20A]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Macro_FOLR2
+      review_status: locked
+      review_notes: |
+        Strong FOLR2 signature (MARCO, LYVE1, CCL8, FCER2). Clear tissue-resident macrophage.
+        At 1.5 the broader FOLR2 family (anchor c1 + c4 + c15) splits into 3 sub-states:
+        1.5_c6 (MARCO/C2/CFD/CD209 — canonical resident), 1.5_c1 (CCL8/CCL2/CD163L1 —
+        chemokine-active), 1.5_c7 (MPPED2/DNM1/HSF4/EMP1 — distinct unidentified). All
+        retain Macro_FOLR2 identity; not split into separate labels.
+    c2:
+      n_cells: 4646
+      ucell_top: B_cell
+      ucell_top_score: 0.4647
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.2734
+      limma_top_markers: [NIBAN3, PAX5, FCRL1, BANK1, BLK, OSBPL10, FCRL2, CD19, TNFRSF13C, MS4A1, IGHD, RALGPS2, CD22, CD79B, TNFRSF13B]
+      novelty_flags: []
+      assigned_label: B_cell
+      review_status: locked
+      review_notes: |
+        Clean B cell (PAX5, CD19, MS4A1, CD79B, BANK1, IGHD). High canonical marker overlap.
+        At 1.5 splits into MS4A1-high mature B (1.5_c3, n=3946) and IGHD-high naive B
+        (1.5_c16, n=697). V1 yaml uses single B_cell label — keep at anchor.
+    c3:
+      n_cells: 4530
+      ucell_top: CD8_Trm
+      ucell_top_score: 0.3391
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.0355
+      limma_top_markers: [ITGA1, KLRC1, KLRC3, CD8A, KLRD1, KLRC4, GNLY, NELL2, HAGHL, CCL5, KLRK1, THEMIS, SCML4, BCL11B, CD3E]
+      novelty_flags: [tight_margin, marker_mismatch]
+      assigned_label: CD8_Trm
+      review_status: locked
+      review_notes: |
+        CD8 Trm signature (ITGA1, KLRC1/3/4, KLRD1, CD8A, GNLY, CCL5). Tight margin vs Resting.
+    c4:
+      n_cells: 4505
+      ucell_top: Macro_FOLR2
+      ucell_top_score: 0.6261
+      ucell_runner_up: Macro_C1Q
+      ucell_margin: 0.305
+      limma_top_markers: [CD163L1, CCL8, MPPED2, TMEM37, SCN9A, GFRA2, BCAT1, PLEKHG5, EGFL7, CCL2, ITSN1, LILRB5, ME1, CD209, LYVE1]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Macro_FOLR2
+      review_status: locked
+      review_notes: |
+        Second FOLR2 macrophage cluster (CD163L1, CCL8, CCL2, LYVE1, CD209). Variant of c1.
+    c5:
+      n_cells: 3834
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.289
+      ucell_runner_up: CD8_Tem
+      ucell_margin: 0.031
+      limma_top_markers: [DTHD1, GZMK, TIGIT, CD8A, NKG7, BICDL1, SH2D1A, KLRG1, CCL5, SYNE1, DUSP2, PYHIN1, THEMIS, CD5, ST8SIA1]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: CD8_Tem
+      review_status: locked
+      review_notes: |
+        CD8 effector-memory signature (GZMK, NKG7, KLRG1, CCL5, DTHD1, TIGIT). Override of UCell CD8_Resting argmax.
+    c6:
+      n_cells: 2955
+      ucell_top: Macro_C1Q
+      ucell_runner_up: Macro_inflam
+      ucell_top_score: 0.3448
+      ucell_margin: 0.0513
+      limma_top_markers: [C3, TREM2, VASH1, FCGBP, SIGLEC10, PALD1, DOCK4, USP53, SKIL, IFITM10, EPB41L2, FMNL3, DAGLB, AXL, SLC1A3]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Macro_C1Q
+      review_status: locked
+      review_notes: |
+        C1Q-like macrophage (C3, TREM2, AXL, FCGBP, SIGLEC10). Distinct from FOLR2 clusters.
+    c7:
+      n_cells: 2479
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.4128
+      ucell_runner_up: CD4_Th_like
+      ucell_margin: 0.037
+      limma_top_markers: [CTLA4, TIGIT, TRBC1, SELL, CCR7, LTB, TRAC, ITK, BCL11B, CD3D, CD5, TCF7, SPOCK2, TRBC2, CD3E]
+      novelty_flags: [tight_margin, marker_mismatch]
+      assigned_label: CD4_Th_like
+      review_status: locked
+      review_notes: |
+        At 1.0 anchor this cluster mixes CD4 Tcm/Th_like (dominant, n~1664 at 1.5_c11) with
+        Treg (minority, n~732 at 1.5_c15). At 1.5 the Treg signature concentrates into one
+        sub-cluster (CTLA4 lfc=6.17, TIGIT lfc=5.22, BATF) while the rest is pure naive/CM
+        CD4 (CCR7+NELL2+TCF7+SELL+LTB). Anchor labeled CD4_Th_like; Treg recovered via
+        fine_cluster override at 1.5_c15.
+    c8:
+      n_cells: 2159
+      ucell_top: Mast
+      ucell_top_score: 0.473
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.1533
+      limma_top_markers: [VWA5A, TPSG1, CPA3, MS4A2, IL1RL1, HDC, SLC18A2, ADCYAP1, CTSG, GATA2, RHEX, RAB44, KIT, CMA1, MLPH]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Mast
+      review_status: locked
+      review_notes: |
+        Clean Mast cell (CPA3, MS4A2, KIT, TPSG1, GATA2, HDC, CTSG).
+    c9:
+      n_cells: 2043
+      ucell_top: cDC2
+      ucell_top_score: 0.2646
+      ucell_runner_up: Macro_inflam
+      ucell_margin: 0.0223
+      limma_top_markers: [CD1C, VCAN, FCER1A, IL1R2, CLEC10A, S100A8, LYZ, FCAR, S100A9, TIMP1, AREG, THBS1, GABBR1, CPVL, TREM1]
+      novelty_flags: [low_confidence, tight_margin]
+      assigned_label: cDC2
+      review_status: locked
+      review_notes: |
+        At 1.0/1.5 mixes cDC2 with monocyte and a small Macro_FOLR2 subset. At 3.0 splits:
+          3.0_c19 (n=1244): cDC2          — CD1C(+6.29)+FCER1A+CLEC10A, low CD14
+          3.0_c22 (n=677):  Mono_NC       — VCAN(+7.42)+S100A8/9+CD14(+2.82)+FCAR
+          3.0_c18 (n=168):  Macro_FOLR2   — CD163L1+VENTX+CLEC7A+LYVE1 (mac, not DC)
+        Anchor labeled cDC2 (largest fraction). Overrides for Mono_NC and Macro_FOLR2 at 3.0.
+    c10:
+      n_cells: 1986
+      ucell_top: Plasma
+      ucell_top_score: 0.5915
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.3314
+      limma_top_markers: [AMPD1, TXNDC5, JCHAIN, MZB1, IGLC1, PDK1, SDC1, BMP6, IGKC, IGHG1, SSR4, SEC11C, DERL3, TNFRSF17, TXNDC11]
+      novelty_flags: []
+      assigned_label: Plasma
+      review_status: locked
+      review_notes: |
+        Clean Plasma (JCHAIN, MZB1, IGLC1, IGKC, IGHG1, SDC1, TNFRSF17, DERL3).
+    c11:
+      n_cells: 1417
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.2962
+      ucell_runner_up: Neutrophil
+      ucell_margin: 0.1063
+      limma_top_markers: [S100A8, G0S2, IL1R2, SLC25A37, S100A9, PTGS2, CXCL8, FCAR, TREM1, VASP, CHI3L1, ATG16L2, USP15, SOD2, R3HDM4]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: Neutrophil
+      review_status: locked
+      review_notes: |
+        Strong Neutrophil/granulocyte signature (S100A8/9, G0S2, CXCL8, FCAR, TREM1, PTGS2).
+        Override of UCell CD8_Resting argmax — markers are unambiguously granulocyte.
+    c12:
+      n_cells: 1337
+      ucell_top: NK
+      ucell_top_score: 0.3739
+      ucell_runner_up: CD8_Tem
+      ucell_margin: 0.0896
+      limma_top_markers: [GNLY, KLRD1, NKG7, TXK, KLRC3, SYNE1, PRF1, KLRC1, PTGDS, KLRC4, LPCAT1, PYHIN1, CCL5, MAPK1, CD38]
+      novelty_flags: [marker_mismatch]
+      assigned_label: NK
+      review_status: locked
+      review_notes: |
+        Clean NK (GNLY, KLRD1, NKG7, KLRC1/3/4, PRF1, TXK).
+        At 1.5 splits into KLRC-dominant (1.5_c13, n=571) and GNLY/PRF1-cytotoxic
+        (1.5_c14, n=753, lfc=8.20 GNLY). Both still NK; no separate labels in V1.
+    c13:
+      n_cells: 805
+      ucell_top: Macro_FOLR2
+      ucell_top_score: 0.3941
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.1249
+      limma_top_markers: [COL3A1, COL1A2, COL1A1, PLPP3, EBF1, EPAS1, CXCL12, FABP4, CFD, ITPKC, MGP, EGFL7, TAGLN, SUN1, GSN]
+      novelty_flags: [marker_mismatch]
+      assigned_label: ARTIFACT_stromal_doublets
+      review_status: locked
+      review_notes: |
+        Stromal contamination (COL1A1/2, COL3A1, MGP, DCN, TAGLN, FABP4). Should drop or flag as doublet.
+    c14:
+      n_cells: 627
+      ucell_top: Macro_inflam
+      ucell_top_score: 0.2527
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.0809
+      limma_top_markers: [MMP9, SPP1, CCL22, CSTB, TM4SF19, LPL, CHI3L1, TREM2, GPC4, LIPA, CHIT1, ACP5, IL1RN, NCEH1, BCAP31]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: Macro_LAM
+      review_status: locked
+      review_notes: |
+        Strong Macro_LAM (lipid-associated macrophage) signature: MMP9, SPP1, CHI3L1,
+        TREM2, LPL, ACP5, CHIT1, LIPA, GPNMB, CD9, FABP4. Override of UCell Macro_inflam.
+        At 1.5 splits into LAM core (1.5_c17, n=461) and a CCL22+CCR7+BIRC3+NR4A3+CD40
+        sub-cluster (1.5_c24, n=100) that looks more like activated/migratory DC than LAM —
+        could be misassignment, worth manual check.
+    c15:
+      n_cells: 583
+      ucell_top: Macro_FOLR2
+      ucell_top_score: 0.8682
+      ucell_runner_up: Macro_C1Q
+      ucell_margin: 0.1967
+      limma_top_markers: [HSP90AA1, HSPA1A, HSPH1, HSPA1B, MARCO, DNAJB1, HTRA1, FXYD6, SLC40A1, FUCA1, CD209, FOLR2, CCL8, PEPD, PMP22]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Macro_FOLR2
+      review_status: locked
+      review_notes: |
+        FOLR2 macrophage with heat-shock activation (HSP90AA1, HSPA1A/B, DNAJB1, HSPH1) on top of FOLR2/MARCO/CCL8.
+        Macro_FOLR2 stress sub-state — could split out as fine_cluster if biologically meaningful.
+    c16:
+      n_cells: 528
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.1716
+      ucell_runner_up: Macro_inflam
+      ucell_margin: 0.0386
+      limma_top_markers: [MLPH, MGP, CD24, MUCL1, KIT, XBP1, TAGLN, CHPT1, TPM1, LARS, CD46, TRPS1, DST, AGAP1, ARHGAP8]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: ARTIFACT_epithelial_doublets
+      review_status: locked
+      review_notes: |
+        Epithelial contamination (MUCL1, CD24, KIT, MLPH, KRT-related). Drop or flag.
+    c17:
+      n_cells: 434
+      ucell_top: B_cell
+      ucell_top_score: 0.0
+      ucell_runner_up: CD4_Th_like
+      ucell_margin: 0.0
+      limma_top_markers: [HBB, HBD, HBA2, FBXO7, BNIP3L, SLC25A37, SNCA, CCNI, R3HDM4, UBA52, RBM38, CHPT1, USP12, PCMTD1, SESN3]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: ARTIFACT_erythrocytes
+      review_status: locked
+      review_notes: |
+        Hemoglobin-dominant (HBB, HBA2, HBD). RBC contamination — drop or flag.
+    c18:
+      n_cells: 277
+      ucell_top: CD8_Resting
+      ucell_top_score: 0.4047
+      ucell_runner_up: CD8_Trm
+      ucell_margin: 0.1475
+      limma_top_markers: [KLRC3, GNLY, KLRD1, KLRC4, TXK, NELL2, CD8A, NKG7, DGKD, SCML4, TCF7, KLRK1, PRRC2B, PLCL2, CNR2]
+      novelty_flags: [marker_mismatch]
+      assigned_label: CD8_Trm
+      review_status: locked
+      review_notes: |
+        CD8 cytotoxic / Trm-like (KLRC3, GNLY, KLRD1, CD8A, NKG7, KLRC4). Smaller analog of c3.
+    c19:
+      n_cells: 253
+      ucell_top: cDC1
+      ucell_top_score: 0.4983
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.2985
+      limma_top_markers: [CCDC6, RUBCNL, CPVL, PTGES2, ASAP1, AIM2, ST8SIA4, WDFY4, SLAMF7, MCOLN2, SHTN1, DAPP1, TAP2, LRRK2, MARCH1]
+      novelty_flags: [marker_mismatch]
+      assigned_label: cDC1
+      review_status: locked
+      review_notes: |
+        Clean cDC1 (WDFY4, AIM2, CPVL, MARCH1, TAP2, DAPP1, SLAMF7).
+    c20:
+      n_cells: 118
+      ucell_top: pDC
+      ucell_top_score: 0.6324
+      ucell_runner_up: cDC1
+      ucell_margin: 0.3499
+      limma_top_markers: []
+      novelty_flags: [marker_mismatch]
+      assigned_label: pDC
+      review_status: locked
+      review_notes: |
+        UCell pDC strong (0.63). Limma top markers empty — too few cells per pseudobulk bin (n=118).
+        F1 concordance shows pDC has best F1=0.87 at 1.5 — confirm via featureplots.
+    c21:
+      n_cells: 72
+      ucell_top: Mono_NC
+      ucell_top_score: 0.5909
+      ucell_runner_up: Macro_inflam
+      ucell_margin: 0.1938
+      limma_top_markers: []
+      novelty_flags: [marker_mismatch]
+      assigned_label: Mono_NC
+      review_status: locked
+      review_notes: |
+        UCell Mono_NC strong (0.59). Small cluster (n=72) — limma too few pseudobulk bins.
+    c22:
+      n_cells: 60
+      ucell_top: Macro_inflam
+      ucell_top_score: 0.0212
+      ucell_runner_up: pDC
+      ucell_margin: 0.0128
+      limma_top_markers: []
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: ARTIFACT_lowqc
+      review_status: locked
+      review_notes: |
+        All UCell scores near zero. Likely doublets / dropout / failed cells. Drop.
+    c23:
+      n_cells: 11
+      ucell_top: Mast
+      ucell_top_score: 0.4551
+      ucell_runner_up: CD8_Resting
+      ucell_margin: 0.1019
+      limma_top_markers: []
+      novelty_flags: [marker_mismatch]
+      assigned_label: Mast
+      review_status: locked
+      review_notes: |
+        Mast outlier (n=11). Likely splits from c8 at higher res. UCell Mast (0.46).
+
+# fine_cluster overrides — populated during review for substates the 1.0 anchor merges.
+# Pattern: pick a higher resolution that splits the substate, then list the (resolution, cluster)
+# tuples and the override label. See V1 v2 yaml for example.
+fine_cluster_overrides:
+  treg_split:
+    resolution: '3.0'
+    anchor_clusters: [c7]
+    rationale: |
+      Anchor c7 mixes CD4_Th_like with Treg. At 3.0 the Treg signature concentrates
+      into 3.0_c20 (n=917): CTLA4 lfc=5.86, TIGIT 4.92, BATF 3.60, CCR7 down to 1.64.
+      Sharper than the 1.5 split (1.5_c15, n=732, CTLA4 6.17). FOXP3 confirmed via
+      featureplot. The c7 anchor remainder (3.0_c13, n=1477) is CD4_Tcm-leaning
+      (CCR7 5.10, TCF7 5.25) and inherits CD4_Th_like.
+    overrides:
+      - {resolution: '3.0', cluster: 20, label: Treg}
+
+  cd4_cd8_lineage_split:
+    resolution: '3.0'
+    anchor_clusters: [c0]
+    rationale: |
+      Anchor c0 (n=6335) is pan-naive T at 1.0 and 1.5 (genuinely mixed CD4/CD8 with
+      CD4 lfc=1.38, CD8A lfc=1.91, CCR7+TCF7+IL7R). At 3.0 it cleanly resolves:
+      majority CD4 (3.0_c1+c11, 4655 cells), CD8 resting (3.0_c16, n=943), CD8 effector
+      with KLRG1+PRF1+ (3.0_c29, n=515). Anchor flipped to CD4_Th_like (majority).
+    overrides:
+      - {resolution: '3.0', cluster: 16, label: CD8_Resting}
+      - {resolution: '3.0', cluster: 29, label: CD8_Tem}
+      # 3.0_c1 and c11 inherit CD4_Th_like from the c0 anchor.
+
+  cdc2_mono_macro_split:
+    resolution: '3.0'
+    anchor_clusters: [c9]
+    rationale: |
+      Anchor c9 (n=2043) is cDC2-leaning at 1.0/1.5 but markers mix DC, monocyte, and a
+      small macrophage subset. At 3.0 splits into clean cDC2 (3.0_c19, CD1C+FCER1A+
+      CLEC10A, low CD14), classical-leaning Mono_NC (3.0_c22, VCAN+S100A8/9+CD14+FCAR),
+      and a Macro_FOLR2 subset (3.0_c18, CD163L1+CLEC7A+LYVE1).
+    overrides:
+      - {resolution: '3.0', cluster: 22, label: Mono_NC}
+      - {resolution: '3.0', cluster: 18, label: Macro_FOLR2}
+      # 3.0_c19 inherits cDC2 from the c9 anchor.

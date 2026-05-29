@@ -1,0 +1,96 @@
+# =============================================================================
+# VALIDATION REPORT SCHEMA
+# =============================================================================
+# Interface contract for outputs/validated/validation_report.yaml
+# Gates check this file to determine if processing can proceed.
+# =============================================================================
+
+version: "1.0"
+description: "Schema for validation_report.yaml output files"
+
+# -----------------------------------------------------------------------------
+# REQUIRED FIELDS
+# -----------------------------------------------------------------------------
+
+required_fields:
+  study:
+    type: string
+    description: "Study name (lowercase)"
+    example: "gray"
+
+  status:
+    type: enum
+    values: ["PASS", "FAIL"]
+    description: "Overall validation status"
+
+  cell_count:
+    type: integer
+    description: "Total cells in component study"
+    example: 52681
+
+  match_rate:
+    type: float
+    description: "Fraction of cells matched to iHBCA (0.0 to 1.0)"
+    example: 1.0
+
+# -----------------------------------------------------------------------------
+# OPTIONAL FIELDS
+# -----------------------------------------------------------------------------
+
+optional_fields:
+  matched_cells:
+    type: integer
+    description: "Number of cells successfully matched"
+
+  unmatched_cells:
+    type: integer
+    description: "Number of cells that could not be matched"
+
+  issues:
+    type: list
+    description: "List of documented issues"
+    item_schema:
+      id: string
+      description: string
+      severity: enum[WARNING, ERROR, INFO]
+      resolved: boolean
+
+  warnings:
+    type: list
+    description: "Non-blocking concerns"
+    item_schema:
+      message: string
+
+  barcode_format:
+    type: object
+    description: "Detected barcode format information"
+
+  timestamp:
+    type: datetime
+    description: "When validation was run"
+
+# -----------------------------------------------------------------------------
+# PASS CRITERIA
+# -----------------------------------------------------------------------------
+
+pass_criteria:
+  - "status == 'PASS'"
+  - "match_rate >= 0.95 OR (match_rate >= 0.80 AND issue documented explaining gap)"
+
+# -----------------------------------------------------------------------------
+# EXAMPLE
+# -----------------------------------------------------------------------------
+
+example:
+  study: gray
+  status: PASS
+  cell_count: 52681
+  match_rate: 1.0
+  matched_cells: 52681
+  unmatched_cells: 0
+  issues:
+    - id: GRAY_DONOR_MISMATCH
+      description: "37% of cells had incorrect RM-* donor assignment in original metadata"
+      severity: INFO
+      resolved: true
+  timestamp: "2026-01-20T14:30:00"

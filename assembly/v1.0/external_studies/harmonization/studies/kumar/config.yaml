@@ -1,0 +1,23 @@
+# =============================================================================
+# KUMAR STUDY CONFIGURATION
+# =============================================================================
+
+study_name: kumar
+source_path: "${SOURCE_COMPONENT_STUDIES}/kumar_converted/"
+ihbca_dataset: "Kumar"
+
+cell_id_format:
+  pattern: "{prefix}_{barcode}"
+  has_suffix: false
+  example: "r1_hbca_c01_AACCATGGTATGCTTG"
+  notes: "Multiple underscores in prefix - barcode is always last segment"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues: []
+
+notes: |
+  Medium complexity - multi-underscore cell IDs.
+  Large dataset: 714,331 cells, 126 donors.
+  Testable conditions to be determined during discovery phase.

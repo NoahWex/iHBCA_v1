@@ -1,0 +1,481 @@
+# =============================================================================
+# Submission v1 — Canonical Aesthetic Rules
+# =============================================================================
+# Single source of truth for all visual decisions in the Submission_v1 pipeline.
+# All rendering scripts MUST consume this file via load_aesthetics.R or .py.
+# No inline color definitions, no hardcoded dimensions.
+#
+# Palette keys match the canonical L1/L2 identifiers from summary_idents.csv.
+# Display labels (short_label, descriptive_label) are read from that CSV at
+# load time — NOT stored here. If nomenclature changes, update the CSV;
+# hex values here remain stable unless the underlying types change.
+#
+# Generated from m2_visualization_candidates.Rmd:134-191 HSV logic.
+# Pinned 2026-03-20. Do not regenerate — edit deliberately.
+# =============================================================================
+
+# --- Label Source ---
+# Display labels come from this file. Palette keys here match l2_label column.
+# load_aesthetics.R joins palette keys -> short_label at render time.
+labels:
+  source: summary_idents.csv   # relative to Analysis/Submission_v1/stages/S2_behavioral_groups/
+  key_column: l2_label
+  short_column: short_label
+  descriptive_column: descriptive_label
+  compartment_column: compartment
+
+# --- Color Palettes ---
+# Keys are canonical identifiers. Hex values pinned from HSV computation.
+palettes:
+  # Within-L2 NhoodGroup size rank (1 = largest viable group). Tol distinct
+  # 10-color, colorblind-safe. Used by Fig 2 split-forest panel and any other
+  # panel encoding NhoodGroup rank as a categorical variable.
+  nhoodgroup_rank:
+    "1":  "#332288"
+    "2":  "#117733"
+    "3":  "#44AA99"
+    "4":  "#88CCEE"
+    "5":  "#DDCC77"
+    "6":  "#CC6677"
+    "7":  "#AA4499"
+    "8":  "#882255"
+    "9":  "#999933"
+    "10": "#661100"
+
+  compartment:
+    Stromal: "#D95F02"
+    Epithelial: "#7570B3"
+    Immune: "#1B9E77"
+    Epidermal: "#E6AB02"
+
+  # 7 contributing studies to iHBCA v1 atlas. Paul Tol "bright" colorblind-safe
+  # qualitative 7-color, with olive #999933 replacing default Tol gray for
+  # Twigger to disambiguate from the 'gray' study (which gets Tol blue).
+  # Used by s1.3 study contribution stacked bar; locked 2026-05-22.
+  study:
+    gray:    "#4477AA"
+    kumar:   "#EE6677"
+    murrow:  "#228833"
+    nee:     "#CCBB44"
+    pal:     "#66CCEE"
+    reed:    "#AA3377"
+    twigger: "#999933"
+
+  # LASP-override evidence (s1.5 supp): per-type tint (panel-b violin background)
+  # + face (violin body) for the 3 LASP sub-types, plus background/zero grays
+  # for panel-a Epi UMAP feature plots. Used by s1.5 composite (Atom 4); locked
+  # 2026-05-22.
+  lasp_override:
+    LASP-major:
+      tint: "#E6F0FA"          # light blue background
+      face: "#86B6E0"          # violin body
+    LASP-basal:
+      tint: "#FAE6EE"          # light pink background
+      face: "#E08AAE"          # violin body
+    LASP-KIT:
+      tint: "#FAEEE6"          # light orange background
+      face: "#E0A876"          # violin body
+    background_gray: "#BFBFBF" # panel-a non-LASP Epi cells
+    zero_gray:       "#E5E5E5" # panel-a / panel-b zero-expression cells
+
+  # FLEX cell-level QC status — used by Supp 1 (cell QC pair plot, attrition waterfall, filter UMAP)
+  # and Supp 1.5 (manifold artifact gate). Locked 2026-05-08.
+  # Discrete categorical for filter outcomes; sequential ramp for continuous QC scores.
+  qc_status:
+    kept: "#7570B3"                  # cells passing all QC stages (matches compartment.Epithelial blue)
+    removed_initial: "#E08214"       # step 02-03: low UMI / high mito / doublet at cell QC
+    removed_doublet: "#D6604D"       # step 03 (specific): scDblFinder doublets
+    removed_sample_failed_vf: "#999999"  # step 04 sample-level: failed 100-VF threshold (Pat1_P3_M_UOQ, n=404)
+    removed_manifold: "#9E2A2B"      # step 10b: manifold artifact gate (BigSur residual + depth filter)
+    removed_contam: "#5C0E11"        # step 15: Milo contamination filter (epidermal exclusion)
+    score_ramp_low: "#F0F0F0"        # 3-stop gray ramp for continuous QC scores
+    score_ramp_mid: "#969696"
+    score_ramp_high: "#252525"
+
+  # Kumar 2023 transferred L1 cell-type labels — 13 types
+  # Used by Supp 1.5a (Kumar cell-type UMAP). Locked 2026-05-08.
+  # Per-compartment sequential ramps (compartment-coherent + within-compartment hue progression).
+  kumar_l1:
+    # Epithelial — sequential blues
+    Basal: "#08519C"
+    Luminal_HR: "#3182BD"
+    Luminal_Secretory: "#6BAED6"
+    PS_Epi: "#C6DBEF"
+    # Stromal — sequential greens
+    Fibroblast: "#006D2C"
+    Pericyte: "#31A354"
+    Vascular_Endothelium: "#74C476"
+    Lymphatic_Endothelium: "#BAE4B3"
+    Adipocyte: "#EDF8E9"
+    # Immune — sequential oranges
+    Myeloid: "#A63603"
+    T_Cell: "#E6550D"
+    B_Cell: "#FD8D3C"
+    Mast: "#FDBE85"
+
+  # iHBCA L1 (11 types) — canonical published resolution
+  # Used for Fig 1 (iHBCA atlas) and cross-platform concordance
+  l1:
+    # Stromal (4 types)
+    Fibroblast: "#D94E36"
+    Lymphatic endothelial: "#D96636"
+    Perivascular: "#D97D36"
+    Vascular endothelial: "#D9C436"
+    # Epithelial (4 types)
+    Basal-myoepithelial: "#369ED9"
+    Lactocyte: "#5C36D9"
+    Luminal adaptive secretory precursor: "#364DD9"
+    Luminal hormone sensing: "#7136D9"
+    # Immune (3 types)
+    B-lymphocyte: "#6AD936"
+    Myeloid: "#36D94A"
+    T-lymphocyte: "#52D936"
+
+  # FLEX L1.0 (16 types) — iHBCA L1 base (11) + 5 cluster_annotation overrides
+  # Used for Fig 3 (deep dive). Keys use short names (L1.0 column).
+  # For xopt L0.5: drop pDC, PS_Epi, RBC → 13 types
+  flex_l1.0:
+    # Stromal (5 types)
+    Adipo: "#D93636"
+    Fibro: "#D94E36"
+    LymphEndo: "#D96636"
+    Peri: "#D97D36"
+    VascEndo: "#D9C436"
+    # Epithelial (4 types)
+    Basal: "#369ED9"
+    LumSec: "#364DD9"
+    LumHR: "#7136D9"
+    PS_Epi: "#9B36D9"
+    # Immune (6 types)
+    B_cells: "#6AD936"
+    Myeloid: "#36D94A"
+    T_cells: "#52D936"
+    Mast: "#36D962"
+    Neutro: "#36D979"
+    pDC: "#36D9C1"
+    # Other (1 type)
+    RBC: "#D99536"
+
+  # iHBCA L1.5 (20-22 types) — Austin's original finer annotations from Reed et al.
+  # Used for supplemental atlas UMAP and L1.5 DA beeswarms.
+  # Colors derived from L2 palette (_1 variant of each parent type).
+  l1.5:
+    # Stromal
+    Adipocyte: "#990F0F"
+    Fibroblast: "#99240F"
+    Lymphatic endothelial: "#99380F"
+    Perivascular: "#994B0F"
+    RBC: "#D99536"
+    Schwann cell: "#D9AD36"
+    Vascular endothelial: "#99870F"
+    # Epithelial
+    Basal-myoepithelial: "#0F6799"
+    Luminal adaptive secretory precursor: "#0F2399"
+    Luminal hormone sensing: "#410F99"
+    Lactocyte: "#5C36D9"
+    # Immune
+    B-cell: "#6AD936"
+    Plasma cell: "#36D9A9"
+    CD4T: "#52D936"
+    CD8T: "#52D936"
+    NK/NKT: "#0F995C"
+    Macrophage: "#0F9920"
+    Mast cell: "#36D962"
+    Neutrophil: "#0F9948"
+    Conventional dendritic cell: "#3BD936"
+    Plasmacytoid dendritic cell: "#36D9C1"
+
+  # 40 L2 types — saturation/value variants within parent L1 hue
+  l2:
+    # Stromal — Adipocyte (2)
+    Adipocyte_1: "#990F0F"
+    Adipocyte_2: "#F29191"
+    # Stromal — Fibroblast (6)
+    Fibroblast_1: "#99240F"
+    Fibroblast_2: "#AB3622"
+    Fibroblast_3: "#BD4C39"
+    Fibroblast_4: "#CF6553"
+    Fibroblast_5: "#E08170"
+    Fibroblast_6: "#F2A091"
+    # Stromal — Lymphatic endothelial (2)
+    Lymphatic endothelial_1: "#99380F"
+    Lymphatic endothelial_2: "#F2AE91"
+    # Stromal — Perivascular (2)
+    Perivascular_1: "#994B0F"
+    Perivascular_2: "#F2BC91"
+    # Stromal — RBC (1)
+    RBC_1: "#D99536"
+    # Stromal — Schwann cell (1)
+    Schwann cell_1: "#D9AD36"
+    # Stromal — Vascular endothelial (3)
+    Vascular endothelial_1: "#99870F"
+    Vascular endothelial_2: "#C6B545"
+    Vascular endothelial_3: "#F2E691"
+    # Epithelial — Basal-myoepithelial (4)
+    Basal-myoepithelial_1: "#0F6799"
+    Basal-myoepithelial_2: "#3186B7"
+    Basal-myoepithelial_3: "#5CA9D4"
+    Basal-myoepithelial_4: "#91CFF2"
+    # Epithelial — LASP (3)
+    Luminal adaptive secretory precursor_1: "#0F2399"
+    Luminal adaptive secretory precursor_2: "#4557C6"
+    Luminal adaptive secretory precursor_3: "#919FF2"
+    # Epithelial — LHS (2)
+    Luminal hormone sensing_1: "#410F99"
+    Luminal hormone sensing_2: "#B491F2"
+    # Immune — B-cell (1)
+    B-cell_1: "#6AD936"
+    # Immune — CD4T (1)
+    CD4T_1: "#52D936"
+    # Immune — cDC (1)
+    Conventional dendritic cell_1: "#3BD936"
+    # Immune — Macrophage (2)
+    Macrophage_1: "#0F9920"
+    Macrophage_2: "#91F29D"
+    # Immune — Mast cell (1)
+    Mast cell_1: "#36D962"
+    # Immune — Neutrophil (2)
+    Neutrophil_1: "#0F9948"
+    Neutrophil_2: "#91F2B9"
+    # Immune — NK/NKT (4)
+    NK/NKT_1: "#0F995C"
+    NK/NKT_2: "#31B77C"
+    NK/NKT_3: "#5CD49F"
+    NK/NKT_4: "#91F2C7"
+    # Immune — Plasma cell (1)
+    Plasma cell_1: "#36D9A9"
+    # Immune — pDC (1)
+    Plasmacytoid dendritic cell_1: "#36D9C1"
+
+  # Anatomic position axes (from pca_anatomic_axes.Rmd)
+  anatomic_axes:
+    Anterior_Posterior: "#E41A1C"
+    Upper_Lower: "#377EB8"
+    Inner_Outer: "#4DAF4A"
+
+  # Patient colors
+  patient:
+    Pat1: "#E41A1C"
+    Pat2: "#377EB8"
+    UCI604: "#4DAF4A"
+    UCI220228: "#984EA3"
+
+  # Fig 4 niche-classification palette — 16 keys
+  # Compartment-coherent hue families distinct from l1.5; avoid green (reserved for Immune).
+  # AS_1 → AS_3 ramps darkest → lightest within family (centroid-distance tertile bands).
+  # _isolated keys are desaturated mid-tones for discrete clumps not adjacent to a contiguous structure.
+  niche:
+    # Duct family (blue tints)
+    Duct_AS_1: "#1f4e79"
+    Duct_AS_2: "#6fa8dc"
+    Duct_AS_3: "#b4c7e7"
+    Duct_isolated: "#9eb7d0"
+    # TDLU family (purple tints)
+    TDLU_AS_1: "#5b2e8a"
+    TDLU_AS_2: "#9b7bbd"
+    TDLU_AS_3: "#d1b8e5"
+    TDLU_isolated: "#b8a0cf"
+    # Stroma family (red/orange tints)
+    Stroma_AS_1: "#a04000"
+    Stroma_AS_2: "#d68a4c"
+    Stroma_AS_3: "#f0c7a8"
+    Stroma_isolated: "#c8a085"
+    # Epidermal family (yellow/gold tints — sparse, 5 P3 samples only)
+    Epidermal_AS_1: "#b8860b"
+    Epidermal_AS_2: "#d4a83e"
+    Epidermal_AS_3: "#ecd07a"
+    Epidermal_isolated: "#c4a55a"
+
+  # Fig 4 position-class palette — 18 keys
+  # P-level depth: P1 neutral; P2 beige (NAC-adjacent); P3-A cool blue; P3-M green; P3-P warm purple.
+  # Within each family, quadrant variation: UOQ emphasized (mid-saturated darker tone) since UOQ is the experimental focus.
+  # Back-fills the CommoT scaffold's viridis 2-tone fallback (commot_xenium_pub_20260511/scripts/05_render_panels.py:50-59).
+  position_class:
+    # P1 (nipple — neutral)
+    P1: "#737373"
+    # P2 (NAC-adjacent — pale beige family)
+    P2_NAC: "#e8d8be"
+    P2_UIQ: "#d6b88f"
+    P2_UOQ: "#c49966"
+    P2_LIQ: "#bca580"
+    P2_LOQ: "#a07a4a"
+    # P3 anterior sector (cool blue family)
+    P3_A_UIQ: "#9ec2e8"
+    P3_A_UOQ: "#5b8fbe"
+    P3_A_LIQ: "#7daad1"
+    P3_A_LOQ: "#3e6a98"
+    # P3 medial sector (green family)
+    P3_M_UIQ: "#a0c597"
+    P3_M_UOQ: "#5d9051"
+    P3_M_LIQ: "#7faa75"
+    P3_M_LOQ: "#3f6f36"
+    # P3 posterior sector (warm purple family — deepest)
+    P3_P_UIQ: "#c192c6"
+    P3_P_UOQ: "#8a4f9b"
+    P3_P_LIQ: "#a874ad"
+    P3_P_LOQ: "#6a3781"
+
+# --- Dimensions (Nature guidelines) ---
+# Nature: single column = 89mm (3.50in), double = 183mm (7.20in), max height = 247mm (9.72in)
+dimensions:
+  single_column_mm: 89
+  double_column_mm: 183
+  max_height_mm: 247
+  panel_types:
+    umap:
+      width: 3.5
+      height: 3.5
+      pt_size: 0.05       # 258K cells — must be tiny for legibility
+      stroke: 0
+      alpha: 0.3
+    umap_wide:             # with legend beside
+      width: 5.0
+      height: 3.5
+      pt_size: 0.02
+      stroke: 0
+      alpha: 0.15
+    dotplot:
+      width: 7.2
+      height: 4.0          # scale: add ~0.15in per group beyond 20
+      dot_scale: 5
+    heatmap_tile:
+      width: 7.2
+      height: 5.0          # scale: add ~0.12in per group beyond 25
+    heatmap_pheatmap:
+      width: 7.2
+      height: 5.0
+    stacked_bar:
+      width: 7.2
+      height: 3.0
+    bar_horizontal:
+      width: 3.5
+      height: 4.0
+    biplot:
+      width: 5.0
+      height: 4.5
+    schematic:              # dataset overview, concentric circle diagram
+      width: 7.2
+      height: 5.0
+    beeswarm_compact:       # joint-only DA beeswarm (~20-25 rows)
+      width: 7.2
+      height: 5.0
+    beeswarm_tall:          # supplemental DA beeswarm with FLEX L2S (~50 rows)
+      width: 7.2            # Nature double column (183mm)
+      height: 9.72          # Nature max page height (247mm)
+    biplot_network:          # circular node-edge network (28+ nodes)
+      width: 7.8
+      height: 7.8
+    forest_split:            # split-violin / forest, 3 compartments — landscape, single figure row
+      width: 9.4
+      height: 3.9
+    forest_multi_context:    # PxR-NG x 3-context forest (Fig 2 bottom-row MAIN). 37 NG rows x 3 cols.
+      width: 7.2             # Nature double column (183mm)
+      height: 7.9            # ~5.5mm per NG row x 37 rows + headers + axes
+    alluvial_flow:           # donor flow alluvial — wide and short
+      width: 8.6
+      height: 3.5
+
+# --- Typography ---
+# Nature: sans-serif only (Helvetica or Arial), 5pt minimum, 7pt max body,
+# 8pt bold lowercase panel labels. Consistent font across all figures.
+typography:
+  base_size: 7
+  title_size: 8
+  panel_label_size: 8           # bold, lowercase (a, b, c), upper-left corner
+  legend_size: 6
+  legend_title_size: 7
+  axis_text_size: 6
+  axis_title_size: 7
+  strip_text_size: 7
+  family: "Helvetica"           # fallback: Arial, then DejaVu Sans in container
+  family_fallback: ["Arial", "DejaVu Sans"]
+  min_pt: 5                     # Nature hard floor
+  max_body_pt: 7                # Nature max for non-label text
+  # How labels are displayed (not stored — resolved at render time from CSV)
+  l1_labels: "as-is"       # use canonical L1 names
+  l2_labels: "short"       # use short_label column from summary_idents.csv
+
+# --- Element Density Rules ---
+# Thresholds for legibility. Exceeding triggers warning in validate_panel().
+density:
+  umap_max_cells: 300000        # downsample (stratified) above this
+  umap_alpha: 0.3               # transparency for point overlap
+  heatmap_max_genes_per_group: 5
+  heatmap_max_groups: 25        # split into sub-panels above this
+  dotplot_max_genes_per_group: 3
+  dotplot_max_groups: 20        # split or use landscape above this
+  stacked_bar_max_categories: 15  # combine rare into "Other" above this
+  legend_max_items: 20          # wrap or abbreviate above this
+  min_font_pt: 5                # hard floor — Nature minimum
+
+# --- Rendering Rules ---
+# Nature specs: vector PDF primary, 1200 DPI for rasterized scatter (Noah pref 2026-05-07
+# — Nature 600 DPI minimum is too low for scientific reproduction); 300 DPI minimum for
+# photographs; extended data 300 DPI max.
+rendering:
+  raster: false                 # ALWAYS false for Seurat/ggplot publication vectors
+  dpi: 1200                     # Bumped 600→1200 (2026-05-07): rasterized panel content
+  dpi_extended_data: 300        # Online-only extended data: 300 DPI max
+  dpi_umap_raster: 1200         # Rasterized scatter inside vector PDF wrapper (UMAPs, pair plots)
+  format:
+    - pdf                       # primary (vector, editable text)
+    - png                       # convenience preview (at full DPI)
+  background: "white"
+  antialias: "default"
+  font_embedding: "TrueType"   # TrueType 2 or 42; avoid TrueType 3
+  text_outlined: false          # Nature requires editable text — do NOT outline
+
+# --- Line Weights (Nature specs) ---
+line_weights:
+  minimum: 0.25                 # pt — Nature hard minimum
+  axes: 0.6                     # pt — axes and tick marks
+  scale_bar: 0.6                # pt — scale bars (separate editable layer)
+  border: 0.5                   # pt — panel borders if used
+  grid: null                    # Nature: no background gridlines
+
+# --- Continuous Color Scales ---
+scales:
+  expression_diverging:
+    low: "#2166AC"
+    mid: "#F7F7F7"
+    high: "#B2182B"
+  abundance_sequential:
+    low: "#FFFFFF"
+    high: "#08519C"
+  purity_sequential:
+    low: "#FEE0D2"
+    high: "#DE2D26"
+  position_diverging:           # for PC loading maps
+    low: "#313695"
+    mid: "#FFFFFF"
+    high: "#A50026"
+
+  # 23-color hand-tuned qualitative palette (Tol-style hue separation). Cycled
+  # by index for arbitrary categorical color assignment where the key set is
+  # not semantically bound. Used by s1.7 annotation-per-compartment to color
+  # native labels within each per-study sub-panel (label sets are study-specific
+  # so a key->color map would be wrong; cycle-by-index is right). Locked 2026-05-22.
+  qualitative_23:
+    - "#E6194B"   # red
+    - "#3CB44B"   # green
+    - "#4363D8"   # blue
+    - "#F58231"   # orange
+    - "#911EB4"   # purple
+    - "#42D4F4"   # cyan
+    - "#F032E6"   # magenta
+    - "#BFEF45"   # lime
+    - "#FABED4"   # pink
+    - "#469990"   # teal
+    - "#9A6324"   # brown
+    - "#800000"   # maroon
+    - "#AAFFC3"   # mint
+    - "#808000"   # olive
+    - "#000075"   # navy
+    - "#FFD700"   # gold
+    - "#A9A9A9"   # dark gray
+    - "#FF6347"   # tomato
+    - "#4169E1"   # royal blue
+    - "#228B22"   # forest green
+    - "#DA70D6"   # orchid
+    - "#CD853F"   # peru
+    - "#000000"   # black

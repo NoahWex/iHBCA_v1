@@ -1,0 +1,202 @@
+# inquiry.yaml — cohort definitions, formulas, contrasts for risk_main_effects
+# Companion inquiry to parity_x_risk_20260504. Same Milo substrate; different
+# question.
+#
+# Question:
+#   What are the cell-population-level differences between risk classes
+#   (parity adjusted)?
+#
+# Substrate:
+#   - Same Milo object as parity_x_risk_20260504.
+#   - Donor metadata extended with `risk_class` column via
+#     scripts/prep_derive_risk_class.R (writes config/derived_donor_metadata.csv).
+#   - Pooled cohorts: AR + one risk class. Test variable = risk_class.
+
+inquiry_schema_version: 2  # alluvial: block (per coordination/process/inquiry_schema_changelog.md)
+inquiry: risk_main_effects_20260507
+description: |
+  Cell-population main effects of germline/sporadic risk class on the iHBCA
+  V1 atlas. Each cohort pools AR + one risk class. The cohort coefficient
+  (e.g., risk_classBR1) gives the per-nhood logFC of risk-class membership
+  on cell abundance, with parity, study, and other covariates blocked.
+
+  Distinct from parity_x_risk_20260504 (which tests within-stratum parity).
+  Together the two inquiries provide:
+    - parity_x_risk: "what does parity do in each risk stratum?"
+    - risk_main_effects: "what does risk class do, parity-adjusted?"
+
+  AR is the reference level in every comparison.
+
+  risk_class values (mutually exclusive):
+    AR  — risk_status_binary == "AR" (no risk factors of any kind)
+    BR1 — brca_genotype == "BRCA1" (verified BRCA1 carrier)
+    BR2 — brca_genotype == "BRCA2" (verified BRCA2 carrier)
+    HRS — risk_status_binary == "HR" AND no verified germline driver
+          (cancer-history-driven HR, or family-history-elected prophylactic
+           with negative or untested genotype)
+
+cohorts:
+
+  BR1_vs_AR:
+    description: |
+      AR + BRCA1 carrier pool. Tests the average abundance shift of each
+      cell population in BRCA1 carriers vs AR donors, with parity blocked.
+    filters:
+      risk_class: [AR, BR1]
+      parity_binary: [parous, nulliparous]
+      study: {exclude: [twigger]}
+    formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_binary + risk_class
+    fdr_weighting: graph-overlap
+    spatial_fdr: 0.05
+    prop: 0.1
+    contrasts:
+      - name: BR1_vs_AR
+        type: coef
+        coef: risk_classBR1
+        description: BRCA1 main effect on cell abundance, parity-adjusted.
+
+  HRS_vs_AR:
+    description: |
+      AR + HR_sporadic pool. Tests HR-by-non-genotype effect on cell abundance,
+      parity blocked. HR_sporadic = HR donors with no verified germline driver
+      (typically cancer-history-driven HR or family-history prophylactic).
+    filters:
+      risk_class: [AR, HRS]
+      parity_binary: [parous, nulliparous]
+      study: {exclude: [twigger]}
+    formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_binary + risk_class
+    fdr_weighting: graph-overlap
+    spatial_fdr: 0.05
+    prop: 0.1
+    contrasts:
+      - name: HRS_vs_AR
+        type: coef
+        coef: risk_classHRS
+        description: HR-sporadic main effect on cell abundance, parity-adjusted (cancer_history NOT blocked — it is definitional to HR classification).
+
+  # NOTE 2026-05-07: HRS_vs_AR_no_cancerhx removed. cancer_history is
+  # definitional to HR classification (HRS donors are HR specifically
+  # because of their cancer history), so blocking it produces a singular
+  # design and silently drops AR donors with NA cancer_history (causing
+  # testNhoods rownames length errors in 51994565_2 / 51995186_2). The
+  # remaining HRS_vs_AR formula now drops cancer_history; the "with
+  # cancer_history blocked" sensitivity is no longer meaningful.
+
+  BR2_vs_AR:
+    description: |
+      AR + BRCA2 carrier pool. Low power (n_BR2 ~ 16); reported as sensitivity.
+      Excluded from headline; supplemental flag.
+    filters:
+      risk_class: [AR, BR2]
+      parity_binary: [parous, nulliparous]
+      study: {exclude: [twigger]}
+    formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_binary + risk_class
+    fdr_weighting: graph-overlap
+    spatial_fdr: 0.05
+    prop: 0.1
+    contrasts:
+      - name: BR2_vs_AR
+        type: coef
+        coef: risk_classBR2
+        description: BRCA2 main effect on cell abundance, parity-adjusted (low power).
+
+# Alluvial visualization: donor flow across testable axes.
+# Risk inquiry: parity is in covariates; risk_class is the testing axis (rightmost).
+alluvial:
+  axes:
+    - study
+    - facs_status
+    - parity_binary
+    - cancer_history
+    - brca_genotype
+    - risk_class
+  exclusion_priority:
+    - {field: study, value: twigger, label: "excl: twigger study"}
+    - {field: risk_class, value: unknown, label: "excl: risk_class unknown"}
+
+# Stage B terms_of_interest — covariates to scan for collinearity.
+# Mirrors parity_x_risk; risk_class is the test variable (added below).
+terms_of_interest:
+  # parity axis
+  - parity_binary
+  - parity_count
+  - age_at_first_birth
+  # age / menopause axis
+  - age_binary
+  - age_continuous
+  - menopausal_status_binary
+  # risk / genotype axis
+  - tissue_indication
+  - risk_class
+  - risk_status_binary
+  - risk_genotype_only
+  - brca_genotype
+  - cancer_history
+  # technical
+  - facs_status
+  - sample_preservation
+  - sample_type
+  - dissociation_minutes
+  # study / batch
+  - study
+  - dataset
+  # other potentially confounding
+  - bmi_category
+
+# Stage F config — same defaults as parity_x_risk
+stage_f_defaults:
+  groupNhoods:
+    da_fdr: 0.10
+    max_lfc: NA
+    overlap: 1
+    subset_nhoods: NA
+  pseudobulk:
+    min_donors_per_group: 10
+    min_cells_per_donor: 5
+  within_parent_markers:
+    min_count: 5
+    min_total_count: 15
+    fdr: 0.05
+
+# Stage B / G context — same as parity_x_risk; risk-by-other-axis collinearity
+# may emerge as relevant during execution.
+context:
+  collinearity_checks:
+    - x: risk_class
+      y: study
+      alpha: 0.05
+      reason: "study composition varies across risk classes; flag if confounded"
+    - x: risk_class
+      y: cancer_history
+      alpha: 0.05
+      reason: "cancer_history is constant for AR; aliased within AR; check within HR cohorts"
+    - x: risk_class
+      y: parity_binary
+      alpha: 0.05
+      reason: "if parity distribution differs across risk classes, parity adjustment matters more"
+    - x: risk_class
+      y: tissue_indication
+      alpha: 0.05
+      reason: "BR1/BR2 carriers more likely to have prophylactic mastectomy; AR mostly reduction. Confounded with cohort, but flag for methods caveat."
+    - x: risk_class
+      y: sample_preservation
+      alpha: 0.05
+      reason: "fresh vs frozen vs organoid distribution varies by study + risk class; flag if non-orthogonal"
+    - x: risk_class
+      y: facs_status
+      alpha: 0.05
+      reason: "Pal sorts (cell-type-sorted), Reed/Kumar do not. BR1 is Pal-heavy; AR is Reed-heavy. Captures sorting bias."
+  dissoc_column: dissociation_minutes
+  stress_signal_threshold: 0.10
+  dissoc_genes:
+    # Same set as parity_x_risk; F.3 stress flagging logic shared.
+    - FOS
+    - FOSB
+    - JUN
+    - JUNB
+    - JUND
+    - EGR1
+    - ATF3
+    - HSPA1A
+    - HSPA1B
+    - DNAJB1

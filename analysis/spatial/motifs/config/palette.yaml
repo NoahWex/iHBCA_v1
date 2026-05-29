@@ -1,0 +1,113 @@
+# Motifs pipeline palette.
+#
+# Module-local because the motif → L1.5 mapping is module-specific and not
+# part of the publication-wide aesthetics vocabulary. Render scripts that
+# need broader project palettes source publication/config/aesthetics.yaml
+# in addition.
+
+# ----------------------------------------------------------------------------
+# NMF motif colors (M0..M8)
+#
+# Motif → dominant L1.5 type (from canonical 9-program basis):
+#   M0  Fb_Activated (0.95)
+#   M1  EC (0.97)
+#   M2  Fb (0.90)
+#   M3  PV (0.97)
+#   M4  CD4T / CD8T / T-NK / cDC2  — immune surveillance / APC context
+#   M5  LEC (0.96)
+#   M6  B / CD8T                   — B-cell pocket
+#   M7  Mac (0.77)
+#   M8  Plas (0.91)
+# ----------------------------------------------------------------------------
+
+program_colors:
+  M0: "#E6194B"   # Fb_Activated
+  M1: "#3CB44B"   # EC
+  M2: "#4363D8"   # Fb
+  M3: "#F58231"   # PV
+  M4: "#911EB4"   # T+DC surveillance
+  M5: "#42D4F4"   # LEC
+  M6: "#F032E6"   # B-cell pocket
+  M7: "#BFEF45"   # Mac
+  M8: "#FABED4"   # Plas
+
+program_labels:
+  M0: "Fb_Activated"
+  M1: "EC"
+  M2: "Fb"
+  M3: "PV"
+  M4: "T+DC surveillance"
+  M5: "LEC"
+  M6: "B-cell pocket"
+  M7: "Mac"
+  M8: "Plas"
+
+# ----------------------------------------------------------------------------
+# L1.5 vocabulary (21 non-epi + 4 epi)
+# ----------------------------------------------------------------------------
+
+l1p5_colors:
+  # Epi (excluded from NMF substrate)
+  LASP-basal: "#8B0000"
+  LASP: "#DC143C"
+  LHS: "#FF1493"
+  BMYO-myo: "#C71585"
+  # Stromal
+  Fb: "#4363D8"
+  Fb_Activated: "#E6194B"
+  Fb_SFRP4: "#F032E6"
+  Adipo: "#BFEF45"
+  # Immune
+  Plas: "#FABED4"
+  "T-NK": "#469990"
+  cDC1: "#9A6324"
+  CD4T: "#800000"
+  Neu: "#AAFFC3"
+  Mast: "#808000"
+  Treg: "#000075"
+  pDC: "#FFD700"
+  Mac: "#A9A9A9"
+  cDC2: "#FF6347"
+  cDC: "#4169E1"
+  CD8T: "#228B22"
+  B: "#DA70D6"
+  # Vascular
+  EC: "#CD853F"
+  PV: "#000000"
+  LEC: "#FF1493"
+  "Vas-cap": "#00CED1"
+
+# ----------------------------------------------------------------------------
+# Structure-class palette (Gautham SpaceFlow substrate)
+# Vocabulary: Duct / TDLU / Stroma / Epidermal / Unknown (Unknown filtered).
+# ----------------------------------------------------------------------------
+
+structure_class_colors:
+  Duct: "#8B0000"
+  TDLU: "#FF1493"
+  Stroma: "#4363D8"
+  Epidermal: "#FFD700"
+  Other: "#999999"
+
+# ----------------------------------------------------------------------------
+# Continuous scales
+# ----------------------------------------------------------------------------
+
+continuous:
+  default: viridis
+  diverging: RdBu_r
+  log2_or:
+    low: "#2166AC"
+    mid: "#F7F7F7"
+    high: "#B2182B"
+
+# ----------------------------------------------------------------------------
+# Default dimensions (Nature single-column 89mm baseline)
+# ----------------------------------------------------------------------------
+
+dimensions:
+  single_column_mm: 89
+  double_column_mm: 183
+  default_panel_mm: 89
+  default_height_mm: 89
+  dpi: 600

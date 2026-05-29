@@ -1,0 +1,328 @@
+schema_version: 2
+compartment: epi
+generated: 2026-04-24
+resolutions_used:
+- '0.3'
+- '5.0'
+note: "Epithelial Stage 2a working draft. Mostly cluster-mode labels at res 0.3 (13 clusters); LASP region uses two fine_cluster\
+  \ overrides at res 5.0 to break out PTN+_LumSec (Spatial_HBCA Fig 4 target) and LASP4 (Reed level2 LASP4 \u2014 clean c57\
+  \ island). c7 (mixed L1) flagged as Doublet artifact.\nPTN+_LumSec rationale: res-5.0 c6 + c84 (mean PTN log1p >= 1.0).\
+  \ 78% of c6 is Kumar Lumsec-basal; PTN+ captures 45.6% of all Lumsec-basal cells. Splits parent res-0.3 clusters c1 + c3\
+  \ (both LASP-major).\nLASP4 rationale: res-5.0 c57 is 66% Reed LASP4. PTN-low. Sits inside res-0.3 c3 (LASP-major parent).\n\
+  c10 (Nee BRCA1-dominant LASP, 2.5K cells): kept inside LASP-major. May warrant artifact flag pending structural review (study-skew).\n"
+clusters_by_resolution:
+  '0.3':
+    c0:
+      n_cells: 299670
+      assigned_label: LHS-major
+    c1:
+      n_cells: 248223
+      assigned_label: LASP-major
+    c2:
+      n_cells: 146932
+      assigned_label: BMYO-basal
+    c3:
+      n_cells: 110722
+      assigned_label: LASP-major
+    c4:
+      n_cells: 101498
+      assigned_label: BMYO-myo
+    c5:
+      n_cells: 36859
+      assigned_label: Lactocyte-LC2
+    c6:
+      n_cells: 17822
+      assigned_label: Lactocyte-LC1
+    c7:
+      n_cells: 13838
+      assigned_label: Doublet
+    c8:
+      n_cells: 8458
+      assigned_label: LASP-major
+    c9:
+      n_cells: 2845
+      assigned_label: LASP-major
+    c10:
+      n_cells: 2546
+      assigned_label: LASP-major
+    c11:
+      n_cells: 1710
+      assigned_label: LHS-major
+    c12:
+      n_cells: 256
+      assigned_label: LASP-major
+  '5.0':
+    c6:
+      parent: LASP-major
+      override_label: LASP-basal
+      n_cells: 18649
+      evidence: PTN log1p mean=1.125, 86% PTN+, 78% Kumar Lumsec-basal, KRT5/14+ basal-luminal hybrid (Reed LASP2 phenotype)
+    c84:
+      parent: LASP-major
+      override_label: LASP-basal
+      n_cells: 3995
+      evidence: PTN log1p mean=1.002, 82% PTN+
+    c62:
+      parent: LASP-major
+      override_label: LASP-KIT
+      n_cells: 6940
+      evidence: 47% Kumar Lumsec-KIT, KIT/SOX4/HES1/MAFB/ELF5 elevated
+labels:
+  BMYO-basal:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c2
+    parent_label: null
+    lineage: Basal
+    is_artifact: false
+    canonical_markers:
+    - KRT5
+    - KRT14
+    - KRT17
+    - TP63
+    - S100A2
+    required_gene: null
+    identity_markers:
+    - KRT5
+    - KRT14
+    - TP63
+    scoring_signature: null
+    notes: "Basal cell \u2014 KRT5+/KRT14+ basal keratin signature without strong contractile/myoepithelial features. res\
+      \ 0.3 c2 (~147K cells, 99% L1=BMYO, includes a small contractile-high sub-state c10 at res 0.5 ~11K cells not separately\
+      \ labeled). Reed BMYO1 dominant (29K Reed-labeled cells). Triangulation: KRT5=0.91, KRT14=1.36, ACTA2=0.65 (lower than\
+      \ BMYO-myo), OXTR=0.17 (low), S100A2=0.51 (high).\n"
+  BMYO-myo:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c4
+    parent_label: null
+    lineage: Basal
+    is_artifact: false
+    canonical_markers:
+    - OXTR
+    - ACTA2
+    - MYH11
+    - MYLK
+    - CNN1
+    - TAGLN
+    - TP63
+    - KRT5
+    - KRT14
+    required_gene: null
+    identity_markers:
+    - OXTR
+    - ACTA2
+    - MYH11
+    - MYLK
+    scoring_signature: null
+    notes: "Myoepithelial cell \u2014 contractile, OXTR+. res 0.3 c4 (~101K cells, 99% L1=BMYO, Kumar 'basal' label dominant\
+      \ 81K). Triangulation: OXTR=0.60 (3.5x higher than BMYO-basal), ACTA2=1.27, MYH11=0.52, MYLK strong; KRT5/KRT14 also\
+      \ retained (1.13/1.41). Maps to Reed BMYO2.\n"
+  LHS-major:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c0
+    - c11
+    parent_label: null
+    lineage: LumHR
+    is_artifact: false
+    canonical_markers:
+    - ESR1
+    - PGR
+    - FOXA1
+    - ANKRD30A
+    - AR
+    - AGR2
+    - AGR3
+    - TFF3
+    - TFF1
+    - MLPH
+    required_gene: null
+    identity_markers:
+    - ESR1
+    - FOXA1
+    - ANKRD30A
+    - AGR2
+    scoring_signature: null
+    notes: "Hormone-sensing luminal. res 0.3 c0 (~300K, primary) + c11 (~1.7K, collapsed as small specialty). Maps to Reed\
+      \ LHS1+LHS2+LHS3 + Kumar LummHR-major/SCGB/active. Subdivision at L1.5 (LHS subtype 1/2/3) not done at this draft \u2014\
+      \ single label until evidence justifies split.\n"
+  LASP-major:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c1
+    - c3
+    - c8
+    - c9
+    - c10
+    - c12
+    parent_label: null
+    lineage: LASP
+    is_artifact: false
+    canonical_markers:
+    - KIT
+    - ELF5
+    - MFGE8
+    - LTF
+    - KRT8
+    - KRT18
+    - GABRP
+    - KRT15
+    - MMP7
+    - SLPI
+    - PIGR
+    required_gene: null
+    identity_markers:
+    - ELF5
+    - MFGE8
+    - LTF
+    - KIT
+    - KRT8
+    scoring_signature: null
+    notes: 'Luminal adaptive secretory precursor (= Kumar Lumsec). Combines res 0.3 c1, c3, c8, c10, c12 (~370K cells). Catch-all
+      parent for fine_cluster overrides PTN+_LumSec and LASP4 at res 5.0. Includes pure-LASP1 island (c8), DDC2 small specialty
+      (c12, dropped), and Nee-BRCA1-skewed cluster (c10, flagged for review).
+
+      '
+  LASP-KIT:
+    mode: fine_cluster
+    source_resolution: '5.0'
+    source_cluster_ids:
+    - c62
+    parent_label: LASP-major
+    lineage: LASP
+    is_artifact: false
+    canonical_markers:
+    - KIT
+    - SOX4
+    - HES1
+    - MAFB
+    - ELF5
+    - MFGE8
+    - SLPI
+    - KRT8
+    - KRT15
+    - KRT18
+    required_gene: KIT
+    identity_markers:
+    - KIT
+    - SOX4
+    - HES1
+    - MAFB
+    scoring_signature: null
+    notes: "Kumar LumSec-KIT-aligned cluster. res 5.0 c62 (6,940 cells, 47% Kumar Lumsec-KIT). Triangulation: KIT=0.40 (highest\
+      \ of LASP fine_clusters), SOX4=0.88, HES1=0.56, MAFB=0.44, ELF5=0.51 \u2014 all Kumar LumSec-KIT canonical. Lobule-localized\
+      \ per Kumar paper. KRT5/14 low (no basal hybrid).\n"
+  LASP-basal:
+    mode: fine_cluster
+    source_resolution: '5.0'
+    source_cluster_ids:
+    - c6
+    - c84
+    parent_label: LASP-major
+    lineage: LASP
+    figure_target: fig4
+    is_artifact: false
+    canonical_markers:
+    - PTN
+    - KRT5
+    - KRT14
+    - KRT15
+    - KRT17
+    - LTF
+    - KRT8
+    - KRT18
+    - KRT19
+    - ALDH1A3
+    - SLPI
+    required_gene: PTN
+    identity_markers:
+    - PTN
+    - KRT5
+    - KRT14
+    - KRT19
+    - LTF
+    scoring_signature: null
+    notes: "Basal-luminal hybrid \u2014 Kumar LumSec-basal-aligned, also matches Reed LASP2 description (LASP markers + BMYO\
+      \ keratins). Spatial_HBCA Fig 4 target. res 5.0 c6 + c84 (22,644 cells), PTN log1p mean \u2265 1.0 threshold. Triangulation\
+      \ confirms basal-luminal hybrid: KRT5 (0.56) and KRT14 (0.77) intermediate between BMYO (0.87-1.41) and LASP-other (0.24-0.30);\
+      \ KRT8/18/19 fully luminal (>1.0); LTF specific (0.81); ALDH1A3 high (0.89, LASP marker); ACTA2/MYH11 absent (0.01-0.03)\
+      \ so not myoepithelial. Of cells with Reed level2: 82% LASP2 \u2014 matches Reed paper \"LASP2 co-expresses LASP and\
+      \ BMYO markers (KRT14, KRT5)\". Of cells with Kumar: 78% Lumsec-basal. Maps to Kumar's \"ductal KRT5+/KRT19+ double-positive\"\
+      \ cells.\n"
+  Lactocyte-LC2:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c5
+    parent_label: null
+    lineage: Lactocyte
+    is_artifact: false
+    canonical_markers:
+    - CSN2
+    - CSN3
+    - CSN1S1
+    - LALBA
+    - CIDEA
+    - OLAH
+    - BTN1A1
+    - FABP3
+    - CEL
+    required_gene: null
+    identity_markers:
+    - CSN2
+    - CSN3
+    - LALBA
+    - CIDEA
+    scoring_signature: null
+    notes: 'Lactating lactocyte (Twigger LC2-dominant, 97-100%). res 0.3 c5 (~37K cells). Casein-high secretory phenotype
+      matching Kumar LumSec-lac state. Twigger study-skewed (lactation samples).
+
+      '
+  Lactocyte-LC1:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c6
+    parent_label: null
+    lineage: Lactocyte
+    is_artifact: false
+    canonical_markers:
+    - LYZ
+    - CD36
+    - MRC1
+    - MFGE8
+    - KIT
+    - ELF5
+    - KRT8
+    - KRT18
+    required_gene: null
+    identity_markers:
+    - LYZ
+    - CD36
+    - MFGE8
+    scoring_signature: null
+    notes: 'Mature secretory lactocyte (Twigger LC1-dominant, 95%, kumar Lumsec-KIT mapping). res 0.3 c6 (~17K cells). Distinct
+      from LC2: lower casein output, retains KIT+ secretory features. Twigger study-skewed.
+
+      '
+  Doublet:
+    mode: cluster
+    source_resolution: '0.3'
+    source_cluster_ids:
+    - c7
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers: []
+    scoring_signature: null
+    notes: 'res 0.3 c7 (~14K cells) has mixed L1 plurality (LASP 68%, LHS 22%, BMYO 10%) with broad doublet candidate composition.
+      Treating as Doublet artifact pending structural review.
+
+      '

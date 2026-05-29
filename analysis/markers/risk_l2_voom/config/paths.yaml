@@ -1,0 +1,50 @@
+# paths.yaml — risk_l2_voom_20260519
+# All HPC paths. Read by SLURM wrappers and scripts via --project-root.
+
+inquiry_root: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/DE_Testing/risk_l2_voom_20260519
+
+inputs:
+  # Per-compartment NPZ counts + enriched metadata (source of L2 labels)
+  components_root: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components
+  epi_npz:  /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/epi_counts.npz
+  epi_meta: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/epi_metadata_enriched.csv
+  imm_npz:  /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/imm_counts.npz
+  imm_meta: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/imm_metadata_enriched.csv
+  str_npz:  /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/str_counts.npz
+  str_meta: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/str_metadata_enriched.csv
+
+  # Gene metadata (shared across all 3 compartments) — for pseudobulk gene names
+  gene_data: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/gene_data.csv
+
+  # Gene symbol mapping — used for DE output annotation (matches existing
+  # stageF3_L2_markers_risk.R convention)
+  gene_mapping: /share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/iHBCA_upload/publication/mappings/gene_symbol_to_ensembl.tsv
+
+  # Donor metadata (159-donor cohort, AR+BR1, with risk_class derived)
+  donor_metadata: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/config/derived_donor_metadata.csv
+
+  # Cohort design (already filtered) — convenient pre-built donor table
+  cohort_design: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/outputs/stageA_cohorts/cohort_BR1_vs_AR_design.csv
+
+  # Existing pseudobulk aggregator (reused, not modified)
+  pseudobulk_aggregate_py: /share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Annotation/dev/full_object_markers_20260421/scripts/pseudobulk_aggregate_full_object.py
+
+outputs:
+  cell_to_l2_csv: outputs/pseudobulk/cell_to_l2.csv          # built in Step 0
+  pseudobulk_dir: outputs/pseudobulk                          # counts + meta land here
+  pseudobulk_counts: outputs/pseudobulk/risk_l2_voom_pseudobulk_counts.csv
+  pseudobulk_meta: outputs/pseudobulk/risk_l2_voom_pseudobulk_meta.csv
+  enriched_donor_meta: outputs/pseudobulk/enriched_donor_metadata.csv
+  design_audit: outputs/design_audit.csv
+  de_results_dir: outputs/de_results
+  comparisons_dir: outputs/comparisons
+  reports_dir: reports
+  logs_dir: logs
+
+container:
+  path: /dfs7/singularity_containers/rcic/JHUB3/Rocky8_jupyter_base_R4.3.3_Spatial.sif
+  r_libs_user: /pub/nwechter/biojhub4_dir/Rocky8_jupyter_base_R4.3.3_Spatial.sif/R/library
+
+slurm:
+  account: dalawson_lab
+  partition: standard

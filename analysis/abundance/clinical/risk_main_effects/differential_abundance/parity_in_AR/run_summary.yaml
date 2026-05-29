@@ -1,0 +1,16 @@
+contrast: parity_in_AR
+cohort: AR_baseline
+formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_binary
+type: coef
+coef: parity_binaryparous
+tested_coef: parity_binaryparous
+stratum_levels: ~
+fdr_weighting: graph-overlap
+spatial_fdr: 0.05
+adaptive_lfc_cutoff: 1.1332
+n_nhoods: 201542
+n_sig: 9648
+n_sig_up: 6203
+n_sig_dn: 3445
+n_libraries: 125
+completed_at: 2026-05-05 23:11:09

@@ -1,0 +1,23 @@
+# =============================================================================
+# REED STUDY CONFIGURATION
+# =============================================================================
+
+study_name: reed
+source_path: "${SOURCE_COMPONENT_STUDIES}/reed.rds"
+ihbca_dataset: "Reed"
+
+cell_id_format:
+  pattern: "Identity mapping"
+  has_suffix: true
+  example: "Reed cell IDs are already in iHBCA format"
+  notes: "Reed IS the iHBCA reference - identity mapping"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues: []
+
+notes: |
+  Reed is the iHBCA reference study - identity mapping.
+  Large dataset: 803,283 cells.
+  Testable conditions to be determined during discovery phase.

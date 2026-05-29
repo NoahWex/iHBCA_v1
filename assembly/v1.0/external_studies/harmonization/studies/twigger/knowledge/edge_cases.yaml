@@ -1,0 +1,215 @@
+# =============================================================================
+# TWIGGER STUDY - EDGE CASES
+# =============================================================================
+# Documented issues discovered during extraction and processing
+
+study: twigger
+last_updated: 2026-01-20
+
+# =============================================================================
+# CELL ID FORMAT ISSUES
+# =============================================================================
+
+cell_id_issues:
+  twigger_reversed_cellids:
+    id: "twigger-reversed-cellids"
+    severity: high
+    status: FIXED
+
+    description: |
+      17,349 cells (15.7%) have reversed cell ID format. Instead of the
+      standard BATCH_BARCODE-1 format, these cells have BARCODE-BATCH format.
+
+    affected:
+      cell_count: 17349
+      total_cells: 110744
+      percentage: 15.7
+      batches: ["HMC", "RB1", "RB2", "RB3"]
+
+    examples:
+      standard_format: "RB5_AAACCCAAGAGGTCAC-1"
+      reversed_format: "AAACCCAAGAGGTCAC-RB5"
+
+    root_cause: |
+      Unknown - possibly different processing pipelines or software versions
+      used for different batches. The HMC and RB1-3 batches appear to have
+      been processed with different cell ID conventions.
+
+    resolution:
+      function: "normalize_twigger_cell_ids()"
+      location: "build_canonical_milo.R"
+      result: "93,395 cells with 100% metadata match after normalization"
+
+    discovery_source: "Integration Assessment Phase A - cell ID mapping audit"
+
+# =============================================================================
+# METADATA MAPPING ISSUES
+# =============================================================================
+
+metadata_mapping_issues:
+  batch_name_mismatch:
+    id: "twigger-batch-name-mismatch"
+    severity: medium
+    status: DOCUMENTED
+
+    description: |
+      Sample names in supplemental metadata (NMC1-7, LMC1-9) do NOT
+      correspond to cell ID batch identifiers (HMC, RB1-5). The mapping
+      between metadata "Batch" column and cell ID batch codes is unclear.
+
+    metadata_batches:
+      column_name: "Batch"
+      values: [1, 2, 3]
+      distribution:
+        batch_1: 9
+        batch_2: 6
+        batch_3: 3
+
+    cell_id_batches:
+      observed: ["HMC", "RB1", "RB2", "RB3", "RB4", "RB5"]
+      note: "These do not obviously map to batch numbers 1, 2, 3"
+
+    sample_names:
+      non_lactating: ["NMC1", "NMC1B", "NMC2", "NMC3", "NMC4", "NMC5", "NMC6", "NMC7"]
+      lactating: ["LMC1", "LMC2", "LMC2B", "LMC3", "LMC4", "LMC5", "LMC6", "LMC7", "LMC8", "LMC9"]
+
+    implication: |
+      Cannot directly link supplemental donor metadata to individual cells
+      using batch information. May need to use alternative mapping strategies
+      or accept that donor-level metadata cannot be reliably assigned.
+
+    discovery_source: "Track 1 supplemental extraction comparison"
+
+# =============================================================================
+# DA TESTING CONSTRAINTS
+# =============================================================================
+
+da_testing_constraints:
+  no_brca_data:
+    id: "twigger-no-brca-contrast"
+    severity: low
+    status: DOCUMENTED
+
+    description: |
+      This study did not collect BRCA mutation status information.
+      Cannot test risk_status differential abundance.
+
+    resolution: "Skip risk_status DA tests for Twigger"
+
+    note: |
+      This is expected - the study focused on lactation biology,
+      not cancer risk. Not a data quality issue.
+
+# =============================================================================
+# NOTES
+# =============================================================================
+
+notes:
+  study_context: |
+    Twigger et al. 2022 is a lactation-focused study comparing human breast
+    milk cells to non-lactating mammary tissue. The primary biological
+    question is about lactation state changes, not cancer risk factors.
+
+  data_quality: |
+    Sample-level metadata is complete (100% coverage for all columns).
+    Cell-level issues relate to ID format conventions, not data quality.
+
+  cell_count_verification: |
+    Total cells in metadata (110,744) matches expected iHBCA count (110,744).
+    After cell ID normalization, 93,395 cells successfully map to metadata.
+    WARNING: 17,349 cells (15.7%) still don't match - needs investigation.
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2 - PRIORITY: HIGH
+# =============================================================================
+
+open_questions:
+
+  sample_to_cell_mapping:
+    question: "How do sample names (NMC1-7, LMC1-9) map to individual cells?"
+    severity: HIGH
+    context: |
+      Supplemental metadata has 18 samples: NMC1-7, LMC1-9
+      Cell IDs contain batch codes: HMC, RB1-5
+      These DO NOT obviously correspond.
+
+      Without this mapping, we CANNOT assign donor metadata to cells.
+      This breaks all condition-based DA testing.
+    resolve_by: "Track 2 - examine RDS metadata for sample/donor column"
+    status: OPEN
+
+  cell_count_discrepancy:
+    question: "Why do only 93,395/110,744 cells match metadata after normalization?"
+    severity: HIGH
+    context: |
+      Total cells: 110,744
+      After normalization: 93,395 match (per edge_cases)
+      Difference: 17,349 cells (15.7%)
+
+      This is EXACTLY the same as reversed cell ID count.
+      But reversed IDs were supposedly FIXED. So why don't they match?
+
+      Possibilities:
+      1. 17,349 reversed IDs were fixed but STILL don't map to metadata
+      2. The 93,395 figure is from a different source/context
+      3. There's additional filtering happening
+
+      This needs root cause explanation.
+    resolve_by: "Track 2 - verify cell counts and mapping at each step"
+    status: OPEN
+
+  batch_code_translation:
+    question: "What is the mapping between metadata Batch (1,2,3) and cell ID batches (HMC, RB1-5)?"
+    severity: HIGH
+    context: |
+      Metadata Batch column: 1 (9 samples), 2 (6 samples), 3 (3 samples)
+      Cell ID batch codes: HMC, RB1, RB2, RB3, RB4, RB5
+
+      There are 6 cell ID batches but only 3 metadata batches.
+      No obvious mapping exists.
+
+      Hypothesis: Maybe metadata "Batch" is sequencing batch, while cell ID
+      batch is sample/processing identifier?
+    resolve_by: "Track 2 - examine RDS metadata for batch-related columns"
+    status: OPEN
+
+  cell_id_unsupervised_analysis:
+    question: "What is the actual cell ID format in twigger_l1_fastmnn.rds?"
+    context: |
+      MUST discover format through unsupervised analysis:
+      - Identify ALL unique patterns (not just standard vs reversed)
+      - Count cells per pattern
+      - Map patterns to batches
+      - Identify which component contains sample/donor info
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+
+  rds_metadata_columns:
+    question: "Which columns exist in RDS @meta.data?"
+    context: |
+      Supplemental has: Sample, Maternal_age, Parity, Infant_age, Batch,
+      Fresh_or_Frozen, Total_cells, Lactation_status
+
+      RDS may have different/additional columns that enable mapping.
+      Need explicit inventory.
+    resolve_by: "Track 2 - list all colnames(obj@meta.data)"
+    status: OPEN
+
+  lactation_status_in_rds:
+    question: "Is lactation_status available per-cell in RDS?"
+    context: |
+      This is the PRIMARY testable condition for Twigger.
+      If not in RDS, we need sample→cell mapping to assign it.
+      If that mapping is broken, we cannot do DA testing.
+    resolve_by: "Track 2 - check for lactation-related columns in RDS"
+    status: OPEN
+
+# =============================================================================
+# VERIFICATION REQUIRED BEFORE PROCEEDING
+# =============================================================================
+
+verification_required:
+  - "Confirm sample→cell mapping mechanism exists"
+  - "Explain 17,349 cell discrepancy with root cause"
+  - "Verify lactation_status can be assigned to all cells"
+  - "Without these, Twigger DA testing is NOT POSSIBLE"

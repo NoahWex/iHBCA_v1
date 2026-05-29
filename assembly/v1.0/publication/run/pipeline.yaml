@@ -1,0 +1,138 @@
+# =============================================================================
+# iHBCA v1.0 Build Pipeline — DAG Definition
+# =============================================================================
+# Encodes the full dependency graph for the iHBCA upload pipeline.
+# Read by submit_pipeline.sh to submit SLURM jobs with correct ordering.
+#
+# Dependency types:
+#   afterok  — data dependency (downstream needs correct outputs)
+#   afterany — diagnostic stage (should run even on partial failure)
+#
+# Plan: Submission/polish_and_rebuild
+# =============================================================================
+
+stages:
+
+  # Phase 1: Extract raw counts from Seurat RDS → intermediates/
+  extract:
+    script: B1_package_external.sh
+    env:
+      B1_MODE: extract
+    sbatch_args: "--array=0-8"
+    resources:
+      mem: 64G
+      time: "02:00:00"
+      cpus: 4
+    depends_on: []
+    description: "Extract count matrices from Seurat RDS (9 tasks: 6 standalone + 3 Pal sub-studies)"
+
+  # Phase 2: Assemble source h5ads from intermediates + metadata
+  assemble_source:
+    script: reassemble_all_source.sh
+    sbatch_args: ""
+    resources:
+      mem: 128G
+      time: "02:00:00"
+      cpus: 4
+    depends_on:
+      - stage: extract
+        type: afterok
+    description: "Assemble 7 CxG-compliant source h5ads (array 0-6)"
+
+  # Phase 3: Assemble integrated object from author share primitives
+  # Independent of source — reads from author share files, not source h5ads
+  assemble_integrated:
+    script: assemble_integrated.sh
+    sbatch_args: ""
+    resources:
+      mem: 180G
+      time: "02:00:00"
+      cpus: 4
+    depends_on: []
+    description: "Assemble all-breast-cells.h5ad from author share"
+
+  # Phase 4: Enrich source embeddings (ports joint scVI from integrated)
+  enrich_source_embeddings:
+    script: enrich_source_embeddings.sh
+    sbatch_args: ""
+    resources:
+      mem: 64G
+      time: "01:00:00"
+      cpus: 2
+    depends_on:
+      - stage: assemble_source
+        type: afterok
+      - stage: assemble_integrated
+        type: afterok
+    description: "Port X_scvi_100 from integrated to 7 source h5ads, compute per-study UMAP"
+
+  # Phase 5: Enrich source metadata/var/uns
+  enrich_source:
+    script: enrich_source.sh
+    sbatch_args: ""
+    resources:
+      mem: 128G
+      time: "02:00:00"
+      cpus: 4
+    depends_on:
+      - stage: enrich_source_embeddings
+        type: afterok
+    description: "Enrich 7 source h5ads with var annotations, uns docs, obs polish"
+
+  # Phase 6: Enrich integrated metadata/var/uns
+  enrich_integrated:
+    script: enrich_integrated.sh
+    sbatch_args: ""
+    resources:
+      mem: 256G
+      time: "06:00:00"
+      cpus: 8
+    depends_on:
+      - stage: assemble_integrated
+        type: afterok
+    description: "Enrich all-breast-cells.h5ad with var, obs, uns, log_normalized layer"
+
+  # Phase 7: Validate all 8 h5ads with CxG, CAP, and HCA validators
+  validate:
+    script: validate_all.sh
+    sbatch_args: ""
+    resources:
+      mem: 180G
+      time: "06:00:00"
+      cpus: 4
+    depends_on:
+      - stage: enrich_source
+        type: afterany
+      - stage: enrich_integrated
+        type: afterany
+    description: "Run 3 validators on all 8 h5ads (7 source + 1 integrated)"
+
+  # Phase 8: Diff source h5ads against Spatial_HBCA originals + integrated vs CxG
+  diff_source:
+    script: diff_all_source.sh
+    sbatch_args: ""
+    resources:
+      mem: 256G
+      time: "06:00:00"
+      cpus: 4
+    depends_on:
+      - stage: enrich_source
+        type: afterany
+      - stage: enrich_integrated
+        type: afterany
+    description: "Diff all 8 h5ads against pre-fix references"
+
+  # Phase 9: Diff against baseline manifest (structural regression check)
+  diff_baseline:
+    script: diff_against_baseline.sh
+    sbatch_args: ""
+    resources:
+      mem: 180G
+      time: "02:00:00"
+      cpus: 4
+    depends_on:
+      - stage: enrich_source
+        type: afterany
+      - stage: enrich_integrated
+        type: afterany
+    description: "Structural diff against baseline_manifest.yaml"

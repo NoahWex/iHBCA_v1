@@ -1,0 +1,89 @@
+# =============================================================================
+# STUDY CONFIG SCHEMA
+# =============================================================================
+# Interface contract for studies/{study}/config.yaml
+# Run scripts read this file to locate data and set parameters.
+# =============================================================================
+
+version: "1.0"
+description: "Schema for per-study config.yaml files"
+
+# -----------------------------------------------------------------------------
+# REQUIRED FIELDS
+# -----------------------------------------------------------------------------
+
+required_fields:
+  study_name:
+    type: string
+    description: "Canonical study name (lowercase)"
+    example: "gray"
+
+  source_path:
+    type: string
+    description: "Path to raw data (Seurat RDS, h5ad, or directory)"
+    example: "${SOURCE_COMPONENT_STUDIES}/gray.rds"
+
+# -----------------------------------------------------------------------------
+# OPTIONAL FIELDS
+# -----------------------------------------------------------------------------
+
+optional_fields:
+  ihbca_dataset:
+    type: string
+    description: "Dataset name in iHBCA metadata (default: capitalized study_name)"
+    example: "Gray"
+    default: "capitalize(study_name)"
+
+  cell_id_format:
+    type: object
+    description: "Cell ID structure documentation"
+    properties:
+      pattern:
+        type: string
+        description: "Format pattern"
+        example: "{donor}_{barcode}"
+      has_suffix:
+        type: boolean
+        description: "Whether cell IDs have -1 suffix"
+        default: false
+      example:
+        type: string
+        description: "Example cell ID"
+
+  parameters:
+    type: object
+    description: "Study-specific processing parameters"
+
+  known_issues:
+    type: list
+    description: "References to documented issues"
+    example: ["GRAY_DONOR_MISMATCH"]
+
+  testable_conditions:
+    type: list
+    description: "Conditions available for DA testing"
+    example: ["age_binary", "parity", "risk_status"]
+
+  notes:
+    type: string
+    description: "Free-form notes about the study"
+
+# -----------------------------------------------------------------------------
+# EXAMPLE
+# -----------------------------------------------------------------------------
+
+example:
+  study_name: gray
+  source_path: "${SOURCE_COMPONENT_STUDIES}/gray.rds"
+  ihbca_dataset: "Gray"
+  cell_id_format:
+    pattern: "{donor}_{barcode}"
+    has_suffix: false
+    example: "PM-D_AAACCTGAGAATCTCC"
+  testable_conditions:
+    - age_binary
+    - parity
+    - risk_status
+  known_issues:
+    - GRAY_DONOR_MISMATCH
+  notes: "Simple study. RM-* donor mismatch fixed via cell ID extraction."

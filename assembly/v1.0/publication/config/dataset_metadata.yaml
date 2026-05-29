@@ -1,0 +1,146 @@
+# =============================================================================
+# HCA DATASET-LEVEL METADATA
+# =============================================================================
+# Per-study uns fields required by the HCA Atlas Tracker.
+# These are dataset-level (not per-cell) metadata populated into adata.uns
+# during h5ad assembly.
+#
+# Source: Publication abstracts, methods sections, and direct knowledge.
+# Plan: Activation/dataset_metadata
+# Updated: 2026-02-24
+# =============================================================================
+
+datasets:
+
+  gray:
+    study_pi: ["Joan Brugge"]
+    contact_email: "joan_brugge@hms.harvard.edu"
+    doi: "10.1016/j.devcel.2022.05.003"
+    geo_accession: "GSE180878"
+    institute: "Harvard Medical School"
+    description: >-
+      Single-cell transcriptomic atlas of 52,681 cells from 16 human breast
+      tissue donors, profiling epithelial lineage heterogeneity across age
+      and parity groups.
+    alignment_software: "Cell Ranger 3.0.2"
+    gene_annotation_version: "v87"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009899"  # 10x 3' v2
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  kumar:
+    study_pi: ["Nicholas Navin"]
+    contact_email: "nnavin@mdanderson.org"
+    doi: "10.1038/s41586-023-06252-9"
+    geo_accession: "GSE195665"
+    institute: "MD Anderson Cancer Center"
+    description: >-
+      Spatially resolved single-cell genomic atlas of 714,331 cells from 126
+      adult human breast tissue donors, identifying 12 major cell types and
+      58 biological states.
+    alignment_software: "Cell Ranger 3.1.0"
+    gene_annotation_version: "v87"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009922"  # 10x 3' v3 (dominant; mix of v2/v3/v3.1)
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  murrow:
+    study_pi: ["Zev Gartner"]
+    contact_email: "zev.gartner@ucsf.edu"
+    doi: "10.1016/j.cels.2022.06.005"
+    geo_accession: "GSE198732"
+    institute: "UC San Francisco"
+    description: >-
+      Single-cell RNA sequencing of 86,136 cells from 28 premenopausal human
+      breast tissue donors, mapping hormone-regulated cell-cell interaction
+      networks.
+    alignment_software: "Cell Ranger 3.0.2"
+    gene_annotation_version: "v87"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009922"  # 10x 3' v3
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  nee:
+    study_pi: ["Kai Kessenbrock"]
+    contact_email: "kkessenb@uci.edu"
+    doi: "10.1038/s41588-023-01298-x"
+    geo_accession: "GSE174588"
+    institute: "UC Irvine"
+    description: >-
+      Single-cell RNA sequencing of 230,100 cells from 22 human breast tissue
+      donors, investigating preneoplastic stromal cell changes in BRCA1
+      mutation carriers.
+    alignment_software: "Cell Ranger 3.1"
+    gene_annotation_version: "v87"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009899"  # 10x 3' v2 (dominant; 20/22 samples v2, 2 v1)
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  twigger:
+    study_pi: ["Walid Khaled"]
+    contact_email: "wtk22@cam.ac.uk"
+    doi: "10.1038/s41467-021-27895-0"
+    geo_accession: "E-MTAB-9841"
+    institute: "University of Cambridge"
+    description: >-
+      Single-cell RNA sequencing of 110,744 cells from 16 human breast tissue
+      donors, characterizing transcriptional changes during lactation and
+      between lactating and non-lactating tissue.
+    # Original alignment: CR 3.0.2 (batch 1) + CR 2.1.1 (batch 2) to hg19.
+    # Data in iHBCA h5ad is mapped to GRCh38 Ensembl IDs via integration pipeline.
+    alignment_software: "Cell Ranger 3.0.2 / Cell Ranger 2.1.1"
+    gene_annotation_version: "v75"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009922"  # 10x 3' v3
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  reed:
+    study_pi: ["Walid Khaled"]
+    contact_email: "wtk22@cam.ac.uk"
+    doi: "10.1038/s41588-024-01688-9"
+    geo_accession: "E-MTAB-13664"
+    institute: "University of Cambridge"
+    description: >-
+      Single-cell RNA sequencing of 803,283 cells from 55 human breast tissue
+      donors contributing to the integrated Human Breast Cell Atlas (iHBCA)
+      v1.0.
+    alignment_software: "Cell Ranger 6.0.2"
+    gene_annotation_version: "v98"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009922"  # 10x 3' v3
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+  pal:
+    study_pi: ["Jane Visvader"]
+    contact_email: "visvader@wehi.edu.au"
+    doi: "10.15252/embj.2020107333"
+    geo_accession: "GSE161529"
+    institute: "Walter and Eliza Hall Institute"
+    description: >-
+      Single-cell RNA sequencing atlas of 131,288 cells from 22 donors spanning
+      normal epithelial, total breast, and BRCA1 carrier tissue samples.
+    alignment_software: "Cell Ranger 3.0.2"
+    gene_annotation_version: "v87"
+    reference_genome: "GRCh38"
+    sequenced_fragment: "3 prime tag"
+    assay_ontology_term_id: "EFO:0009899"  # 10x 3' v2
+    disease_ontology_term_id: "PATO:0000461"  # normal
+
+# =============================================================================
+# CELL RANGER → GENCODE MAPPING REFERENCE
+# =============================================================================
+# For filling alignment_software / gene_annotation_version when CR versions
+# are recovered from Austin Reed handoff or publication supplements:
+#
+#   CR 3.x   → GRCh38-1.2.0  → GENCODE v24 / Ensembl 87
+#   CR 5.x   → GRCh38-2020-A → GENCODE v32 / Ensembl 98
+#   CR 6.x   → GRCh38-2020-A → GENCODE v32 / Ensembl 98
+#   CR 7.x   → GRCh38-2020-A → GENCODE v32 / Ensembl 98
+#   CR 7.1+  → GRCh38-2024-A → GENCODE v44 / Ensembl 113
+# =============================================================================

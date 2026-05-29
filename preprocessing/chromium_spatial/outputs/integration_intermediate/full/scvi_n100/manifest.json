@@ -1,0 +1,36 @@
+{
+  "source": "step 17 full-target sweep winner (MANUAL_OVERRIDE=scvi_n100)",
+  "date": "2026-04-17",
+  "config_label": "scvi_n100",
+  "n_cells": 258317,
+  "n_genes": 18082,
+  "latent_key": "X_emb",
+  "latent_dims": 100,
+  "umap_key": "X_umap",
+  "obs_columns": [
+    "cell_id",
+    "sample_id",
+    "patient_id",
+    "leiden_1.0",
+    "leiden_0.2",
+    "leiden_0.5",
+    "leiden_1.5",
+    "leiden_2.0",
+    "leiden_3.0",
+    "leiden_5.0",
+    "UMAP_1",
+    "UMAP_2",
+    "position"
+  ],
+  "leiden_resolutions": [
+    0.2,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    3.0,
+    5.0
+  ],
+  "cell_filter": "canonical 5-way (step_01_umi, step_02_mad, step_03_doublet, step_10b_manifold, step_15)",
+  "counts_status": "not yet extracted \u2014 can be regenerated from sweep_h5ad if needed"
+}

@@ -1,0 +1,258 @@
+# ============================================================================
+# step_17_integration_sweep / sweep_configs.yaml
+# ============================================================================
+# Canonical sweep configuration for the new step 17 multi-config integration
+# benchmark. Consumed by:
+#   - source/integration_sweep.py  (reads 'configs' to enumerate runs)
+#   - source/scib_metric.py        (reads 'metrics' to know which to compute)
+#   - source/scib_aggregate.py     (reads 'scoring' formula + metric lists)
+#   - source/svd_diagnostic.py     (reads 'svd_thresholds')
+#   - wrapper.py                    (enumerates configs × targets × metrics
+#                                    for SLURM array index math)
+#
+# The scoring formula is pinned to a fixed prior reference (the values in
+# the `scoring` block below). Do not edit the scoring block without explicit
+# sign-off: downstream winner selection depends on stable scoring across
+# re-runs, and changes invalidate the canonical sweep winner manifest.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Integration configs evaluated in the sweep (9 total).
+# ----------------------------------------------------------------------------
+# Each entry defines one row in the benchmark. `method` selects the algorithm
+# in integration_sweep.py; hyperparameter overrides are passed through to the
+# model constructor.
+#
+# Rationale for the config grid:
+#   - scVI n_latent sweep (20/50/100/200): n_latent is the single most
+#     sensitive scVI hyperparameter for downstream cluster granularity in
+#     breast atlas data. 20 under-resolves rare populations; 200 over-fits
+#     batch structure. 50 and 100 are the commonly reported range in the
+#     scvi-tools docs and literature.
+#   - scVI_austin: an independent scvi hyperparameter preset contributed by
+#     A. Gurusamy (n_layers=2, dropout=0.2, batch_size=1024, patience=45,
+#     max_epochs=400). Swept at the same n_latent values so the only
+#     dimension of variation against the default scVI preset is hyperparams.
+#   - Harmony n_latent=50: a fast CPU alternative used as a second batch
+#     correction family in the benchmark.
+#   - PCA n_latent=50: unintegrated baseline. REQUIRED for the SVD
+#     diagnostic to separate "methods differ" from "metric set is trivial".
+#     Do not remove even if it is always last — it anchors the scale.
+configs:
+  - label: scvi_n20
+    method: scvi
+    n_latent: 20
+    hyperparams:
+      n_layers: 3
+      dropout_rate: 0.1
+      batch_size: 128
+      early_stopping_patience: 15
+      max_epochs: 300
+  - label: scvi_n50
+    method: scvi
+    n_latent: 50
+    hyperparams:
+      n_layers: 3
+      dropout_rate: 0.1
+      batch_size: 128
+      early_stopping_patience: 15
+      max_epochs: 300
+  - label: scvi_n100
+    method: scvi
+    n_latent: 100
+    hyperparams:
+      n_layers: 3
+      dropout_rate: 0.1
+      batch_size: 128
+      early_stopping_patience: 15
+      max_epochs: 300
+  - label: scvi_n200
+    method: scvi
+    n_latent: 200
+    hyperparams:
+      n_layers: 3
+      dropout_rate: 0.1
+      batch_size: 128
+      early_stopping_patience: 15
+      max_epochs: 300
+  - label: scvi_austin_n20
+    method: scvi
+    n_latent: 20
+    hyperparams:
+      n_layers: 2
+      dropout_rate: 0.2
+      batch_size: 1024
+      early_stopping_patience: 45
+      max_epochs: 400
+  - label: scvi_austin_n50
+    method: scvi
+    n_latent: 50
+    hyperparams:
+      n_layers: 2
+      dropout_rate: 0.2
+      batch_size: 1024
+      early_stopping_patience: 45
+      max_epochs: 400
+  - label: scvi_austin_n100
+    method: scvi
+    n_latent: 100
+    hyperparams:
+      n_layers: 2
+      dropout_rate: 0.2
+      batch_size: 1024
+      early_stopping_patience: 45
+      max_epochs: 400
+  - label: scvi_austin_n200
+    method: scvi
+    n_latent: 200
+    hyperparams:
+      n_layers: 2
+      dropout_rate: 0.2
+      batch_size: 1024
+      early_stopping_patience: 45
+      max_epochs: 400
+  - label: harmony_n20
+    method: harmony
+    n_latent: 20
+    hyperparams: {}
+  - label: harmony_n50
+    method: harmony
+    n_latent: 50
+    hyperparams: {}
+  - label: harmony_n100
+    method: harmony
+    n_latent: 100
+    hyperparams: {}
+  - label: harmony_n200
+    method: harmony
+    n_latent: 200
+    hyperparams: {}
+  - label: harmony_theta1
+    method: harmony
+    n_latent: 50
+    # theta=1.0: lighter batch correction, allows more biological variance through.
+    hyperparams:
+      theta: 1.0
+  - label: harmony_theta5
+    method: harmony
+    n_latent: 50
+    # theta=5.0: aggressive batch correction, trades bio for mixing.
+    hyperparams:
+      theta: 5.0
+  - label: concord_n50
+    method: concord
+    n_latent: 50
+    # CONCORD (Nature Biotechnology 2025, s41587-025-02950-z)
+    # Contrastive self-supervised learning; latent_dim=50 via --n-latent.
+    # domain_key = batch_key (patient_id). Euclidean neighbors used for scIB
+    # comparability across methods (cosine preferred for UMAP visualization only).
+    hyperparams: {}
+  - label: concord_n100
+    method: concord
+    n_latent: 100
+    hyperparams: {}
+  - label: pca_n50
+    method: pca
+    n_latent: 50
+    hyperparams: {}
+
+# ----------------------------------------------------------------------------
+# scIB metric selection
+# ----------------------------------------------------------------------------
+# Every metric listed here is computed for every config during Phase B's
+# scIB array job. The downstream scoring formula uses a subset (see
+# scoring.bio_metrics + scoring.batch_metrics). Metrics NOT in the scoring
+# subset are stored as sidecar columns in the aggregation CSV for audit.
+#
+# kBET decision (coordinator, 2026-04-11):
+#   kBET is computed as a SIDECAR metric (not included in the overall score).
+#   Rationale:
+#     1. Prior wrapper run_scib_array.sh excluded kBET from the task list
+#        (9 configs x 7 metrics = 63 tasks), but 07_scib_metric.py:40 still
+#        listed it as a valid choice. That inconsistency silently masked
+#        whether kBET would agree or disagree with graph_conn.
+#     2. scib_metrics.kbet_per_label is the pure-Python reimplementation
+#        and runs inside the scGPT container (no rpy2). Compute cost is
+#        small (~2-5 min on 265K cells).
+#     3. Adding kBET to the scored batch mix would re-weight batch_mean
+#        against the pinned scoring formula. We preserve the pinned formula
+#        (bio_mean + batch_mean on ASW_batch + graph_conn only) and expose
+#        kBET as an audit column so reviewers can cross-check whether
+#        graph_conn agrees with the second-opinion metric.
+#   Compute kBET but do NOT include it in scoring. The aggregation script
+#   writes it to the wide CSV; svd_diagnostic.py may include it in the
+#   metric matrix so the SVD can report whether the second-opinion metric
+#   adds structure beyond graph_conn.
+metrics:
+  scored:
+    - ASW_batch
+    - ASW_label
+    - NMI
+    - ARI
+    - graph_conn
+  sidecar:
+    - isolated_labels
+    - PCR
+    - kBET
+
+# ----------------------------------------------------------------------------
+# Scoring formula (PINNED — do not edit without user sign-off)
+# ----------------------------------------------------------------------------
+# bio_mean   = mean(ASW_label, NMI, ARI)
+# batch_mean = mean(ASW_batch, graph_conn)
+# overall    = 0.6 * bio_mean + 0.4 * batch_mean
+#
+# The 60/40 weight biases the winner toward biological conservation over
+# batch mixing. This is the standard scIB-benchmark weighting for atlas
+# construction tasks where cell-type resolution matters more than perfect
+# patient mixing. Do not change without re-running the full benchmark and
+# re-validating the winner.
+scoring:
+  bio_metrics: [ASW_label, NMI, ARI]
+  batch_metrics: [ASW_batch, graph_conn]
+  bio_weight: 0.6
+  batch_weight: 0.4
+
+# ----------------------------------------------------------------------------
+# Leiden resolutions for winner postprocessing
+# ----------------------------------------------------------------------------
+# Coordinator-locked set (2026-04-11, user-approved). Combines the former
+# postprocess set [0.2, 0.5, 1.0, 1.5, 2.0] with the coarser/finer bookends
+# 3.0 and 5.0. The sweep stage runs one Leiden at a fixed resolution for
+# internal scoring (leiden_scoring_resolution below); the winner postprocess
+# job runs ALL of these resolutions and writes them to leiden_multi.csv.
+#
+# The sweep-stage and postprocess-stage Leiden sets are no longer misaligned:
+# the sweep stage uses ONE resolution for scoring and postprocess uses the
+# full multi-resolution set only on the winner config. This resolves the
+# mismatch flagged in sweep_scripts_inventory.md open question #1.
+leiden:
+  # Resolution used inside the sweep's integration_sweep.py run for scIB
+  # clustering metrics (NMI/ARI require a partition). 1.0 is the standard
+  # scIB-benchmark resolution and matches 07_scib_metric.py's fallback at
+  # line 73. Do not change unless re-running the benchmark to compare.
+  scoring_resolution: 1.0
+  # Full resolution set used by postprocess_winner.py to build the
+  # multi-resolution leiden sidecar consumed by downstream annotation.
+  postprocess_resolutions: [0.2, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0]
+
+# ----------------------------------------------------------------------------
+# SVD diagnostic thresholds
+# ----------------------------------------------------------------------------
+# Fail-loud thresholds for the post-aggregation SVD check. These are warning
+# levels only unless --strict is passed. See svd_diagnostic.py for the full
+# failure-mode catalog.
+svd_thresholds:
+  pc1_high_warn: 0.90        # PC1 > 0.90 -> metric set has collapsed to 1D
+  pr_low_warn: 1.5           # participation ratio < 1.5 -> effective dim ~ 1
+  load_high_warn: 0.90       # any single-metric loading > 0.90 -> single metric IS the score
+  fail_on_pc1: true          # exit non-zero if pc1_high_warn is exceeded (locked decision)
+
+# ----------------------------------------------------------------------------
+# Integration defaults shared across configs
+# ----------------------------------------------------------------------------
+defaults:
+  batch_key: patient_id      # scVI/Harmony batch covariate
+  label_key: consensus_label # scIB bio-conservation label column
+  n_neighbors: 30            # sweep-stage neighbor graph for sc.tl.leiden
+  postprocess_n_neighbors: 15  # winner postprocess uses tighter graph for UMAP

@@ -1,0 +1,126 @@
+# =============================================================================
+# ONTOLOGY MAPPING TABLES
+# =============================================================================
+# Populated by plan A2_ontology_mappings.
+# Mechanical mappings (HANCESTRO, HsapDv, EFO) are complete.
+# CL cell type mapping is OUT OF SCOPE for A2 — requires expert curation.
+#
+# CxG schema version targeted: 6.0.0
+# Source: https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/6.0.0/schema.md
+#
+# Updated: 2026-02-11
+# =============================================================================
+
+version: "2.0"
+status: partial  # mechanical mappings done, CL pending
+populated_by: A2_ontology_mappings
+schema_target: "CxG 6.0.0"
+
+# ---------------------------------------------------------------------------
+# HANCESTRO — Self-Reported Ethnicity
+# ---------------------------------------------------------------------------
+# Full mapping table: publication/mappings/hancestro_ethnicity_mapping.tsv
+# 28 unique ethnicity_verbatim values across 287 donors.
+# 106 donors (37%) have no recorded ethnicity → "unknown".
+# 11 mappings flagged VERIFY (ambiguous verbatim labels or harmonization errors).
+hancestro:
+  mapping_file: "publication/mappings/hancestro_ethnicity_mapping.tsv"
+  status: complete
+  coverage:
+    total_donors: 287
+    mapped: 177      # donors with a HANCESTRO term assigned
+    unknown: 110     # empty ethnicity (106) + Other/Not_stated (4) → "unknown"
+    verify_flagged: 12  # number of VERIFY-status rows (not donors)
+  terms_used:
+    - id: "HANCESTRO:0005"
+      label: "European"
+      donor_count: 101  # white/caucasian/Jewish (Jewish mapped here due to CxG prohibition on 0324)
+    - id: "HANCESTRO:0568"
+      label: "African American"
+      donor_count: 51
+    - id: "HANCESTRO:0016"
+      label: "African American or Afro-Caribbean"
+      donor_count: 7   # Black (unspecified), Black British
+    - id: "HANCESTRO:0612"
+      label: "Hispanic or Latin American"
+      donor_count: 13
+    - id: "HANCESTRO:0008"
+      label: "Asian unspecified"
+      donor_count: 2
+    - id: "HANCESTRO:0006"
+      label: "South Asian"
+      donor_count: 2
+    - id: "HANCESTRO:0007"
+      label: "South East Asian"
+      donor_count: 1
+  known_issues:
+    - "HANCESTRO:0324 (Ashkenazi Jew) is prohibited by CxG 6.0.0 — Jewish donors mapped to European"
+    - "Several Nee study ethnicity_grouped values appear to be harmonization errors (e.g., Filipino → 'hispanic')"
+    - "Reed study has multiple UK census categories that grouped as 'white' regardless of actual self-report"
+
+# ---------------------------------------------------------------------------
+# HsapDv — Developmental Stage
+# ---------------------------------------------------------------------------
+# Full mapping table: publication/mappings/hsapdv_age_mapping.tsv
+# All 287 donors are adults → single term HsapDv:0000087.
+hsapdv:
+  mapping_file: "publication/mappings/hsapdv_age_mapping.tsv"
+  status: complete
+  coverage:
+    total_donors: 287
+    age_continuous_available: 161
+    age_binary_only: 121  # Kumar (126) minus 5 with no age data at all
+    age_missing_entirely: 5
+  terms_used:
+    - id: "HsapDv:0000087"
+      label: "human adult stage"
+      donor_count: 287
+      note: "All donors are adult females, age 19-69 where recorded"
+  known_issues:
+    - "Kumar (126 donors): no continuous age — binary young/old only"
+    - "5 donors have no age information at all (3 Kumar, 2 Gray)"
+
+# ---------------------------------------------------------------------------
+# EFO — Assay
+# ---------------------------------------------------------------------------
+# Full mapping table: publication/mappings/efo_assay_mapping.tsv
+# 10 study entries mapped to EFO terms.
+efo_assay:
+  mapping_file: "publication/mappings/efo_assay_mapping.tsv"
+  status: complete
+  coverage:
+    total_studies: 10  # 8 external + 2 native (chromium + xenium)
+    verified: 3        # lawson_chromium, lawson_xenium, gray
+    verify_flagged: 7  # exact chemistry version needs confirmation for external studies
+  terms_used:
+    - id: "EFO:0022606"
+      label: "10x gene expression flex"
+      studies: ["lawson_chromium"]
+    - id: "EFO:0022615"
+      label: "10x Xenium"
+      studies: ["lawson_xenium"]
+    - id: "EFO:0009899"
+      label: "10x 3' v2"
+      studies: ["gray", "nee", "pal"]
+    - id: "EFO:0009922"
+      label: "10x 3' v3"
+      studies: ["kumar", "murrow", "twigger", "reed"]
+  known_issues:
+    - "source_dataset_registry.yaml Xenium EFO term was corrected to EFO:0022615 (verified 2026-02-22)"
+    - "Kumar used mix of v2/v3/v3.1 — mapped to v3 as dominant; per-cell annotation may be needed"
+    - "Nee used mix of v1/v2 — mapped to v2 as dominant (20/22 samples)"
+    - "Murrow, Twigger exact chemistry version not confirmed from accessible methods sections"
+
+# ---------------------------------------------------------------------------
+# CL — Cell Type Ontology (NOT YET POPULATED)
+# ---------------------------------------------------------------------------
+# This is the heavy lift. Requires expert curation of cluster labels → CL terms.
+# Separate effort, not part of A2_ontology_mappings.
+cell_ontology:
+  mapping_file: null  # TBD
+  status: not_started
+  notes: |
+    Requires mapping ~58 Kumar cell types, ~17 Gray subtypes, ~11 Nee types,
+    ~10 Reed types, ~9 Twigger types, ~8 Murrow types, plus Pal cluster numbers.
+    This is a research task, not a mechanical mapping. Will need marker-based
+    validation and possibly the marker-debate skill for ambiguous types.

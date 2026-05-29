@@ -1,0 +1,101 @@
+# =============================================================================
+# SECTION A: DATA PREPARATION - MANIFEST
+# =============================================================================
+# Tracks completion status for each study across processing stages.
+# Updated by agents as work progresses.
+# =============================================================================
+
+version: "1.0"
+created: 2026-01-20
+last_updated: 2026-01-20
+
+# -----------------------------------------------------------------------------
+# STUDY STATUS
+# -----------------------------------------------------------------------------
+# Stages: PENDING → KNOWLEDGE → EXTRACTED → VALIDATED → HARMONIZED → COMPLETE
+# Special: PENDING_REVIEW (blocking, awaiting user input)
+
+studies:
+  gray:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Simple study - proof of concept candidate"
+
+  murrow:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Simple study - proof of concept candidate"
+
+  kumar:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Medium complexity - multi-underscore cell IDs, no continuous age"
+
+  reed:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Medium complexity - identity mapping (is iHBCA reference)"
+
+  twigger:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Complex - had reversed cell IDs (17,349 cells)"
+
+  nee:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Complex - spaces in cell IDs, BRCA mislabeling needs fix"
+
+  pal_norm_epi:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Very complex - Pal substudy, ~86% match expected"
+
+  pal_norm_total:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Very complex - Pal substudy, ~88% match expected"
+
+  pal_norm_b1:
+    stage: PENDING
+    status: NOT_STARTED
+    owner: null
+    last_update: null
+    notes: "Very complex - Pal substudy, donor 0123 collision"
+
+# -----------------------------------------------------------------------------
+# INTEGRATION STATUS
+# -----------------------------------------------------------------------------
+
+integration:
+  status: BLOCKED
+  blocked_by: "All studies must reach COMPLETE before integration"
+  canonical_metadata_exists: false
+  merge_report_exists: false
+
+# -----------------------------------------------------------------------------
+# SUMMARY COUNTS
+# -----------------------------------------------------------------------------
+
+summary:
+  total_studies: 9
+  pending: 9
+  in_progress: 0
+  pending_review: 0
+  complete: 0

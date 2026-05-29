@@ -1,0 +1,1060 @@
+schema_version: 2
+compartment: imm
+generated: 2026-04-24 (migrated from v1)
+resolutions_used:
+- '1.0'
+note: Finalized annotation, res 1.0. 30 clusters reviewed. Labels from direct marker review; canonical markers from limma cluster DE (jobs 51233868).
+clusters_by_resolution:
+  '1.0':
+    c0:
+      n_cells: 27139
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.89
+      kumar_n: 17501
+      kumar_support: clean
+      kumar_top:
+        CD8-Trm: 15490
+        CD4-Tem: 1105
+        CD4-Th-like: 512
+        CD4-Th: 199
+      assigned_label: CD8_Trm
+    c3:
+      n_cells: 10472
+      kumar_plurality: CD8-Tem
+      kumar_pct: 0.81
+      kumar_n: 8046
+      kumar_support: clean
+      kumar_top:
+        CD8-Tem: 6541
+        GD: 458
+        CD8-Trm: 308
+        CD4-Th-like: 254
+      assigned_label: CD8_Tem
+    c6:
+      n_cells: 7953
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.31
+      kumar_n: 4654
+      kumar_support: ambiguous
+      kumar_top:
+        CD8-Trm: 1426
+        CD4-Th-like: 1270
+        CD4-Th: 987
+        CD4-naive: 766
+      assigned_label: SS
+    c18:
+      n_cells: 1896
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.27
+      kumar_n: 225
+      kumar_support: ambiguous
+      kumar_top:
+        CD8-Trm: 60
+        CD4-Th-like: 36
+        CD4-Th: 23
+        CD4-Tem: 22
+      assigned_label: Stromal_Doublets
+    c19:
+      n_cells: 1851
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.67
+      kumar_n: 179
+      kumar_support: decent
+      kumar_top:
+        CD8-Trm: 119
+        CD4-Th-like: 13
+        CD4-Th: 9
+        CD8-Tem: 8
+      assigned_label: Epithelial_Doublets
+    c20:
+      n_cells: 1713
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.51
+      kumar_n: 1565
+      kumar_support: mixed
+      kumar_top:
+        CD8-Trm: 799
+        CD4-Th: 347
+        CD4-Th-like: 293
+        CD4-Tem: 97
+      assigned_label: T_naive
+    c25:
+      n_cells: 799
+      kumar_plurality: CD8-Trm
+      kumar_pct: 0.44
+      kumar_n: 792
+      kumar_support: mixed
+      kumar_top:
+        CD8-Trm: 350
+        CD4-Th-like: 346
+        CD4-Th: 40
+        CD8-Tem: 27
+      assigned_label: CD4_Th_like
+    c1:
+      n_cells: 16030
+      kumar_plurality: CD4-Th-like
+      kumar_pct: 0.82
+      kumar_n: 13079
+      kumar_support: clean
+      kumar_top:
+        CD4-Th-like: 10768
+        CD4-Th: 967
+        CD4-naive: 658
+        CD4-Tem: 273
+      assigned_label: CD4_Th_like
+    c4:
+      n_cells: 9682
+      kumar_plurality: CD4-Th
+      kumar_pct: 0.68
+      kumar_n: 7995
+      kumar_support: decent
+      kumar_top:
+        CD4-Th: 5471
+        CD4-Th-like: 1582
+        CD4-naive: 465
+        CD4-Tem: 321
+      assigned_label: Th17
+    c9:
+      n_cells: 7141
+      kumar_plurality: CD4-Tem
+      kumar_pct: 0.64
+      kumar_n: 3795
+      kumar_support: decent
+      kumar_top:
+        CD4-Tem: 2411
+        CD4-activated: 723
+        CD4-Th-like: 245
+        CD8-Trm: 219
+      assigned_label: IFNg_T
+    c10:
+      n_cells: 7138
+      kumar_plurality: CD4-naive
+      kumar_pct: 0.42
+      kumar_n: 6625
+      kumar_support: mixed
+      kumar_top:
+        CD4-naive: 2796
+        CD4-Treg: 2236
+        CD4-Th-like: 888
+        CD4-Tem: 360
+      assigned_label: Treg
+    c14:
+      n_cells: 2476
+      kumar_plurality: CD4-activated
+      kumar_pct: 0.54
+      kumar_n: 2274
+      kumar_support: mixed
+      kumar_top:
+        CD4-activated: 1217
+        CD8-activated: 946
+        CD4-Tem: 26
+        CD4-naive: 24
+      assigned_label: ZNF683_T
+    c24:
+      n_cells: 921
+      kumar_plurality: CD4-Th-like
+      kumar_pct: 0.26
+      kumar_n: 920
+      kumar_support: ambiguous
+      kumar_top:
+        CD4-Th-like: 236
+        CD4-naive: 234
+        NK: 160
+        NKT: 98
+      assigned_label: DS
+    c7:
+      n_cells: 7884
+      kumar_plurality: NK
+      kumar_pct: 0.58
+      kumar_n: 7150
+      kumar_support: mixed
+      kumar_top:
+        NK: 4135
+        NKT: 2674
+        NK-ILCs: 117
+        CD8-Tem: 78
+      assigned_label: NK
+    c17:
+      n_cells: 2240
+      kumar_plurality: NK-ILCs
+      kumar_pct: 0.84
+      kumar_n: 1699
+      kumar_support: clean
+      kumar_top:
+        NK-ILCs: 1435
+        T_prol: 184
+        NK: 21
+        CD4-Tem: 13
+      assigned_label: NK_ILC_prolif
+    c2:
+      n_cells: 10473
+      kumar_plurality: bmem_switched
+      kumar_pct: 0.56
+      kumar_n: 6225
+      kumar_support: mixed
+      kumar_top:
+        bmem_switched: 3476
+        b_naive: 2281
+        bmem_unswitched: 418
+        CD8-Tem: 18
+      assigned_label: B_cell
+    c8:
+      n_cells: 7831
+      kumar_plurality: plasma_IgA
+      kumar_pct: 0.83
+      kumar_n: 6301
+      kumar_support: clean
+      kumar_top:
+        plasma_IgA: 5222
+        plasma_IgG: 1046
+        CD8-activated: 5
+        CD8-Tem: 4
+      assigned_label: Plasma
+    c5:
+      n_cells: 9532
+      kumar_plurality: Macro-m1
+      kumar_pct: 0.79
+      kumar_n: 7628
+      kumar_support: clean
+      kumar_top:
+        Macro-m1: 5991
+        Macro-m1-CCL: 1309
+        mye-prol: 88
+        cDC2: 85
+      assigned_label: Macro_C1Q
+    c12:
+      n_cells: 6495
+      kumar_plurality: Macro-m1
+      kumar_pct: 0.35
+      kumar_n: 3381
+      kumar_support: mixed
+      kumar_top:
+        Macro-m1: 1173
+        Macro-m2: 752
+        Mono-classical: 564
+        Macro-m1-CCL: 240
+      assigned_label: Macro_inflam
+    c13:
+      n_cells: 6356
+      kumar_plurality: Macro-m2
+      kumar_pct: 0.74
+      kumar_n: 5895
+      kumar_support: decent
+      kumar_top:
+        Macro-m2: 4382
+        Macro-m2-CXCL: 1048
+        Mono-classical: 287
+        Macro-IFN: 84
+      assigned_label: Macro_FOLR2
+    c15:
+      n_cells: 2335
+      kumar_plurality: Macro-lipo
+      kumar_pct: 0.72
+      kumar_n: 1081
+      kumar_support: decent
+      kumar_top:
+        Macro-lipo: 775
+        mye-prol: 139
+        Macro-m1: 72
+        Mono-classical: 47
+      assigned_label: Macro_LAM
+    c16:
+      n_cells: 2290
+      kumar_plurality: Macro-m2
+      kumar_pct: 0.67
+      kumar_n: 2268
+      kumar_support: decent
+      kumar_top:
+        Macro-m2: 1512
+        Mono-classical: 473
+        Macro-lipo: 98
+        Macro-m2-CXCL: 96
+      assigned_label: Macro_LAM
+    c22:
+      n_cells: 1272
+      kumar_plurality: Macro-m2
+      kumar_pct: 0.61
+      kumar_n: 1240
+      kumar_support: decent
+      kumar_top:
+        Macro-m2: 758
+        Mono-classical: 225
+        Macro-lipo: 99
+        Macro-m2-CXCL: 70
+      assigned_label: DS_2
+    c23:
+      n_cells: 990
+      kumar_plurality: Mono-non-classical
+      kumar_pct: 0.96
+      kumar_n: 960
+      kumar_support: clean
+      kumar_top:
+        Mono-non-classical: 925
+        Mono-classical: 30
+        Macro-IFN: 4
+        cDC2: 1
+      assigned_label: Mono_NC
+    c11:
+      n_cells: 6939
+      kumar_plurality: cDC2
+      kumar_pct: 0.49
+      kumar_n: 6157
+      kumar_support: mixed
+      kumar_top:
+        cDC2: 3024
+        Mono-classical: 2503
+        Macro-IFN: 135
+        Macro-m2-CXCL: 121
+      assigned_label: cDC2
+    c21:
+      n_cells: 1306
+      kumar_plurality: cDC1
+      kumar_pct: 0.53
+      kumar_n: 1005
+      kumar_support: mixed
+      kumar_top:
+        cDC1: 529
+        mDC: 329
+        pDC: 76
+        cDC2: 34
+      assigned_label: cDC1
+    c29:
+      n_cells: 137
+      kumar_plurality: pDC
+      kumar_pct: 0.98
+      kumar_n: 59
+      kumar_support: decent
+      kumar_top:
+        pDC: 58
+        cDC2: 1
+      assigned_label: pDC
+    c26:
+      n_cells: 638
+      kumar_plurality: Mast
+      kumar_pct: 0.97
+      kumar_n: 597
+      kumar_support: clean
+      kumar_top:
+        Mast: 580
+        CD4-Tem: 10
+        NK-ILCs: 2
+        CD4-Th: 1
+      assigned_label: Mast
+    c27:
+      n_cells: 506
+      kumar_plurality: Neutrophil
+      kumar_pct: 0.85
+      kumar_n: 498
+      kumar_support: clean
+      kumar_top:
+        Neutrophil: 426
+        Mast: 64
+        CD4-Th: 3
+        Macro-m1: 1
+      assigned_label: Neutrophil
+    c28:
+      n_cells: 191
+      kumar_plurality: unknown
+      kumar_pct: 0.0
+      kumar_n: 0
+      kumar_support: no_kumar_cells
+      kumar_top: {}
+      assigned_label: SS_2
+labels:
+  CD8_Trm:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c0
+    parent_label: null
+    lineage: CD8_T
+    is_artifact: false
+    canonical_markers:
+    - CD8A
+    - CD8B
+    - KLRC1
+    - ITGAE
+    - CD69
+    - CXCR6
+    - ZNF683
+    - NR4A2
+    required_gene: null
+    identity_markers:
+    - CD8A
+    - CD8B
+    - CCL5
+    - KLRC1
+    - KLRD1
+    - KLRK1
+    scoring_signature: null
+    notes: "CD8 Trm. Largest T cell cluster (27K cells). Kumar+Reed clean agreement. CD8A/B prominent. NK receptor co-expression:\
+      \ NKG2A (KLRC1), CD94 (KLRD1), NKG2D (KLRK1) \u2014 NKG2A+ CD8 Trm phenotype consistent with tissue-resident cytotoxic\
+      \ T cells."
+  CD8_Tem:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c3
+    parent_label: null
+    lineage: CD8_T
+    is_artifact: false
+    canonical_markers:
+    - CD8A
+    - GZMK
+    - GZMA
+    - GZMB
+    - PRF1
+    - NKG7
+    - CCL5
+    - EOMES
+    required_gene: null
+    identity_markers:
+    - GZMK
+    - EOMES
+    - CST7
+    - GZMA
+    - NKG7
+    - CCL5
+    scoring_signature: null
+    notes: "CD8 TEM. GZMK+EOMES+ canonical circulating TEM. EOMES i2=0% (perfectly consistent across studies). Checkpoint\
+      \ co-expression present: PD-1 (z=1.68), LAG3 (z=1.83), TIGIT \u2014 chronic antigen exposure history, not terminal exhaustion\
+      \ (TIM-3 absent)."
+  SS:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c6
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers: []
+    scoring_signature: null
+    notes: "Study-specific artifact. 55% of Nee cells and 25% of Pal cells land here \u2014 driven by batch/technical signal,\
+      \ not biology. Kumar ambiguous (31% CD8-Trm plurality). Low LOR values across all markers. Exclude from biological interpretation."
+  Stromal_Doublets:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c18
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers:
+    - COL14A1
+    - COL4A1
+    - LAMA4
+    - SPARCL1
+    - NR2F2
+    scoring_signature: null
+    notes: Stromal/endothelial contamination. Top markers are vascular/stromal (COL14A1, COL4A1, LAMA4, SPARCL1, GJA4, CCL14,
+      NR2F2, ADAMTS1). 65% Reed, 13% Pal, only 225 Kumar cells (all misclassified as T cells). Exclude from immune analysis.
+  Epithelial_Doublets:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c19
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers:
+    - EPCAM
+    - KRT18
+    - KRT8
+    - AGR3
+    - CLDN7
+    scoring_signature: null
+    notes: "Epithelial contamination. Top markers are luminal epithelial (EPCAM, KRT18, KRT8, CLDN7, AGR3, AZGP1, ANKRD30A)\
+      \ \u2014 misclassified as immune during sorting. 63% Reed, 16% Pal, only 179 Kumar cells. Exclude from immune analysis."
+  CD8_Resting:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c20
+    parent_label: null
+    lineage: CD8_T
+    is_artifact: false
+    canonical_markers:
+    - CD8A
+    - CD8B
+    - IL7R
+    - TCF7
+    - TSC22D3
+    - FOXP1
+    - LEF1
+    - SELL
+    - CCR7
+    required_gene: null
+    identity_markers:
+    - TSC22D3
+    - SLAMF6
+    - IL7R
+    - DUSP1
+    - CD69
+    scoring_signature: null
+    notes: "Resting CD8+ T cells (2026-04-24: renamed from T_naive after evidence re-analysis). CD8A frac=0.45, CD8B=0.34\
+      \ (matches CD8_Tem c3: 0.49/0.28); CD4=0.07 (clearly CD8 lineage). Classic naive markers CCR7/SELL/LEF1/KLF2/S1PR1/MAL\
+      \ all below 0.10 \u2014 not truly naive. Resting signature strong: IL7R=0.98, TSC22D3=0.99, FOXP1=0.49, TCF7=0.31. Kumar\
+      \ native labels: 51% CD8-Trm / 22% CD4-Th / 19% CD4-Th-like / 1% CD4-naive \u2014 Kumar did not call naive. 91% Kumar\
+      \ study-dominance \u2014 interpret with caution. Most consistent with a resting/Tcm-like CD8 population misclassified\
+      \ as Trm by Kumar due to marker overlap."
+  CD4_Th_like:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c1
+    - c25
+    parent_label: null
+    lineage: CD4_T
+    is_artifact: false
+    canonical_markers:
+    - IL7R
+    - CD40LG
+    - CCR4
+    - CD28
+    - BATF
+    - CXCR4
+    required_gene: null
+    identity_markers:
+    - IL7R
+    - CD40LG
+    - CCR4
+    - CD28
+    - BATF
+    - CXCR4
+    scoring_signature: null
+    notes: Folded into CD4_Th_like (c1). No pooled logreg markers, 99% Kumar, Kumar near-50/50 CD8-Trm/CD4-Th-like. Technical
+      Leiden boundary artifact at res 1.0.
+  Th17:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c4
+    parent_label: null
+    lineage: CD4_T
+    is_artifact: false
+    canonical_markers:
+    - RORC
+    - KLRB1
+    required_gene: null
+    identity_markers:
+    - RORC
+    - KLRB1
+    - CCR6
+    - RORA
+    - IL7R
+    scoring_signature: null
+    notes: "Th17. RORC (ROR\u03B3t) + KLRB1 (CD161) + CCR6 + RORA \u2014 canonical Th17 signature. Kumar CD4-Th (decent support).\
+      \ Overrides working label CD4_Th_1."
+  IFNg_T:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c9
+    parent_label: null
+    lineage: T_ambiguous
+    figure_target: fig2
+    is_artifact: false
+    canonical_markers:
+    - IFNG
+    required_gene: null
+    identity_markers:
+    - IFNG
+    - CCL5
+    - ZNF683
+    - CRTAM
+    - TBX21
+    scoring_signature: null
+    notes: "IFN-gamma-producing effector T cells. IFNG z=3.00 (max), TNF z=1.93, LTA z=1.73 \u2014 Th1/Tc1 cytokine triad.\
+      \ T-bet (TBX21) present. CD4 vs CD8 lineage unresolved: Kumar calls CD4-TEM (64% of 3,795 Kumar cells); Reed calls CD8_Tc1\
+      \ (85% of 2,880 Reed cells). Unique among all T cell clusters: every other T cell cluster has Kumar and Reed agreeing\
+      \ on CD4 vs CD8 lineage \u2014 c9 is the sole exception. Interpreted as a converging effector state where Th1 and Tc1\
+      \ share the IFNG/TNF/LTA/TBX21 program and are transcriptionally indistinguishable. CD8B z=0.58 (weak positive, diluted\
+      \ in mixed population). CD4 mRNA undetectable by scRNA-seq. PD-1 z=0.35, TIM-3 absent \u2014 effector, not exhausted.\
+      \ Heat shock artifact (HSPA1A/B, DNAJB1 i2 ~97-99%) from specific studies, not identity signal. DA: enriched in BRCA1\
+      \ carriers (brca_status_adj). HCP5 (IFN-gamma-inducible lncRNA) top unmapped signal."
+  Treg:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c10
+    parent_label: null
+    lineage: Treg
+    is_artifact: false
+    canonical_markers:
+    - FOXP3
+    - CTLA4
+    - IKZF2
+    - RTKN2
+    - TIGIT
+    - TNFRSF18
+    required_gene: null
+    identity_markers:
+    - FOXP3
+    - CTLA4
+    - IKZF2
+    - IKZF4
+    - LAYN
+    - RTKN2
+    - TIGIT
+    scoring_signature: null
+    notes: "Tregs. FOXP3 LOR=4.47 (dominant). Full canonical panel confirmed: CTLA4, Helios (IKZF2 i2=0%), Eos (IKZF4), LAYN,\
+      \ RTKN2 (effector Treg markers), TIGIT, GITR (TNFRSF18). SELL and LEF1 both i2=0% \u2014 resting/central Treg phenotype,\
+      \ consistent with Kumar plurality being CD4-naive (2,796) despite 2,236 explicit CD4-Treg calls. CXCL13 LOR=2.08 suggests\
+      \ Tfr subset present. Helios+ consistent with thymic Treg origin."
+  ZNF683_T:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c14
+    parent_label: null
+    lineage: T_ambiguous
+    is_artifact: false
+    canonical_markers:
+    - ZNF683
+    required_gene: null
+    identity_markers:
+    - ZNF683
+    - CD8B
+    - CISH
+    - SCML4
+    - THEMIS
+    - GZMA
+    scoring_signature: null
+    notes: "Recently TCR-activated T cells. ZNF683 (Hobit) top and most consistent marker (i2=17%). CISH, SCML4, THEMIS all\
+      \ i2=0% \u2014 perfectly consistent pan-T activation markers. CISH is a negative regulator of TCR/cytokine signaling\
+      \ induced by activation. CD8B LOR=1.01 present. CD4/CD8 lineage ambiguous: Kumar splits 54% CD4-activated / 42% CD8-activated;\
+      \ Reed has 173 cells with no coherent plurality (CD8_Trm 36%, CD4_Th 29%). 91% Kumar-dominated cluster. FOXP3=0 (not\
+      \ Treg)."
+  DS:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c24
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers:
+    - IL7R
+    - CD40LG
+    - CCR4
+    - CD28
+    - BATF
+    - CXCR4
+    required_gene: null
+    identity_markers: []
+    scoring_signature: null
+    notes: 'Single-donor artifact. 887/921 cells (96%) from Kumar_P20. No pooled logreg markers (single-study signal only).
+      Kumar ambiguous: CD4-Th-like/CD4-naive/NK/NKT mix. Exclude from biological interpretation.'
+  NK:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c7
+    parent_label: null
+    lineage: NK
+    is_artifact: false
+    canonical_markers:
+    - FGFBP2
+    - GNLY
+    required_gene: null
+    identity_markers:
+    - FGFBP2
+    - S1PR5
+    - NKG7
+    - GNLY
+    - GZMB
+    - PRF1
+    - KLRF1
+    scoring_signature: null
+    notes: "Cytotoxic NK cells. FGFBP2 LOR=6.46 i2=10% (top, highly consistent). S1PR5 (NK egress), NKG7, GNLY, GZMB, PRF1,\
+      \ KLRF1 (NKp80) \u2014 canonical cytotoxic NK profile. Kumar 52% NK / 34% NKT. NKT contamination expected at this resolution."
+  NK_ILC_prolif:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c17
+    parent_label: null
+    lineage: ILC
+    is_artifact: false
+    canonical_markers:
+    - KIT
+    - SH2D1B
+    - MKI67
+    - TOP2A
+    - STMN1
+    - TYMS
+    - HIST1H4C
+    - CENPF
+    - NKG7
+    required_gene: null
+    identity_markers:
+    - KIT
+    - SH2D1B
+    - PBK
+    - DLGAP5
+    - TNFSF11
+    scoring_signature: null
+    notes: 'Proliferating NK/ILC cluster. Kumar 84% NK-ILCs (clean). Mixed proliferation signal (PBK i2=19%, DLGAP5 i2=23%,
+      KIF15 i2=29%) and ILC markers (KIT/CD117, SH2D1B/EAT-2). Does not split at res 1.5 (99.6% stays in one cluster). Splits
+      cleanly at res 2.0 into: NK_ILC body (1818, KIR+/KIT+/XCL1/2+), cytotoxic NK (209, FGFBP2+/GNLY+, same signature as
+      c7), and proliferating (202, MKI67+/BIRC5+).'
+  B_cell:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c2
+    parent_label: null
+    lineage: B
+    is_artifact: false
+    canonical_markers:
+    - MS4A1
+    - CD79A
+    - CD79B
+    - CD19
+    - BANK1
+    - HLA-DRA
+    - CD74
+    - TNFRSF13C
+    - MEF2B
+    required_gene: null
+    identity_markers:
+    - MS4A1
+    - CD79A
+    - CD19
+    - BANK1
+    - BCL11A
+    - EBF1
+    - SPIB
+    scoring_signature: null
+    notes: "B cells. MS4A1 (CD20), CD79A, CD19, BANK1 \u2014 canonical B cell markers. BCL11A, EBF1, SPIB \u2014 B cell TFs.\
+      \ Kumar: bmem_switched (56%), b_naive (37%), bmem_unswitched (7%) \u2014 mixed naive and memory at this resolution."
+  Plasma:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c8
+    parent_label: null
+    lineage: plasma
+    is_artifact: false
+    canonical_markers:
+    - MZB1
+    - TNFRSF17
+    - JCHAIN
+    - IGHA1
+    - IGHA2
+    - SDC1
+    - XBP1
+    - PRDM1
+    - IRF4
+    - CD38
+    required_gene: null
+    identity_markers:
+    - MZB1
+    - TNFRSF17
+    - CD38
+    - FCRL5
+    - DERL3
+    scoring_signature: null
+    notes: "Plasma cells. MZB1 LOR=6.50, TNFRSF17 (BCMA), CD38, FCRL5 \u2014 canonical plasma cell markers. Kumar 83% plasma_IgA,\
+      \ 17% plasma_IgG \u2014 IgA-dominant but mixed isotype at this resolution."
+  Macro_C1Q:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c5
+    parent_label: null
+    lineage: macrophage
+    is_artifact: false
+    canonical_markers:
+    - C1QA
+    - C1QB
+    - C1QC
+    - HLA-DRA
+    required_gene: null
+    identity_markers:
+    - C1QA
+    - C1QB
+    - C1QC
+    - HLA-DRA
+    - CD74
+    - FCGR2A
+    scoring_signature: null
+    notes: "C1Q+ tissue-resident macrophage. C1QA/B/C + HLA-DR + CD74 + FCGR2A \u2014 complement-producing homeostatic TRM\
+      \ profile. Cross-study: 80% Kumar, 10% Twigger, 5% Gray (94 donors). Kumar=Macro-m1 (79%)."
+  Macro_inflam:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c12
+    parent_label: null
+    lineage: macrophage
+    is_artifact: false
+    canonical_markers:
+    - SAT1
+    - MS4A7
+    - IL1B
+    - CXCL8
+    - CCL3
+    - CCL4
+    - TNF
+    - NFKBIA
+    - G0S2
+    - CXCL2
+    - CXCL3
+    required_gene: null
+    identity_markers:
+    - SAT1
+    - MS4A7
+    - PLA2G7
+    - PILRA
+    - FCER1G
+    - IER3
+    scoring_signature: null
+    notes: 'Inflammatory/monocyte-derived macrophage. SAT1 (stress/activation), MS4A7 (inflammasome-associated), PLA2G7 (monocyte-derived),
+      PILRA (inhibitory myeloid receptor). Best cross-study macrophage: 52% Kumar, 28% Reed, 10% Pal, 7% Murrow. Kumar plurality
+      mixed (Macro-m1 35%, Macro-m2 22%, Mono-classical 17%).'
+  Macro_FOLR2:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c13
+    parent_label: null
+    lineage: macrophage
+    is_artifact: false
+    canonical_markers:
+    - LYVE1
+    - FOLR2
+    - CD163
+    required_gene: null
+    identity_markers:
+    - LYVE1
+    - FOLR2
+    - F13A1
+    - MRC1
+    - CD163
+    - COLEC12
+    - RNASE1
+    scoring_signature: null
+    notes: "FOLR2+ tissue-resident macrophage. LYVE1+FOLR2+F13A1+MRC1+CD163 \u2014 interstitial perivascular TRM (Mulder et\
+      \ al. Sci Immunol 2021). 93% Kumar (95 donors), Kumar=Macro-m2. COLEC12 (scavenger receptor) and RNASE1 also present."
+  Macro_LAM:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c15
+    - c16
+    parent_label: null
+    lineage: macrophage
+    is_artifact: false
+    canonical_markers:
+    - GPNMB
+    - PLIN2
+    - CHIT1
+    - SPP1
+    required_gene: null
+    identity_markers:
+    - CHIT1
+    - SIGLEC15
+    - CYP27A1
+    - CCL18
+    - SPP1
+    - APOC1
+    - GPNMB
+    - PLIN2
+    - CTSD
+    - CTSB
+    - CTSL
+    scoring_signature: null
+    notes: "Lipid-associated macrophage (LAM). Merged with c16 (Macro_LAM) \u2014 both clusters share lipid-associated macrophage\
+      \ identity. This cluster is Twigger/Kumar-enriched, lactation context (CHIT1, CYP27A1). Previously labeled Macro_lipo."
+  DS_2:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c22
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers:
+    - CD68
+    - CD163
+    - MRC1
+    - CTSB
+    - CTSL
+    scoring_signature: null
+    notes: Single-donor artifact. 97% Kumar, 1 donor (992/1,272 cells from one individual). Macrophage markers (CD68, CD163,
+      MRC1) present but donor concentration disqualifies biological interpretation. Exclude from analysis.
+  Mono_NC:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c23
+    parent_label: null
+    lineage: monocyte
+    is_artifact: false
+    canonical_markers:
+    - AIF1
+    - LILRA5
+    required_gene: null
+    identity_markers:
+    - AIF1
+    - FCER1G
+    - TYROBP
+    - LST1
+    - LILRA5
+    - SERPINA1
+    scoring_signature: null
+    notes: "Non-classical monocytes. AIF1 (IBA1), FCER1G, TYROBP, LST1, LILRA5 \u2014 canonical non-classical monocyte profile.\
+      \ 97% Kumar, 34 donors \u2014 Kumar-enriched cell type, well-sampled. Kumar=Mono-non-classical (96%)."
+  cDC2:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c11
+    parent_label: null
+    lineage: DC
+    is_artifact: false
+    canonical_markers:
+    - CD1C
+    - CLEC10A
+    - FCER1A
+    required_gene: null
+    identity_markers:
+    - CD1C
+    - CLEC10A
+    - FCER1A
+    - LYZ
+    - FCN1
+    - LGALS2
+    scoring_signature: null
+    notes: cDC2 / monocyte-derived DC. CD1C+CLEC10A+FCER1A anchor cDC2 lineage; FCN1+LYZ+LGALS2 are monocyte markers, consistent
+      with cDC2-FCN1 transitional state described in recent atlases (intermediate between classical cDC2 and mo-DC). 89% Kumar,
+      6% Twigger (94 donors). Kumar=cDC2 (49%) / Mono-classical (40%).
+  cDC1:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c21
+    parent_label: null
+    lineage: DC
+    is_artifact: false
+    canonical_markers:
+    - FLT3
+    - DNASE1L3
+    - IDO1
+    required_gene: null
+    identity_markers:
+    - FLT3
+    - DNASE1L3
+    - IDO1
+    - CLEC4C
+    scoring_signature: null
+    notes: "cDC1 / tolerogenic DC. FLT3+DNASE1L3+IDO1 consistent with cDC1 identity; IDO1 marks tolerogenic/regulatory DC\
+      \ function. CLEC4C (BDCA-2) is top LOR marker \u2014 typically a pDC marker but expressed in some cDC1/transitional\
+      \ DCs. Kumar=cDC1 (51%)/mDC (33%), 77% Kumar, 14% Reed (34 donors). 76 Kumar pDC calls suggest possible contamination\
+      \ or transitional state."
+  pDC:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c29
+    parent_label: null
+    lineage: pDC
+    is_artifact: false
+    canonical_markers:
+    - LILRA4
+    - CLEC4C
+    - IRF7
+    - IRF8
+    - TCF4
+    - PLD4
+    - ITM2C
+    - GZMB
+    - SPIB
+    - JCHAIN
+    required_gene: null
+    identity_markers:
+    - LILRA4
+    - CLEC4C
+    - LAMP5
+    - PTCRA
+    - SCT
+    scoring_signature: null
+    notes: "Plasmacytoid DCs. LILRA4 (BDCA-2 ligand), CLEC4C (BDCA-2), LAMP5, PTCRA \u2014 canonical pDC panel. GZMB present\
+      \ (activated pDC). 85% Twigger, 137 total cells (small cluster). Kumar=pDC (98% of 59 Kumar cells)."
+  Mast:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c26
+    parent_label: null
+    lineage: mast
+    is_artifact: false
+    canonical_markers:
+    - TPSAB1
+    - TPSB2
+    - MS4A2
+    required_gene: null
+    identity_markers:
+    - TPSAB1
+    - TPSB2
+    - CPA3
+    - MS4A2
+    - GATA2
+    - HDC
+    - CTSG
+    scoring_signature: null
+    notes: "Mast cells. TPSAB1/TPSB2 (tryptases), CPA3 (carboxypeptidase A3), MS4A2 (Fc\u03B5RI\u03B2), GATA2 (mast cell TF),\
+      \ HDC (histidine decarboxylase), CTSG (cathepsin G) \u2014 unambiguous mast cell profile. 97% Kumar (26 donors), Kumar=Mast\
+      \ (clean)."
+  Neutrophil:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c27
+    parent_label: null
+    lineage: neutrophil
+    is_artifact: false
+    canonical_markers:
+    - FCGR3B
+    - CXCR1
+    - CXCR2
+    - S100A12
+    - S100A8
+    - S100A9
+    - CXCL8
+    - CYP4F3
+    required_gene: null
+    identity_markers:
+    - FCGR3B
+    - CXCR1
+    - CXCR2
+    - CYP4F3
+    - S100A12
+    - CXCL8
+    scoring_signature: null
+    notes: Neutrophils. FCGR3B (CD16b, neutrophil-specific), CXCR1/CXCR2 (IL-8 receptors), CYP4F3 (neutrophil lipid mediator),
+      S100A12 (neutrophil S100 protein). 85% Kumar (16 donors, clean), Kumar=Neutrophil. Small cluster (506 cells).
+  SS_2:
+    mode: cluster
+    source_resolution: '1.0'
+    source_cluster_ids:
+    - c28
+    parent_label: null
+    lineage: artifact
+    is_artifact: true
+    canonical_markers: []
+    required_gene: null
+    identity_markers: []
+    scoring_signature: null
+    notes: "Study-specific artifact (Reed). 92% Reed, 8% Gray. MT genes (MT1X, MT1E, MT2A etc.) dominate pooled LOR but per-study\
+      \ scores show 0 in all studies except Reed \u2014 MT signal is entirely Reed batch-driven, not biology. T cell markers\
+      \ (IL7R, CXCR4, IL2 all i2=0%) present underneath. Exclude from biological interpretation."

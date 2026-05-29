@@ -1,0 +1,255 @@
+meta:
+  compartment: Immune
+  base_resolution: '0.5'
+  override_resolution: '1.0'
+  experiment: Immune_clean
+  total_flex_cells: 44553
+  total_clusters_res0p5: 18
+
+# Canonical full names for L1.5 labels in this compartment.
+vocabulary:
+  Macrophage:
+    full_name: Macrophage
+    label_short: Mac
+    lineage: Myeloid
+    notes: MRC1/CD163/CD14/C1QC; FLEX adds STAB1/FCGRT
+  cDC:
+    full_name: conventional Dendritic Cell (unsplit)
+    label_short: cDC
+    lineage: Myeloid_DC
+    notes: Base-resolution cDC label at res 0.5; splits into cDC1/cDC2 at override res 1.0
+  cDC1:
+    full_name: conventional Dendritic Cell type 1
+    label_short: cDC1
+    lineage: Myeloid_DC
+    notes: CLEC9A+/WDFY4+/IRF8+ cross-presenting DC; override from cDC at res 1.0
+  cDC2:
+    full_name: conventional Dendritic Cell type 2
+    label_short: cDC2
+    lineage: Myeloid_DC
+    notes: FCER1A+/CLEC7A+ DC; override from cDC at res 1.0
+  pDC:
+    full_name: plasmacytoid Dendritic Cell
+    label_short: pDC
+    lineage: Myeloid_DC
+    notes: LILRA4/IL3RA/SPIB/IRF7/CLEC4C
+  "Mast cell":
+    full_name: Mast cell
+    label_short: Mast
+    lineage: Myeloid_Mast
+    notes: CPA3/KIT/CTSG/TPSAB1; FLEX adds HDC/IL1RL1
+  Neutrophil:
+    full_name: Neutrophil
+    label_short: Neu
+    lineage: Myeloid_Granulocyte
+    notes: S100A8/MNDA in nuclear; CSF3R/NAMPT/TREM1 in FLEX (FLEX rescues call from miscall as monocyte)
+  "B cell":
+    full_name: B cell
+    label_short: B
+    lineage: Lymphoid_B
+    notes: BANK1/MS4A1/CD79A/BLK
+  "Plasma cell":
+    full_name: Plasma cell
+    label_short: Plas
+    lineage: Lymphoid_B
+    notes: MZB1/TENT5C/SLAMF7/JCHAIN/TXNDC5 — terminally differentiated B (Ig-secreting)
+  "CD4 T cell":
+    full_name: CD4+ T cell
+    label_short: CD4T
+    lineage: Lymphoid_T
+    notes: IL7R/TRAC/CD3E; FLEX adds ITK/ETS1
+  "CD4 Treg":
+    full_name: CD4+ Regulatory T cell
+    label_short: Treg
+    lineage: Lymphoid_T
+    notes: FOXP3+/CTLA4+/TIGIT+; override from CD4 T cell at res 1.0
+  "CD8 T cell":
+    full_name: CD8+ T cell
+    label_short: CD8T
+    lineage: Lymphoid_T
+    notes: CCL5/CD3E/CD8A/GZMA; FLEX adds KLRK1/ZAP70
+  "T-NK":
+    full_name: Natural Killer cell
+    label_short: T-NK
+    lineage: Lymphoid_NK
+    notes: NKG7/KLRD1/GZMA at parent (shared with iHBCA NK); on the Xenium 280-gene panel this cluster carries T-cell-dominated transcripts (CD3E/CCL5), reflecting panel-limited NK identity (relabel rationale)
+artifact_vocabulary:
+  Stromal_artifact: { full_name: "Stromal nucleus capturing immune RNA" }
+  Epithelial_artifact: { full_name: "Epithelial nucleus capturing immune RNA" }
+  MastCell_artifact: { full_name: "Mast cell fragment (single-marker n_sig=1)" }
+  Macrophage_artifact: { full_name: "Macrophage fragment (CD163-only)" }
+
+base:
+  '0':
+    label: Macrophage
+    label_short: Mac
+    lineage: Myeloid
+    confidence: high
+    notes: 'Nuclear: MRC1(184), CD163(169), CD14(163), C1QC(120). FLEX: STAB1, FCGRT, MRC1.'
+  '1':
+    label: CD4 T cell
+    label_short: CD4T
+    lineage: Lymphoid_T
+    confidence: high
+    notes: 'Nuclear: IL7R(128), TRAC(104), CD3E(103). FLEX: IL7R, ITK, ETS1.'
+  '2':
+    label: CD8 T cell
+    label_short: CD8T
+    lineage: Lymphoid_T
+    confidence: high
+    notes: 'Nuclear: CCL5(114), CD3E(101), CD8A(98), GZMA(93). FLEX: KLRK1, TC2N, ZAP70.'
+  '3':
+    label: cDC
+    label_short: cDC
+    lineage: Myeloid_DC
+    confidence: high
+    notes: 'Nuclear: LYZ(110), FGL2(95), ITGAX(84), FCER1A(81). FLEX: CSF2RA, CLEC7A, CD74.'
+  '4':
+    label: Plasma cell
+    label_short: Plas
+    lineage: Lymphoid_B
+    confidence: high
+    notes: 'Nuclear: MZB1(144), TENT5C(150), SLAMF7(132). FLEX: MZB1, JCHAIN, TXNDC5.'
+  '5':
+    label: B cell
+    label_short: B
+    lineage: Lymphoid_B
+    confidence: high
+    notes: 'Nuclear: BANK1(123), MS4A1(123), CD79A(84). FLEX: MS4A1, BLK, BANK1.'
+  '6':
+    label: Stromal_artifact
+    label_short: Stromal_art
+    lineage: Artifact
+    confidence: high
+    notes: ACTA2/CD3E/CD8A/MYLK/SFRP1 — stromal nucleus capturing T cell RNA.
+  '7':
+    label: Stromal_artifact
+    label_short: Stromal_art
+    lineage: Artifact
+    confidence: high
+    notes: ACTA2/CX3CR1/DST/MYLK — stromal nucleus capturing myeloid RNA.
+  '8':
+    label: Mast cell
+    label_short: Mast
+    lineage: Myeloid_Mast
+    confidence: high
+    notes: 'Nuclear: CPA3(93), KIT(84), CTSG(73), TPSAB1(62). FLEX: HDC, IL1RL1, KIT. Triple-concordant.'
+  '9':
+    label: Neutrophil
+    label_short: Neu
+    lineage: Myeloid_Granulocyte
+    confidence: high
+    notes: 'Nuclear: S100A8(39), ITGAX(35), MNDA — ambiguous from panel alone (CSF3R absent). FLEX: CSF3R(59), NAMPT(57),
+      DUSP1(54), TREM1(50) — definitive granulocyte. Cross-layer call; nuclear panel alone would miscall as monocyte.
+
+      '
+  '10':
+    label: T-NK
+    label_short: T-NK
+    lineage: Lymphoid_NK
+    confidence: high
+    notes: 'Nuclear: KLRD1(0.73), NKG7(0.69), GZMA(0.71). Verified from nuclear bundle expression — cluster numbering shifted
+      from 2x2 HTML run (non-deterministic Leiden). Panel-limited NK cluster: NK markers expressed on a T-cell-dominated transcriptional background; relabeled T-NK to reflect Xenium 280-gene panel resolution.'
+  '11':
+    label: Stromal_artifact
+    label_short: Stromal_art
+    lineage: Artifact
+    confidence: high
+    notes: ACTA2(0.30)/MRC1(0.47)/CD3E(0.73)/TRAC(0.66) — stromal nucleus co-embedding with macrophage and T cell signal.
+      Verified from nuclear bundle expression.
+  '12':
+    label: cDC1
+    label_short: cDC1
+    lineage: Myeloid_DC
+    confidence: medium
+    notes: 'Nuclear: LYZ(39), FGL2(35), CLEC9A(22), HAVCR2(26). FLEX: WDFY4, IRF8, CIITA — cDC1 lineage.'
+  '13':
+    label: Epithelial_artifact
+    label_short: Epithelial_art
+    lineage: Artifact
+    confidence: high
+    notes: TACSTD2/DSP/KRT14/CDH1 — epithelial nucleus in immune compartment.
+  '14':
+    label: pDC
+    label_short: pDC
+    lineage: Myeloid_DC
+    confidence: high
+    notes: 'Nuclear: LILRA4(16), IL3RA(14), SPIB(11). FLEX: IL3RA, IRF7, CLEC4C.'
+  '15':
+    label: MastCell_artifact
+    label_short: Mast_art
+    lineage: Artifact
+    confidence: high
+    notes: CTSG only (n_sig=1) — mast cell fragment.
+  '16':
+    label: MastCell_artifact
+    label_short: Mast_art
+    lineage: Artifact
+    confidence: high
+    notes: CPA3 only (n_sig=1) — mast cell fragment.
+  '17':
+    label: Macrophage_artifact
+    label_short: Mac_art
+    lineage: Artifact
+    confidence: high
+    notes: CD163 only (n_sig=1) — macrophage fragment.
+overrides:
+  resolution: '1.0'
+  principle: 'Only override where nuclear + cyto + FLEX all agree and the call is unambiguous. Ambiguous res=1.0 clusters
+    inherit their res=0.5 base label.
+
+    '
+  treg_from_cd4:
+    base_cluster: '1'
+    override_cluster: '16'
+    new_label: CD4 Treg
+    new_label_short: Treg
+    lineage: Lymphoid_T
+    confidence: high
+    evidence: 'Nuclear: FOXP3(30), CTLA4(35), TIGIT(25). Cyto: FOXP3(13), TRAC(24), CD3E(18). FLEX: CTLA4(39), TIGIT(33),
+      TRAC(28). FOXP3 confirmed in both Xenium layers. Triple-concordant.
+
+      '
+  cdc_split:
+    base_cluster: '3'
+    override_clusters:
+      cDC2:
+        cluster: '7'
+        new_label: cDC2
+        new_label_short: cDC2
+        confidence: high
+        evidence: 'Nuclear: FCER1A(88, lfc=8.0). Cyto: FCER1A(86, lfc=7.0). FLEX: CLEC7A(47). FCER1A confirmed in both Xenium
+          layers. Triple-concordant.
+
+          '
+      cDC1:
+        cluster: '18'
+        new_label: cDC1
+        new_label_short: cDC1
+        confidence: high
+        evidence: 'Nuclear: CLEC9A(27, lfc=7.9). Cyto: CLEC9A(22, lfc=6.9). FLEX: FLT3(26, lfc=6.6), WDFY4(24, lfc=5.2), IRF8(23,
+          lfc=4.2). CLEC9A in both Xenium layers; canonical cDC1 TF program in FLEX. Triple-concordant.
+
+          '
+final_labels:
+- Macrophage
+- cDC2
+- cDC1
+- pDC
+- Mast cell
+- Neutrophil
+- B cell
+- Plasma cell
+- CD4 T cell
+- CD4 Treg
+- CD8 T cell
+- T-NK
+- Stromal_artifact
+- Epithelial_artifact
+- MastCell_artifact
+- Macrophage_artifact
+artifact_labels:
+- Stromal_artifact
+- Epithelial_artifact
+- MastCell_artifact
+- Macrophage_artifact

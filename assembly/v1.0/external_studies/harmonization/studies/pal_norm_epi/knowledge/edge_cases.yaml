@@ -1,0 +1,236 @@
+# =============================================================================
+# PAL NORM EPI - EDGE CASES AND KNOWN ISSUES
+# =============================================================================
+# Documented exceptions for cell ID mapping and DA testing.
+# =============================================================================
+
+study: pal_norm_epi
+last_updated: 2026-01-20
+
+# =============================================================================
+# CELL ID MAPPING ISSUES
+# =============================================================================
+
+cell_id_mapping:
+  - id: "pal-unmatched-epi"
+    category: "mapping"
+    severity: "expected"
+    cells_affected: 7695
+    total_cells: 53716
+    percentage: 14.3
+
+    description: |
+      14.3% of cells in the Pal NormEpi native object do not map to cells
+      in the iHBCA Pal subset.
+
+    root_cause: |
+      The Pal native Seurat object (SeuratObject_NormEpi.rds) was processed
+      with the original Pal 2021 QC criteria. The iHBCA (Reed et al.) re-processed
+      the raw 10x data with their own QC filters. Different filtering criteria
+      resulted in partially overlapping cell sets.
+
+    evidence:
+      - "Pal 2021 used sample-specific QC thresholds from SampleStats.txt"
+      - "iHBCA used unified QC criteria across all studies"
+      - "Cell barcode sets are subsets, not identical"
+
+    resolution: "Document and proceed"
+    impact: |
+      - Unmatched cells cannot receive iHBCA cell type annotations
+      - Unmatched cells can still be analyzed in native embedding
+      - DA analysis in native embedding unaffected
+      - Joint embedding analysis uses only matched cells
+
+    verification_steps:
+      - "Extract cell IDs from native RDS"
+      - "Extract Pal cell IDs from iHBCA"
+      - "Compute intersection and document exact unmatched cells"
+
+# =============================================================================
+# DA TESTING CONSTRAINTS
+# =============================================================================
+
+da_constraints:
+  - id: "pal-parity-confounding"
+    category: "testing"
+    severity: "blocking"
+    condition: "parity"
+
+    description: |
+      Parity is confounded with menopausal status in Pal NormEpi.
+      Cannot test parity effects independently.
+
+    distribution:
+      pre_menopausal:
+        nulliparous: 6
+        parous: 2
+      post_menopausal:
+        nulliparous: 1
+        parous: 2
+
+    root_cause: |
+      Study design inherent confounding. The original Pal authors explicitly
+      noted in the paper that they could not decipher parity effects due to
+      this confounding.
+
+    resolution: "Skip parity DA tests for pal_norm_epi"
+    impact: |
+      - Cannot perform parity DA analysis
+      - menopausal_status remains the only testable condition
+
+  - id: "pal-normepi-no-age-binary"
+    category: "testing"
+    severity: "limitation"
+    condition: "age_binary"
+
+    description: |
+      Continuous age is available but age distribution overlaps between
+      menopausal groups, making binary age classification uninformative.
+
+    evidence:
+      - "Pre-menopausal ages: 20, 21, 22, 23, 24, 26, 44, 48"
+      - "Post-menopausal ages: 48, 49, 55"
+      - "Age 48 appears in both groups"
+
+    resolution: "Skip age_binary DA tests"
+    note: "Age is correlated with but not equivalent to menopausal status"
+
+  - id: "pal-normepi-no-risk-status"
+    category: "testing"
+    severity: "limitation"
+    condition: "risk_status"
+
+    description: |
+      All NormEpi samples are from normal donors (N-* prefix).
+      No BRCA1 carriers in this substudy.
+
+    evidence:
+      - "Sample prefixes: N-1105, N-0280, N-0230.16, N-0408, N-1469, N-0123, N-0064, N-0093, N-0342, N-0372, N-0275"
+      - "B1-* samples (BRCA1 carriers) go to NormB1 substudy"
+
+    resolution: "Skip risk_status DA tests"
+    note: "Use pal_norm_b1 for BRCA1 vs normal comparisons"
+
+# =============================================================================
+# METADATA QUALITY NOTES
+# =============================================================================
+
+metadata_quality:
+  - id: "pal-surgical-menopause"
+    category: "metadata"
+    severity: "informational"
+
+    description: |
+      One post-menopausal donor (N-0275) had hysterectomy-induced menopause.
+      This may represent different biology than natural menopause.
+
+    affected_samples:
+      - specimen: "N-0275"
+        note: "hysterectomy"
+
+    resolution: "Document but include in analysis"
+    rationale: |
+      Excluding would reduce post-menopausal group from 3 to 2 donors.
+      Original study included this sample.
+
+  - id: "pal-specimen-id-format"
+    category: "metadata"
+    severity: "informational"
+
+    description: |
+      Specimen IDs use different formats across files.
+
+    formats:
+      table_ev1: "N-{number}"
+      r_script_samples: "N-{number}-epi"
+      cell_ids: "N_{number}_epi_{barcode}-1"
+
+    note: "Hyphens in specimen IDs become underscores in cell IDs"
+
+# =============================================================================
+# INTEGRATION NOTES
+# =============================================================================
+
+integration_notes:
+  - id: "pal-substudy-independence"
+    category: "integration"
+    severity: "critical"
+
+    description: |
+      Pal substudies (NormEpi, NormTotal, NormB1) are independent CCA-integrated
+      objects that CANNOT be merged.
+
+    reason: |
+      - Different sample sets
+      - Different integration parameters
+      - Different biological focus
+
+    impact: |
+      - Each substudy must be analyzed independently
+      - Cannot combine cells from different substudies
+      - Joint embedding treats each as separate study
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+
+open_questions:
+
+  cell_id_format_verification:
+    question: "Confirm cell ID format is {SamplesComb}_{Barcode}-1?"
+    context: |
+      Expected pattern from R script analysis: N_{number}_{type}_{barcode}-1
+      Example: N_1105_epi_AAACCTGAGACTAGGC-1
+
+      MUST verify through UNSUPERVISED analysis:
+      - Split by potential separators
+      - Identify barcode component (16bp ACGT)
+      - Verify sample prefix matches Table EV1
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+
+  unmatched_cells_investigation:
+    question: "Which specific cells are in the 14.3% unmatched?"
+    context: |
+      7,695 cells don't match iHBCA Pal subset.
+      Need to identify if these are:
+      - All from specific donors?
+      - Distributed across all samples?
+      - Related to specific QC criteria?
+    resolve_by: "Track 2 - cell ID comparison with iHBCA"
+    status: OPEN
+
+  metadata_columns_in_rds:
+    question: "What metadata columns exist in RDS @meta.data?"
+    context: |
+      Need to verify:
+      - Is menopausal_status present?
+      - Is donor/specimen ID present?
+      - What column naming convention is used?
+    resolve_by: "Track 2 - colnames(obj@meta.data)"
+    status: OPEN
+
+  cell_count_verification:
+    question: "Confirm total cell count is 53,716"
+    context: |
+      knowledge.md lists 53,716 cells for NormEpi.
+      Verify this matches ncol(SeuratObject_NormEpi.rds).
+    resolve_by: "Track 2 - ncol(obj)"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do cells distribute across 11 samples?"
+    context: |
+      11 samples: 8 pre-menopausal, 3 post-menopausal
+      Need per-sample cell counts to understand
+      menopausal group balance.
+    resolve_by: "Track 2 - table(obj$sample_column)"
+    status: OPEN
+
+  menopausal_group_balance:
+    question: "Is there sufficient cell count in post-menopausal group?"
+    context: |
+      Only 3 post-menopausal donors vs 8 pre-menopausal.
+      Cell counts per group will determine statistical power for DA.
+    resolve_by: "Track 2 - aggregate cells by menopausal_status"
+    status: OPEN

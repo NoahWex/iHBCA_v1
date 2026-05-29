@@ -1,0 +1,25 @@
+# =============================================================================
+# NEE STUDY CONFIGURATION
+# =============================================================================
+
+study_name: nee
+source_path: "${PROJECT_SPATIAL_HBCA}/project/ReferenceDatasets/iHBCA/component_studies/nee.rds"
+ihbca_dataset: "Nee"
+
+cell_id_format:
+  pattern: "{prefix}_{barcode}-1"
+  has_suffix: true
+  example: "UCI_Patients _Ctrl_Ind1_..._BARCODE-1"
+  notes: "WARNING: Has SPACES in prefix!"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues:
+  - NEE_BRCA_MISLABELING   # 8 of 11 Controls labeled as HR in iHBCA
+  - NEE_SPACES_IN_CELLID   # Spaces in cell ID prefix
+
+notes: |
+  Complex study - multiple edge cases to resolve.
+  230,100 cells total.
+  Testable conditions to be determined during discovery phase.

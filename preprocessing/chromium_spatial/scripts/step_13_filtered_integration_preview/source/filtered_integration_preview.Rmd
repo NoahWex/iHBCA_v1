@@ -1,0 +1,853 @@
+---
+title: "Step 13: Filtered Integration Preview - Post-Artifact Removal Assessment"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = TRUE,
+  warning = TRUE,
+  fig.width = 10,
+  fig.height = 8
+)
+
+# Load required libraries
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(ggplot2)
+  library(dplyr)
+  library(presto)
+  library(patchwork)
+  library(viridis)
+  library(yaml)
+})
+
+cat("Libraries loaded\n")
+```
+
+# Setup Project Root
+
+```{r project_root}
+# Use here package to navigate to preprocessing directory
+if (!require("here", quietly = TRUE)) {
+  stop("Install 'here' package: install.packages('here')")
+}
+
+# PROJECT_ROOT is set by the wrapper from CFG_PROJECT_ROOT. The here::here
+# call is a legacy fallback for interactive reruns outside the wrapper and
+# is not exercised by the canonical pipeline.
+PROJECT_ROOT <- here::here("project", "01_Preprocessing")
+
+cat("Project root:", PROJECT_ROOT, "\n")
+
+# Verify it's the right directory (should have config/ and outputs/)
+if (!dir.exists(file.path(PROJECT_ROOT, "config"))) {
+  stop("PROJECT_ROOT doesn't have config/ directory. Current: ", PROJECT_ROOT)
+}
+
+cat("Project root verified\n")
+```
+
+# Load Configuration Files
+
+```{r load_configs}
+# Load module configurations
+config_path <- file.path(PROJECT_ROOT, "config/module_configs.yaml")
+if (!file.exists(config_path)) {
+  stop("Config file not found: ", config_path)
+}
+config <- yaml::read_yaml(config_path)
+
+# Get Step 13 config (uses Step 12 resolutions)
+step_13_config <- config$modules$step_13_filtered_integration_preview
+
+if (is.null(step_13_config)) {
+  stop("step_13_filtered_integration_preview not found in config$modules")
+}
+
+# Get Step 12 config for clustering resolutions
+step_12_config <- config$modules$step_12_filtered_scvi_integration
+
+if (is.null(step_12_config)) {
+  stop("step_12_filtered_scvi_integration not found in config$modules")
+}
+
+cat("Loaded module_configs.yaml\n")
+
+# Load preprocessing manifest
+manifest_path <- file.path(PROJECT_ROOT, "config/preprocessing_manifest.yaml")
+if (!file.exists(manifest_path)) {
+  stop("Preprocessing manifest not found: ", manifest_path)
+}
+manifest <- yaml::read_yaml(manifest_path)
+
+cat("Loaded preprocessing_manifest.yaml\n")
+
+# Load raw data manifest (up one level from preprocessing)
+raw_manifest_path <- file.path(dirname(PROJECT_ROOT), "config/raw_data_manifest.yaml")
+if (!file.exists(raw_manifest_path)) {
+  stop("Raw data manifest not found: ", raw_manifest_path)
+}
+raw_manifest <- yaml::read_yaml(raw_manifest_path)
+
+cat("Loaded raw_data_manifest.yaml\n")
+```
+
+# Extract Step 12 Outputs
+
+```{r extract_step12}
+# CRITICAL DIFFERENCE FROM STEP 09:
+# Using Step 12 (filtered scVI) outputs instead of Step 08 (unfiltered)
+
+cat("\n============================================================================\n")
+cat("FILTERED INTEGRATION MODE - Step 12 Outputs\n")
+cat("============================================================================\n")
+cat("Filter: FOUR-WAY (Step 01 + Step 02 + Step 03 + Step 10b)\n")
+cat("============================================================================\n\n")
+
+# Step 12 output base
+STEP_12_BASE <- file.path(PROJECT_ROOT, "outputs/12_FilteredScviIntegration")
+
+# Validate Step 12 outputs exist
+latent_path <- file.path(STEP_12_BASE, "embeddings/latent_50d.csv")
+umap_path <- file.path(STEP_12_BASE, "embeddings/umap_2d.csv")
+metadata_path <- file.path(STEP_12_BASE, "metadata/cell_metadata_integrated.csv")
+
+# Validate files exist
+if (!file.exists(latent_path)) {
+  stop("Latent embeddings not found: ", latent_path)
+}
+if (!file.exists(umap_path)) {
+  stop("UMAP coordinates not found: ", umap_path)
+}
+if (!file.exists(metadata_path)) {
+  stop("Cell metadata not found: ", metadata_path)
+}
+
+cat("Step 12 file paths validated\n")
+
+# Get default resolution from config
+default_resolution <- step_13_config$algorithm_params$default_resolution
+cat("Default resolution:", default_resolution, "\n")
+```
+
+# Load Step 12 Embeddings
+
+```{r load_embeddings}
+cat("\n=== Loading Step 12 (Filtered) Embeddings ===\n\n")
+
+# Load latent embeddings
+latent_embedding <- read.csv(latent_path, row.names = 1, check.names = FALSE)
+cat("  Latent:", nrow(latent_embedding), "cells x", ncol(latent_embedding), "dims\n")
+
+# Load UMAP coordinates
+umap_embedding <- read.csv(umap_path, row.names = 1, check.names = FALSE)
+cat("  UMAP:", nrow(umap_embedding), "cells x", ncol(umap_embedding), "dims\n")
+
+# Validate alignment
+if (!identical(rownames(latent_embedding), rownames(umap_embedding))) {
+  stop("Cell IDs don't match between latent and UMAP!")
+}
+
+cat("\nEmbeddings loaded\n")
+```
+
+# Define FOUR-WAY Passing Cells
+
+```{r qc_cells}
+# All cells in Step 12 embeddings already passed FOUR-WAY QC filter
+# (Step 01 UMI + Step 02 MAD + Step 03 Doublet + Step 10b Manifold)
+passing_cells <- rownames(latent_embedding)
+
+cat("FOUR-WAY passing cells:", length(passing_cells), "\n")
+cat("Filter components:\n")
+cat("  - step_01_umi_pass\n")
+cat("  - step_02_mad_pass\n")
+cat("  - step_03_doublet_pass\n")
+cat("  - step_10b_manifold_pass (artifact removal)\n")
+```
+
+# Load Step 12 Integrated Metadata
+
+```{r load_step12_metadata}
+cat("\n=== Loading Step 12 Cell Metadata ===\n\n")
+
+# Load Step 12 metadata (contains sample_id for each cell)
+step_12_cell_metadata <- read.csv(metadata_path, stringsAsFactors = FALSE)
+step_12_cell_metadata$cell_id <- step_12_cell_metadata$X
+
+cat("  Loaded Step 12 metadata:", nrow(step_12_cell_metadata), "cells\n")
+cat("  Columns:", paste(head(colnames(step_12_cell_metadata), 10), collapse = ", "), "...\n")
+
+# Extract sample list
+samples_needed <- unique(step_12_cell_metadata$sample_id)
+cat("\n  Samples detected:", length(samples_needed), "\n")
+
+cat("\nStep 12 metadata loaded\n")
+```
+
+# Extract Cluster Column Names
+
+```{r define_clustering_columns}
+cat("\n=== Extracting Clustering Column Names ===\n\n")
+
+# Extract clustering columns from Step 12 metadata
+clustering_columns <- grep("^leiden_scvi_", colnames(step_12_cell_metadata), value = TRUE)
+
+cat("  Found", length(clustering_columns), "clustering columns:\n")
+for (col in clustering_columns) {
+  cat("    -", col, "\n")
+}
+
+# Define default cluster column using leiden_scvi_* format
+default_cluster_col <- sprintf("leiden_scvi_%.1f", default_resolution)
+
+# Verify it exists
+if (!(default_cluster_col %in% clustering_columns)) {
+  stop("Default cluster column '", default_cluster_col, "' not found!\n",
+       "  Available: ", paste(clustering_columns, collapse = ", "))
+}
+
+cat("\nDefault cluster column:", default_cluster_col, "\n")
+```
+
+# Load Step 04 Label Transfer
+
+```{r load_label_metadata}
+cat("\n=== Loading Step 04 Cell Type Labels ===\n\n")
+
+# Load label metadata per sample
+label_list <- list()
+
+for (sample_id in samples_needed) {
+  label_file <- file.path(PROJECT_ROOT, "outputs/04_LabelTransfer/cell_metadata",
+                          paste0(sample_id, "_labels.csv"))
+
+  if (!file.exists(label_file)) {
+    warning("Label file not found for ", sample_id, ": ", label_file)
+    next
+  }
+
+  # Load label data
+  label_data <- read.csv(label_file, stringsAsFactors = FALSE)
+
+  # First column is ALREADY PREFIXED cell_id
+  cell_id_col <- colnames(label_data)[1]
+  label_data$cell_id <- label_data[[cell_id_col]]
+
+  # Select only HBCATransferredLabels.Kumar_2023 (reconciled labels)
+  label_list[[sample_id]] <- label_data %>%
+    select(cell_id, HBCATransferredLabels.Kumar_2023)
+
+  cat("  Loaded", nrow(label_data), "cells from", sample_id, "\n")
+}
+
+# Combine all label data
+label_metadata <- bind_rows(label_list)
+cat("\nTotal label metadata:", nrow(label_metadata), "cells\n")
+```
+
+# Load Step 03 Doublet Scores
+
+```{r load_step03_doublets}
+cat("\n=== Loading Step 03 Doublet Scores ===\n\n")
+
+# Load doublet scores per sample
+doublet_list <- list()
+
+for (sample_id in samples_needed) {
+  doublet_file <- file.path(PROJECT_ROOT, "outputs/03_DoubletDetection/metadata",
+                            paste0(sample_id, ".csv"))
+
+  if (!file.exists(doublet_file)) {
+    warning("Doublet file not found for ", sample_id, ": ", doublet_file)
+    next
+  }
+
+  # Load doublet data
+  doublet_data <- read.csv(doublet_file, stringsAsFactors = FALSE)
+
+  # First column is cell_barcode (already prefixed)
+  cell_id_col <- colnames(doublet_data)[1]
+  doublet_data$cell_id <- doublet_data[[cell_id_col]]
+
+  # Select only doublet score
+  doublet_list[[sample_id]] <- doublet_data %>%
+    select(cell_id, scDblFinder_score, doublet_filter_pass)
+
+  cat("  Loaded", nrow(doublet_data), "cells from", sample_id, "\n")
+}
+
+# Combine all doublet data
+step_03_doublets <- bind_rows(doublet_list)
+cat("\nTotal doublet scores:", nrow(step_03_doublets), "cells\n")
+```
+
+# Map Anatomical Positions
+
+```{r map_anatomical_positions}
+cat("\n=== Mapping Anatomical Positions ===\n\n")
+
+# Build position mapping from raw_data_manifest
+position_map <- list()
+
+for (patient_name in names(raw_manifest$patients)) {
+  patient <- raw_manifest$patients[[patient_name]]
+
+  for (pos_name in names(patient$positions)) {
+    pos <- patient$positions[[pos_name]]
+    anatomical <- pos$anatomical
+
+    if (is.null(anatomical)) {
+      warning("No anatomical data for ", patient_name, "/", pos_name)
+      next
+    }
+
+    midline <- anatomical$midline_position
+
+    vertical <- if (length(anatomical$vertical_position) > 1) {
+      "Upper+Lower"
+    } else {
+      anatomical$vertical_position
+    }
+
+    horizontal <- if (length(anatomical$horizontal_position) > 1) {
+      "Inner+Outer"
+    } else {
+      anatomical$horizontal_position
+    }
+
+    sample_id <- paste0(patient_name, "_", pos_name)
+    position_map[[sample_id]] <- list(
+      midline_position = midline,
+      vertical_position = vertical,
+      horizontal_position = horizontal
+    )
+  }
+}
+
+# Convert to dataframe for merging
+position_df <- bind_rows(lapply(names(position_map), function(sid) {
+  data.frame(
+    sample_id = sid,
+    midline_position = position_map[[sid]]$midline_position,
+    vertical_position = position_map[[sid]]$vertical_position,
+    horizontal_position = position_map[[sid]]$horizontal_position,
+    stringsAsFactors = FALSE
+  )
+}))
+
+cat("Mapped", nrow(position_df), "positions\n")
+```
+
+# Assemble Unified Metadata
+
+```{r assemble_unified_metadata}
+cat("\n=== Assembling Unified Metadata ===\n\n")
+
+# Start with Step 12 integrated metadata (already loaded)
+unified_metadata <- step_12_cell_metadata
+
+cat("Starting with Step 12 metadata:", nrow(unified_metadata), "cells\n")
+
+# Merge Step 04 cell type labels
+unified_metadata <- unified_metadata %>%
+  left_join(label_metadata, by = "cell_id")
+
+cat("After label merge:", nrow(unified_metadata), "cells\n")
+cat("  Cells with cell type labels:", sum(!is.na(unified_metadata$HBCATransferredLabels.Kumar_2023)), "\n")
+
+# Merge Step 03 doublet scores
+unified_metadata <- unified_metadata %>%
+  left_join(step_03_doublets, by = "cell_id")
+
+cat("After doublet score merge:", nrow(unified_metadata), "cells\n")
+
+# Merge anatomical position data
+unified_metadata <- unified_metadata %>%
+  left_join(position_df, by = "sample_id")
+
+cat("After position merge:", nrow(unified_metadata), "cells\n")
+
+# Save unified metadata
+metadata_output <- file.path(PROJECT_ROOT, "outputs/13_FilteredIntegrationPreview/metadata")
+dir.create(metadata_output, recursive = TRUE, showWarnings = FALSE)
+write.csv(unified_metadata,
+          file.path(metadata_output, "unified_metadata.csv"),
+          row.names = FALSE)
+
+cat("\nUnified metadata saved\n")
+```
+
+# Load Raw Counts Per Sample
+
+```{r load_counts}
+cat("\n=== Loading Raw Counts Per Sample ===\n\n")
+
+# Initialize
+seurat_list <- list()
+manifest_metadata <- data.frame(
+  sample_id = character(),
+  patient_id = character(),
+  position = character(),
+  stringsAsFactors = FALSE
+)
+
+# Define patients to process
+patients <- c("Pat1", "Pat2", "UCI604", "UCI220228")
+
+for (patient_id in patients) {
+  patient_data <- raw_manifest$patients[[patient_id]]
+
+  if (is.null(patient_data)) {
+    warning("Patient ", patient_id, " not found in raw manifest")
+    next
+  }
+
+  positions <- names(patient_data$positions)
+
+  for (pos_name in positions) {
+    pos_data <- patient_data$positions[[pos_name]]
+
+    if (is.null(pos_data$chromium)) {
+      next
+    }
+
+    sample_id <- pos_data$chromium$sample_id
+    h5_path <- pos_data$chromium$filtered_data_path
+
+    if (is.null(sample_id) || is.null(h5_path)) {
+      warning("Missing sample_id or h5_path for ", patient_id, "/", pos_name)
+      next
+    }
+
+    if (!file.exists(h5_path)) {
+      warning("H5 file not found: ", h5_path)
+      next
+    }
+
+    # Load raw counts
+    counts_raw <- Seurat::Read10X_h5(h5_path)
+
+    # Add sample_id prefix to match Step 12 format
+    colnames(counts_raw) <- paste0(sample_id, "_", colnames(counts_raw))
+
+    # Filter to FOUR-WAY passing cells
+    sample_passing_cells <- passing_cells[grepl(paste0("^", sample_id, "_"), passing_cells)]
+    cells_to_keep <- intersect(sample_passing_cells, colnames(counts_raw))
+
+    if (length(cells_to_keep) == 0) {
+      warning("No passing cells found for ", sample_id)
+      next
+    }
+
+    # Subset counts
+    counts_filtered <- counts_raw[, cells_to_keep]
+
+    # Create Seurat object
+    seurat_obj <- CreateSeuratObject(
+      counts = counts_filtered,
+      project = sample_id,
+      min.cells = 0,
+      min.features = 0
+    )
+
+    seurat_list[[sample_id]] <- seurat_obj
+
+    manifest_metadata <- rbind(manifest_metadata, data.frame(
+      sample_id = sample_id,
+      patient_id = patient_id,
+      position = pos_name,
+      stringsAsFactors = FALSE
+    ))
+  }
+}
+
+cat("\nLoaded", length(seurat_list), "samples\n")
+```
+
+# Merge Seurat Objects
+
+```{r merge_objects}
+cat("\n=== Merging Seurat Objects ===\n\n")
+
+if (length(seurat_list) == 0) {
+  stop("No Seurat objects to merge!")
+}
+
+first_obj <- seurat_list[[1]]
+
+if (length(seurat_list) > 1) {
+  remaining_objs <- seurat_list[2:length(seurat_list)]
+
+  seurat_merged <- merge(
+    x = first_obj,
+    y = remaining_objs,
+    add.cell.ids = NULL,
+    project = "filtered_integrated"
+  )
+} else {
+  seurat_merged <- first_obj
+}
+
+cat("Merged:", ncol(seurat_merged), "cells x", nrow(seurat_merged), "genes\n")
+```
+
+# Add Patient/Position Metadata
+
+```{r add_metadata}
+cat("\n=== Adding Patient/Position Metadata ===\n\n")
+
+extract_sample_id <- function(cell_names) {
+  gsub("_[ACGT]+-[0-9]+$", "", cell_names)
+}
+
+cell_sample_ids <- extract_sample_id(colnames(seurat_merged))
+
+seurat_merged$patient_id <- manifest_metadata$patient_id[
+  match(cell_sample_ids, manifest_metadata$sample_id)
+]
+
+seurat_merged$position <- manifest_metadata$position[
+  match(cell_sample_ids, manifest_metadata$sample_id)
+]
+
+cat("Metadata added\n")
+```
+
+# Add Unified Metadata to Seurat Object
+
+```{r add_unified_metadata}
+cat("\n=== Adding Unified Metadata to Seurat Object ===\n\n")
+
+seurat_cells <- colnames(seurat_merged)
+metadata_cells <- unified_metadata$cell_id
+
+matching_cells <- intersect(seurat_cells, metadata_cells)
+cat("  Matching cells:", length(matching_cells), "/", length(seurat_cells), "\n")
+
+cols_to_add <- setdiff(colnames(unified_metadata), c("cell_id", "X", "patient_id", "position", "position_id"))
+
+for (col in cols_to_add) {
+  seurat_merged@meta.data[[col]] <- unified_metadata[[col]][
+    match(seurat_cells, unified_metadata$cell_id)
+  ]
+}
+
+cat("\nAdded", length(cols_to_add), "metadata columns to Seurat object\n")
+```
+
+# Add Step 12 Embeddings
+
+```{r add_embeddings}
+cat("\n=== Adding Step 12 (Filtered) Embeddings ===\n\n")
+
+merged_cells <- colnames(seurat_merged)
+latent_subset <- latent_embedding[merged_cells, , drop = FALSE]
+umap_subset <- umap_embedding[merged_cells, , drop = FALSE]
+
+seurat_merged[["scvi"]] <- CreateDimReducObject(
+  embeddings = as.matrix(latent_subset),
+  key = "scvi_",
+  assay = "RNA"
+)
+
+seurat_merged[["umap"]] <- CreateDimReducObject(
+  embeddings = as.matrix(umap_subset),
+  key = "UMAP_",
+  assay = "RNA"
+)
+
+cat("Added scvi (", ncol(latent_subset), "D) and umap (2D) reductions\n", sep = "")
+```
+
+# Verify Cluster Assignments
+
+```{r verify_clusters}
+cat("\n=== Verifying Cluster Assignments ===\n\n")
+
+missing_cols <- setdiff(clustering_columns, colnames(seurat_merged@meta.data))
+if (length(missing_cols) > 0) {
+  stop("Missing clustering columns in Seurat metadata: ", paste(missing_cols, collapse = ", "))
+}
+
+cat("All", length(clustering_columns), "clustering columns present:\n")
+for (col in clustering_columns) {
+  n_clusters <- length(unique(seurat_merged@meta.data[[col]]))
+  cat("  -", col, ":", n_clusters, "clusters\n")
+}
+
+cat("\nDefault cluster column verified:", default_cluster_col, "\n")
+```
+
+# Join Layers (CRITICAL for Seurat v5)
+
+```{r join_layers}
+cat("\n=== Normalizing and Joining Layers ===\n\n")
+
+gc()
+
+cat("Normalizing data...\n")
+seurat_merged <- NormalizeData(seurat_merged, verbose = FALSE)
+cat("  Normalization complete\n\n")
+
+gc()
+
+cat("Joining layers...\n")
+seurat_merged <- JoinLayers(seurat_merged)
+cat("  JoinLayers complete\n\n")
+
+gc()
+
+cat("\nLayers joined successfully\n")
+```
+
+# Quick Visualization Test
+
+```{r quick_viz}
+cat("\n=== Quick Visualization Test ===\n\n")
+
+# UMAP by patient
+p1 <- DimPlot(
+  seurat_merged,
+  reduction = "umap",
+  group.by = "patient_id",
+  pt.size = 0.1,
+  raster = FALSE
+) + ggtitle("UMAP by Patient (FOUR-WAY Filtered)")
+
+print(p1)
+
+# UMAP by cluster (default resolution)
+p2 <- DimPlot(
+  seurat_merged,
+  reduction = "umap",
+  group.by = default_cluster_col,
+  label = TRUE,
+  pt.size = 0.1,
+  raster = FALSE
+) +
+  ggtitle(paste("UMAP by", default_cluster_col, "(Filtered)")) +
+  NoLegend()
+
+print(p2)
+
+# UMAP by cell type labels
+if ("HBCATransferredLabels.Kumar_2023" %in% colnames(seurat_merged@meta.data)) {
+  p3 <- DimPlot(
+    seurat_merged,
+    reduction = "umap",
+    group.by = "HBCATransferredLabels.Kumar_2023",
+    label = TRUE,
+    repel = TRUE,
+    pt.size = 0.1,
+    alpha = 0.3,
+    raster = FALSE
+  ) +
+    ggtitle("UMAP by Cell Type (HBCA Kumar 2023) - Filtered") +
+    theme(legend.position = "right")
+
+  print(p3)
+}
+
+cat("\nVisualizations created successfully\n")
+```
+
+# QC Metric Overlays
+
+```{r qc_overlays}
+cat("\n=== QC Metric Overlays ===\n\n")
+
+q95_counts <- quantile(seurat_merged$nCount_RNA, 0.95, na.rm = TRUE)
+q5_features <- quantile(seurat_merged$nFeature_RNA, 0.05, na.rm = TRUE)
+q95_features <- quantile(seurat_merged$nFeature_RNA, 0.95, na.rm = TRUE)
+
+# FeaturePlot: nCount_RNA
+p_counts <- FeaturePlot(
+  seurat_merged,
+  features = "nCount_RNA",
+  max.cutoff = q95_counts,
+  pt.size = 0.2,
+  alpha = 0.3,
+  raster = FALSE
+) +
+  scale_color_viridis(option = "viridis", direction = -1) +
+  ggtitle("UMAP: UMI Counts per Cell (Filtered)")
+
+print(p_counts)
+
+# FeaturePlot: nFeature_RNA
+p_features <- FeaturePlot(
+  seurat_merged,
+  features = "nFeature_RNA",
+  max.cutoff = q95_features,
+  min.cutoff = q5_features,
+  order = TRUE,
+  raster = FALSE
+) +
+  scale_color_viridis(option = "viridis") +
+  ggtitle("UMAP: Genes Detected per Cell (Filtered)")
+
+print(p_features)
+
+cat("\nQC metric overlays complete\n")
+```
+
+# Multi-Resolution Marker Analysis
+
+```{r multi_res_markers, fig.width=14, fig.height=10}
+cat("\n=== Multi-Resolution Marker Analysis ===\n\n")
+
+cat("Running marker analysis across", length(clustering_columns), "resolutions...\n\n")
+
+gc()
+
+all_resolution_markers <- list()
+
+for (i in seq_along(clustering_columns)) {
+  res_col <- clustering_columns[i]
+
+  cat("---\n")
+  cat("Resolution", i, "of", length(clustering_columns), ":", res_col, "\n")
+
+  Idents(seurat_merged) <- seurat_merged@meta.data[[res_col]]
+
+  n_clusters <- length(unique(Idents(seurat_merged)))
+  cat("  Clusters:", n_clusters, "\n")
+
+  cat("  Running presto::wilcoxauc()...\n")
+  markers <- presto::wilcoxauc(seurat_merged, assay = "data")
+
+  cat("  Found", nrow(markers), "marker tests\n")
+
+  sig_markers <- markers %>%
+    filter(padj < 0.05, logFC > 0) %>%
+    arrange(group, desc(logFC))
+
+  cat("  Significant markers (padj < 0.05, logFC > 0):", nrow(sig_markers), "\n")
+
+  top_markers <- sig_markers %>%
+    group_by(group) %>%
+    slice_max(order_by = logFC, n = 5) %>%
+    ungroup()
+
+  all_resolution_markers[[res_col]] <- markers
+
+  gc()
+
+  # Generate dotplot
+  if (nrow(top_markers) > 0) {
+    tryCatch({
+      p_dotplot <- DotPlot(
+        seurat_merged,
+        features = unique(top_markers$feature),
+        group.by = res_col
+      ) +
+        coord_flip() +
+        scale_color_viridis(option = "viridis") +
+        ggtitle(paste("Top Markers -", res_col, "(Filtered)")) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+              axis.text.y = element_text(size = 6))
+
+      print(p_dotplot)
+    }, error = function(e) {
+      cat("  Dotplot generation failed:", e$message, "\n")
+    })
+  }
+
+  cat("\n")
+}
+
+cat("Multi-resolution marker analysis complete\n")
+```
+
+# Save Per-Resolution Markers
+
+```{r save_markers}
+cat("\n=== Saving Per-Resolution Markers ===\n\n")
+
+if (length(all_resolution_markers) == 0) {
+  cat("No markers to save - skipping\n")
+} else {
+  output_dir <- file.path(PROJECT_ROOT, "outputs/13_FilteredIntegrationPreview/markers_by_resolution")
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+  for (res_col in names(all_resolution_markers)) {
+    res_value <- gsub("leiden_scvi_([0-9.]+)$", "\\1", res_col)
+    filename <- paste0("markers_res_", res_value, ".csv")
+    filepath <- file.path(output_dir, filename)
+
+    tryCatch({
+      write.csv(all_resolution_markers[[res_col]], file = filepath, row.names = FALSE)
+      cat("  ", filename, "-", nrow(all_resolution_markers[[res_col]]), "rows\n")
+    }, error = function(e) {
+      cat("  Failed to save", filename, ":", e$message, "\n")
+    })
+  }
+
+  # Save combined file
+  combined_markers <- bind_rows(
+    lapply(names(all_resolution_markers), function(res_col) {
+      res_value <- gsub(".*res_([0-9.]+)$", "\\1", res_col)
+      all_resolution_markers[[res_col]] %>%
+        mutate(resolution = res_value, .before = 1)
+    })
+  )
+
+  combined_filepath <- file.path(output_dir, "all_markers_all_resolutions.csv")
+  write.csv(combined_markers, file = combined_filepath, row.names = FALSE)
+  cat("  all_markers_all_resolutions.csv -", nrow(combined_markers), "rows\n")
+
+  cat("\nMarker files saved successfully\n")
+}
+```
+
+# Save Seurat Object
+
+```{r save_seurat}
+cat("\n=== Saving Seurat Object ===\n\n")
+
+seurat_output <- file.path(PROJECT_ROOT, "outputs/13_FilteredIntegrationPreview/seurat_objects")
+dir.create(seurat_output, recursive = TRUE, showWarnings = FALSE)
+
+seurat_path <- file.path(seurat_output, "integrated_seurat.rds")
+saveRDS(seurat_merged, file = seurat_path)
+
+cat("Seurat object saved\n")
+cat("  Path:", seurat_path, "\n")
+cat("  Size:", format(file.size(seurat_path) / 1024^3, digits = 2), "GB\n")
+cat("  Cells:", ncol(seurat_merged), "\n")
+cat("  Genes:", nrow(seurat_merged), "\n")
+```
+
+# Summary
+
+```{r summary}
+cat("\n=== FILTERED INTEGRATION PREVIEW SUMMARY ===\n\n")
+
+cat("Filter Applied: FOUR-WAY\n")
+cat("  - step_01_umi_pass\n")
+cat("  - step_02_mad_pass\n")
+cat("  - step_03_doublet_pass\n")
+cat("  - step_10b_manifold_pass (artifact removal)\n\n")
+
+cat("Seurat Object:\n")
+cat("  Cells:", ncol(seurat_merged), "\n")
+cat("  Genes:", nrow(seurat_merged), "\n")
+cat("  Patients:", length(unique(seurat_merged$patient_id)), "\n")
+cat("  Samples:", length(unique(seurat_merged$orig.ident)), "\n")
+
+cat("\nDimensional Reductions:\n")
+print(names(seurat_merged@reductions))
+
+cat("\nCluster Columns:\n")
+cat(" ", paste(clustering_columns, collapse = ", "), "\n")
+
+cat("\nAll chunks executed successfully!\n")
+cat("\nStep 13 improvements over Step 09:\n")
+cat("  - Uses FOUR-WAY filtered cells (artifact-free)\n")
+cat("  - Loads from Step 12 filtered scVI integration\n")
+cat("  - Reduced cell count after Step 10b artifact removal\n")
+```

@@ -1,0 +1,75 @@
+# Canonical markers for Immune L1.5 dotplot — nuclear layer.
+# Derived from annotation_cascade.yaml evidence (2026-04-19).
+# Gene order = display order (most diagnostic first).
+# FLEX-only genes (IRF7, NAMPT, TREM1, CLEC7A, IRF8, ITK, BLK, JCHAIN, HDC)
+# are excluded — not present in the Xenium 280-gene nuclear panel.
+
+Macrophage:
+  - MRC1
+  - CD163
+  - CD14
+  - C1QC
+
+cDC2:
+  - FCER1A
+  - ITGAX
+  - LYZ
+  - FGL2
+
+cDC1:
+  - CLEC9A
+  - HAVCR2
+  - LYZ
+  - FGL2
+
+pDC:
+  - LILRA4
+  - IL3RA
+  - SPIB
+
+Mast cell:
+  - CPA3
+  - TPSAB1
+  - KIT
+  - CTSG
+
+Neutrophil:
+  - S100A8
+  - ITGAX
+  - MNDA
+
+CD4 T cell:
+  - IL7R
+  - TRAC
+  - CD3E
+  - CXCR4
+
+CD4 Treg:
+  - FOXP3
+  - CTLA4
+  - TIGIT
+  - TRAC
+  - CD3E
+
+CD8 T cell:
+  - CD8A
+  - CCL5
+  - GZMA
+  - CD3E
+
+T-NK:
+  - KLRD1
+  - KLRF1
+  - NKG7
+  - PRF1
+  - GZMA
+
+B cell:
+  - MS4A1
+  - BANK1
+  - CD79A
+
+Plasma cell:
+  - MZB1
+  - TENT5C
+  - SLAMF7

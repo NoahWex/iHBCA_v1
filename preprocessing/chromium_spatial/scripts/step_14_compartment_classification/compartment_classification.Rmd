@@ -1,0 +1,1036 @@
+---
+title: "Step 14: Compartment Classification"
+author: "Spatial HBCA Pipeline"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+params:
+  project_root: !r Sys.getenv("PROJECT_ROOT", here::here())
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 8)
+
+library(here)
+library(yaml)
+library(Seurat)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(patchwork)
+library(presto)
+library(DT)
+
+# -------- Canonical path resolution --------
+# The canonical preprocessing tree places every step's outputs under
+# CFG_PREPROCESSING_STEP_14 (set by run/_common.sh → paths.yaml). When the
+# wrapper invokes this notebook it exports CFG_PREPROCESSING_STEP_14 so we
+# read it directly here instead of reconstructing a dev-tree path from
+# module_configs.yaml's io_config.output_base. Fallback to the legacy path
+# is retained for interactive reruns against the Spatial_HBCA dev tree.
+PROJECT_ROOT <- params$project_root
+
+OUTPUT_BASE <- Sys.getenv("CFG_PREPROCESSING_STEP_14", "")
+if (!nzchar(OUTPUT_BASE)) {
+  OUTPUT_BASE <- file.path(PROJECT_ROOT, "project/01_Preprocessing/outputs/14_CompartmentClassification")
+}
+
+# Locate module_configs.yaml: canonical config/module_configs.yaml first,
+# then the legacy dev-tree path.
+CANONICAL_CONFIG <- file.path(PROJECT_ROOT, "config", "module_configs.yaml")
+LEGACY_CONFIG    <- file.path(PROJECT_ROOT, "project/01_Preprocessing/config/module_configs.yaml")
+MODULE_CONFIG_PATH <- if (file.exists(CANONICAL_CONFIG)) CANONICAL_CONFIG else LEGACY_CONFIG
+
+module_configs <- read_yaml(MODULE_CONFIG_PATH)
+step_config <- module_configs$modules$step_14_compartment_classification
+
+# Input sources (filtered L2 integration from step 12 preferred, step 08 fallback)
+CANONICAL_STEP_12 <- Sys.getenv("CFG_PREPROCESSING_STEP_12", "")
+CANONICAL_STEP_08 <- Sys.getenv("CFG_PREPROCESSING_STEP_08", "")
+
+if (nzchar(CANONICAL_STEP_12) && file.exists(file.path(CANONICAL_STEP_12, "seurat_objects/integrated_seurat.rds"))) {
+  INPUT_PRIMARY <- file.path(CANONICAL_STEP_12, "seurat_objects/integrated_seurat.rds")
+} else {
+  INPUT_PRIMARY <- file.path(PROJECT_ROOT, "project/01_Preprocessing", step_config$io_config$input_sources$primary)
+}
+
+if (nzchar(CANONICAL_STEP_08) && file.exists(file.path(CANONICAL_STEP_08, "seurat_objects/integrated_seurat.rds"))) {
+  INPUT_FALLBACK <- file.path(CANONICAL_STEP_08, "seurat_objects/integrated_seurat.rds")
+} else {
+  INPUT_FALLBACK <- file.path(PROJECT_ROOT, "project/01_Preprocessing", step_config$io_config$input_sources$fallback)
+}
+
+# Algorithm parameters from config
+ALGO_PARAMS <- step_config$algorithm_params
+
+# Create output directories
+dir.create(file.path(OUTPUT_BASE, "metadata"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "visualizations"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(OUTPUT_BASE, "reports"), recursive = TRUE, showWarnings = FALSE)
+
+theme_set(theme_bw(base_size = 12))
+
+cat("=== CONFIGURATION LOADED ===\n")
+cat("Output base:", OUTPUT_BASE, "\n")
+cat("Epidermal threshold:", ALGO_PARAMS$epidermal_threshold_pct, "%\n")
+
+# Clustering resolution to use (configurable)
+DEFAULT_RESOLUTION <- ALGO_PARAMS$default_cluster_resolution %||% 1.0
+cat("Default clustering resolution:", DEFAULT_RESOLUTION, "\n")
+```
+
+# Compartment Classification
+
+Objective: Assign cells to tissue compartments (Epithelial, Stromal, Immune,
+Endothelial, Epidermal) and flag samples with epidermal contamination. The
+classifier is a two-layer rule — marker-panel scoring per cell plus a
+Leiden majority vote at resolution 1.0. Step 04 HBCA labels (Kumar 2023)
+are read for validation overlay only and do not drive the assignment.
+
+---
+
+## 1. Data Loading & Schema Preview
+
+```{r load-data}
+if (file.exists(INPUT_PRIMARY)) {
+  seurat_obj <- readRDS(INPUT_PRIMARY)
+  data_source <- "Step 12 (filtered integration)"
+} else if (file.exists(INPUT_FALLBACK)) {
+  seurat_obj <- readRDS(INPUT_FALLBACK)
+  data_source <- "Step 08 (initial integration fallback)"
+  cat("NOTE: Using step 08 fallback. Re-run with step 12 for canonical results.\n\n")
+} else {
+  stop("No integrated Seurat object found.\n  Primary: ", INPUT_PRIMARY, "\n  Fallback: ", INPUT_FALLBACK)
+}
+
+cat("Data source:", data_source, "\n")
+cat("Loaded Seurat object:", ncol(seurat_obj), "cells\n")
+```
+
+```{r schema-preview}
+cat("=== METADATA SCHEMA ===\n")
+cat("Available columns:\n")
+print(colnames(seurat_obj@meta.data))
+
+clustering_columns <- grep("^leiden_scvi_", colnames(seurat_obj@meta.data), value = TRUE)
+if (length(clustering_columns) == 0) {
+  if ("seurat_clusters" %in% colnames(seurat_obj@meta.data)) {
+    clustering_columns <- "seurat_clusters"
+  }
+}
+
+cat("\n=== CLUSTERING COLUMNS ===\n")
+cat("Found", length(clustering_columns), "clustering columns:\n")
+for (col in clustering_columns) {
+  n_clusters <- length(unique(seurat_obj@meta.data[[col]]))
+  cat("  -", col, ":", n_clusters, "clusters\n")
+}
+
+DEFAULT_CLUSTER_COL <- sprintf("leiden_scvi_%.1f", DEFAULT_RESOLUTION)
+if (!(DEFAULT_CLUSTER_COL %in% colnames(seurat_obj@meta.data))) {
+  DEFAULT_CLUSTER_COL <- clustering_columns[1]
+  cat("\nDefault resolution column not found, using:", DEFAULT_CLUSTER_COL, "\n")
+} else {
+  cat("\nUsing cluster column:", DEFAULT_CLUSTER_COL, "\n")
+}
+
+HIGH_RES_CLUSTER_COL <- "leiden_scvi_5.0"
+if (HIGH_RES_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+  n_high_res <- length(unique(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]]))
+  cat("High-res cluster column:", HIGH_RES_CLUSTER_COL, "(", n_high_res, "clusters)\n")
+} else {
+  cat("High-res cluster column", HIGH_RES_CLUSTER_COL, "not found\n")
+}
+
+if ("HBCATransferredLabels.Kumar_2023" %in% colnames(seurat_obj@meta.data)) {
+  cat("\n=== HBCA LABEL VOCABULARY ===\n")
+  label_counts <- table(seurat_obj$HBCATransferredLabels.Kumar_2023)
+  print(sort(label_counts, decreasing = TRUE))
+} else {
+  label_cols <- grep("HBCA|Transfer|Label", colnames(seurat_obj@meta.data), value = TRUE, ignore.case = TRUE)
+  cat("HBCA label column not found. Available candidates:\n")
+  print(label_cols)
+}
+
+cat("\n=== SAMPLE STRUCTURE ===\n")
+if ("sample_id" %in% colnames(seurat_obj@meta.data)) {
+  cat("Samples:\n")
+  print(table(seurat_obj$sample_id))
+}
+if ("patient_id" %in% colnames(seurat_obj@meta.data)) {
+  cat("\nPatients:\n")
+  print(table(seurat_obj$patient_id))
+}
+```
+
+---
+
+## 2. Explore Clustering Structure
+
+```{r cluster-overview}
+if (DEFAULT_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+  cluster_counts <- table(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]])
+  cluster_df <- data.frame(
+    cluster = names(cluster_counts),
+    cell_count = as.numeric(cluster_counts),
+    proportion = round(as.numeric(cluster_counts) / sum(cluster_counts) * 100, 2)
+  )
+
+  DT::datatable(cluster_df, caption = paste("Cluster Summary -", DEFAULT_CLUSTER_COL))
+
+  ggplot(cluster_df, aes(x = reorder(cluster, cell_count), y = cell_count)) +
+    geom_col(fill = "steelblue", alpha = 0.7) +
+    coord_flip() +
+    labs(title = paste("Cells per Cluster (", DEFAULT_CLUSTER_COL, ")"),
+         x = "Cluster", y = "Cell Count") +
+    theme_minimal()
+}
+```
+
+```{r umap-overview}
+if ("umap" %in% names(seurat_obj@reductions)) {
+  p_clusters <- DimPlot(seurat_obj, group.by = DEFAULT_CLUSTER_COL,
+                        label = TRUE, label.size = 3, repel = TRUE,
+                        pt.size = 0.3, alpha = 0.3, raster = FALSE) +
+    ggtitle(paste("Clusters:", DEFAULT_CLUSTER_COL)) + NoLegend()
+  p_clusters_high_res <- DimPlot(seurat_obj, group.by = HIGH_RES_CLUSTER_COL,
+                                 label = TRUE, label.size = 3, repel = TRUE,
+                                 pt.size = 0.3, alpha = 0.3, raster = FALSE) +
+    ggtitle(paste("Clusters:", HIGH_RES_CLUSTER_COL)) + NoLegend()
+
+  label_col <- if ("HBCATransferredLabels.Kumar_2023" %in% colnames(seurat_obj@meta.data)) {
+    "HBCATransferredLabels.Kumar_2023"
+  } else if ("HBCATransferredLabel" %in% colnames(seurat_obj@meta.data)) {
+    "HBCATransferredLabel"
+  } else {
+    NULL
+  }
+
+  if (!is.null(label_col)) {
+    p_hbca <- DimPlot(seurat_obj, group.by = label_col,
+                      label = TRUE, label.size = 2.5, repel = TRUE,
+                      pt.size = 0.3, alpha = 0.3, raster = FALSE) +
+      ggtitle("HBCA Transferred Labels") + NoLegend()
+    print(p_clusters + p_hbca)
+    print(p_clusters + p_clusters_high_res)
+
+  } else {
+    print(p_clusters + p_clusters_high_res)
+    print(p_clusters_high_res)
+  }
+}
+```
+
+```{r cluster-markers}
+if (DEFAULT_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+  cluster_ids <- seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]
+  cluster_levels <- as.character(sort(as.numeric(unique(cluster_ids))))
+  seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]] <- factor(cluster_ids, levels = cluster_levels)
+
+  Idents(seurat_obj) <- seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]
+  DefaultAssay(seurat_obj) <- "RNA"
+
+  cluster_markers <- presto::wilcoxauc(seurat_obj, assay = "data")
+  cluster_markers$group <- factor(cluster_markers$group, levels = cluster_levels)
+  seurat_obj@misc$cluster_markers <- cluster_markers
+
+  top_markers <- cluster_markers %>%
+    filter(auc > 0.5) %>%
+    group_by(group) %>%
+    slice_max(order_by = auc, n = 10) %>%
+    arrange(group)
+
+  DT::datatable(top_markers, caption = paste("Top 10 Markers per Cluster (AUC > 0.5) -", DEFAULT_CLUSTER_COL))
+}
+```
+
+```{r cluster-heatmap, fig.width=12, fig.height=10}
+if (exists("top_markers") && nrow(top_markers) > 0) {
+
+  markers_plot <- top_markers %>%
+    group_by(group) %>%
+    slice_head(n = 5)
+
+  DoHeatmap(subset(seurat_obj, downsample = 500),
+            features = unique(markers_plot$feature),
+            size = 3,
+            slot = "data", raster = FALSE) +
+    theme(axis.text.y = element_text(size = 6))
+}
+```
+
+---
+
+## 3. Cluster Annotation & Manual Overrides
+
+### 3.1 Initialize Annotations from HBCA Labels
+
+```{r init-cluster-annotation}
+label_col <- if ("HBCATransferredLabels.Kumar_2023" %in% colnames(seurat_obj@meta.data)) {
+  "HBCATransferredLabels.Kumar_2023"
+} else if ("HBCATransferredLabel" %in% colnames(seurat_obj@meta.data)) {
+  "HBCATransferredLabel"
+} else {
+  NULL
+}
+
+if (!is.null(label_col) && DEFAULT_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+  crosstab <- table(
+    Cluster = seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]],
+    HBCALabel = seurat_obj@meta.data[[label_col]]
+  )
+
+  dominant_label <- apply(crosstab, 1, function(x) names(which.max(x)))
+  label_purity <- apply(crosstab, 1, function(x) round(max(x) / sum(x) * 100, 1))
+
+  cluster_to_annotation <- setNames(dominant_label, names(dominant_label))
+  seurat_obj$cluster_annotation <- unname(cluster_to_annotation[as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]])])
+
+  cluster_identity <- data.frame(
+    cluster = names(dominant_label),
+    initial_annotation = dominant_label,
+    purity_pct = label_purity,
+    total_cells = rowSums(crosstab),
+    row.names = NULL
+  )
+
+  DT::datatable(cluster_identity, caption = "Initial Cluster Annotations (HBCA Majority Vote)")
+}
+```
+
+### 3.2 Cluster Splitting (High-Resolution Subclustering)
+
+```{r cluster-splitting, fig.width=12, fig.height=5}
+# Parent clusters identified as mixed-compartment during review; split using
+# the high-resolution Leiden layer (res 5.0) to isolate subpopulations before
+# re-annotating. The list is stable across runs — update only when data changes.
+CLUSTERS_TO_SPLIT <- c(
+  "14",
+  "26",
+  "27"
+)
+
+if (length(CLUSTERS_TO_SPLIT) > 0 && HIGH_RES_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+
+  cat("=== CLUSTER SPLITTING ANALYSIS ===\n\n")
+
+  for (parent_cluster in CLUSTERS_TO_SPLIT) {
+    cells_in_parent <- which(as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]) == parent_cluster)
+
+    if (length(cells_in_parent) == 0) {
+      cat("Cluster", parent_cluster, ": No cells found, skipping\n")
+      next
+    }
+
+    subclusters <- seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]][cells_in_parent]
+    subcluster_table <- sort(table(subclusters), decreasing = TRUE)
+
+    cat("Cluster", parent_cluster, "(", length(cells_in_parent), "cells) splits into:\n")
+
+    for (subclust in names(subcluster_table)) {
+      cells_in_sub <- cells_in_parent[subclusters == subclust]
+      hbca_labels <- seurat_obj@meta.data[[label_col]][cells_in_sub]
+      dominant <- names(sort(table(hbca_labels), decreasing = TRUE))[1]
+      purity <- round(max(table(hbca_labels)) / length(cells_in_sub) * 100, 1)
+      cat(sprintf("
+   Subcluster %s: %d cells -> %s (%.1f%% purity)\n",
+   subclust, length(cells_in_sub), dominant, purity))
+    }
+    cat("\n")
+
+    subclusters_in_parent <- unique(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]][cells_in_parent])
+    cells_full_subclusters <- which(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]] %in% subclusters_in_parent)
+    obj_subset <- seurat_obj[, cells_full_subclusters]
+    obj_subset$in_parent_cluster <- colnames(obj_subset) %in% colnames(seurat_obj)[cells_in_parent]
+
+    if ("umap" %in% names(seurat_obj@reductions)) {
+
+      seurat_obj$highlight_cluster <- ifelse(
+        as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]) == parent_cluster,
+        paste0("Cluster ", parent_cluster), "Other"
+      )
+       obj_subset$highlight_cluster <- ifelse(
+        as.character(obj_subset@meta.data[[DEFAULT_CLUSTER_COL]]) == parent_cluster,
+        paste0("Cluster ", parent_cluster), "Other"
+      )
+
+      p_global <- DimPlot(seurat_obj, group.by = "highlight_cluster",
+                          cols = c(setNames("red", paste0("Cluster ", parent_cluster)), "Other" = "grey85"),
+                          pt.size = 0.5, alpha = 0.8, order = TRUE) +
+        ggtitle(paste0("Cluster ", parent_cluster, " in global context")) +
+        NoLegend()
+
+      p_subset <- DimPlot(obj_subset, group.by = "highlight_cluster",
+                          cols = c(setNames("red", paste0("Cluster ", parent_cluster)), "Other" = "grey85"),
+                          pt.size = 0.5, alpha = 0.8, order = TRUE) +
+        ggtitle(paste0("Cluster ", parent_cluster, " in global context")) +
+        NoLegend()
+
+      print(p_global + p_subset)
+
+      p2 <- DimPlot(obj_subset, group.by = HIGH_RES_CLUSTER_COL,
+                    label = TRUE, label.size = 3, repel = TRUE,
+                    pt.size = 0.3, alpha = 0.4) +
+        ggtitle(paste0("Cluster ", parent_cluster, ": Subclusters (full extent)")) +
+        NoLegend()
+
+      p3 <- DimPlot(obj_subset, group.by = label_col,
+                    label = TRUE, label.size = 3, repel = TRUE,
+                    pt.size = 0.3, alpha = 0.4) +
+        ggtitle(paste0("Cluster ", parent_cluster, ": HBCA Labels")) +
+        NoLegend()
+
+      print(p2 + p3)
+
+      cat("Showing", length(cells_full_subclusters), "cells from", length(subclusters_in_parent),
+          "subclusters (", length(cells_in_parent), "in parent cluster)\n\n")
+    }
+  }
+} else if (length(CLUSTERS_TO_SPLIT) > 0) {
+  cat("High-resolution cluster column", HIGH_RES_CLUSTER_COL, "not found.\n")
+  cat("Available clustering columns:", paste(clustering_columns, collapse = ", "), "\n")
+}
+```
+
+```{r high-res-subcluster-markers, fig.width=12, fig.height=8}
+if (length(CLUSTERS_TO_SPLIT) > 0 && HIGH_RES_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+
+  for (parent_cluster in CLUSTERS_TO_SPLIT) {
+    cells_in_parent <- which(as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]) == parent_cluster)
+
+    if (length(cells_in_parent) < 50) {
+      cat("Cluster", parent_cluster, ": Too few cells for marker analysis, skipping\n\n")
+      next
+    }
+
+    subclusters_in_parent <- unique(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]][cells_in_parent])
+    cells_full_subclusters <- which(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]] %in% subclusters_in_parent)
+    obj_subset <- seurat_obj[, cells_full_subclusters]
+
+    cat("Cluster", parent_cluster, ": Analyzing", length(cells_full_subclusters),
+        "cells from", length(subclusters_in_parent), "subclusters",
+        "(", length(cells_in_parent), "cells in parent cluster)\n")
+
+    Idents(obj_subset) <- obj_subset@meta.data[[HIGH_RES_CLUSTER_COL]]
+    DefaultAssay(obj_subset) <- "RNA"
+
+    n_subclusters <- length(unique(Idents(obj_subset)))
+    if (n_subclusters < 2) {
+      cat("Cluster", parent_cluster, ": Only 1 subcluster, skipping marker analysis\n\n")
+      next
+    }
+
+    cat("=== CLUSTER", parent_cluster, "SUBCLUSTER ANALYSIS ===\n")
+    cat("Computing markers for", n_subclusters, "subclusters...\n\n")
+
+    subcluster_markers <- presto::wilcoxauc(obj_subset, assay = "data")
+    seurat_obj@misc[[paste0("cluster_", parent_cluster, "_subcluster_markers")]] <- subcluster_markers
+
+    top_sub_markers <- subcluster_markers %>%
+      filter(auc > 0.55, pct_in > 20) %>%
+      group_by(group) %>%
+      slice_max(order_by = auc, n = 5) %>%
+      arrange(group, desc(auc))
+
+    subcluster_summary <- obj_subset@meta.data %>%
+      group_by(!!sym(HIGH_RES_CLUSTER_COL), !!sym(label_col)) %>%
+      summarise(n = n(), .groups = "drop") %>%
+      group_by(!!sym(HIGH_RES_CLUSTER_COL)) %>%
+      mutate(
+        total = sum(n),
+        pct = round(n / total * 100, 1)
+      ) %>%
+      slice_max(order_by = n, n = 1) %>%
+      select(subcluster = !!sym(HIGH_RES_CLUSTER_COL),
+             dominant_label = !!sym(label_col),
+             n_cells = total,
+             purity_pct = pct) %>%
+      arrange(desc(n_cells))
+
+    subcluster_summary$top_markers <- sapply(subcluster_summary$subcluster, function(sc) {
+      top_sub_markers %>%
+        filter(group == sc) %>%
+        slice_head(n = 3) %>%
+        pull(feature) %>%
+        paste(collapse = ", ")
+    })
+
+    cat("Subcluster Summary:\n")
+    print(as.data.frame(subcluster_summary))
+    cat("\n")
+
+    if (nrow(top_sub_markers) > 0) {
+
+      heatmap_plot <- DoHeatmap(
+        subset(obj_subset, downsample = 1000),
+        features = unique(top_sub_markers$feature),
+        group.by = HIGH_RES_CLUSTER_COL,
+        slot = "data",
+        size = 3,
+        angle = 45
+      ) +
+        ggtitle(paste0("Cluster ", parent_cluster, " - Subcluster Markers (Heatmap)")) +
+        theme(
+          axis.text.y = element_text(size = 7),
+          plot.title = element_text(size = 14, face = "bold")
+        )
+
+      print(heatmap_plot)
+
+      dotplot <- DotPlot(
+        obj_subset,
+        features = unique(top_sub_markers$feature),
+        group.by = HIGH_RES_CLUSTER_COL,
+        dot.scale = 6
+      ) +
+        coord_flip() +
+        ggtitle(paste0("Cluster ", parent_cluster, " - Subcluster Markers (DotPlot)")) +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+          axis.text.y = element_text(size = 7),
+          plot.title = element_text(size = 14, face = "bold")
+        )
+
+      print(dotplot)
+    }
+
+    cat("\n---\n\n")
+  }
+}
+```
+
+```{r apply-cluster-splits}
+# Reassignments from the splitting review: each entry reroutes a
+# high-resolution subcluster to a distinct annotation.
+SPLIT_ASSIGNMENTS <- list(
+  "14" = list(
+    "37" = "Adipocyte"
+  )
+)
+
+if (length(SPLIT_ASSIGNMENTS) > 0 && HIGH_RES_CLUSTER_COL %in% colnames(seurat_obj@meta.data)) {
+  cat("=== APPLYING CLUSTER SPLITS ===\n")
+
+  for (parent_cluster in names(SPLIT_ASSIGNMENTS)) {
+    subclust_map <- SPLIT_ASSIGNMENTS[[parent_cluster]]
+    cells_in_parent <- which(as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]) == parent_cluster)
+
+    for (subclust in names(subclust_map)) {
+      new_annotation <- subclust_map[[subclust]]
+      cells_to_update <- cells_in_parent[
+        as.character(seurat_obj@meta.data[[HIGH_RES_CLUSTER_COL]][cells_in_parent]) == subclust
+      ]
+
+      if (length(cells_to_update) > 0) {
+        old_ann <- unique(seurat_obj$cluster_annotation[cells_to_update])[1]
+        seurat_obj$cluster_annotation[cells_to_update] <- new_annotation
+        cat(sprintf("Cluster %s subcluster %s: %s -> %s (%d cells)\n",
+                    parent_cluster, subclust, old_ann, new_annotation, length(cells_to_update)))
+      }
+    }
+  }
+}
+```
+
+### 3.3 Manual Annotation Overrides
+
+```{r manual-overrides}
+# Per-cluster overrides where marker evidence or label purity fixes the
+# annotation unambiguously. Each entry records annotation, target compartment,
+# and the marker panel used to justify it.
+MANUAL_OVERRIDES <- list(
+  "16" = list(
+    annotation = "Keratinocyte",
+    compartment = "Epidermal",
+    markers = c("DSP", "DSG1", "PKP1", "KRTDAP")
+  ),
+  "21" = list(
+    annotation = "Keratinocyte",
+    compartment = "Epidermal",
+    markers = c("DSP", "DSG1", "PKP1", "KRTDAP")
+  ),
+  "29" = list(
+    annotation = "Keratinocyte",
+    compartment = "Epidermal",
+    markers = c("DSP", "DSG1", "PKP1", "KRTDAP")
+  ),
+  "31" = list(
+    annotation = "Melanocyte",
+    compartment = "Epidermal",
+    markers = c("MLANA", "PMEL", "TYRP1", "DCT")
+  ),
+
+  "18" = list(
+    annotation = "B_Cell",
+    compartment = "Immune",
+    markers = c("MS4A1", "CD79A", "CD37", "BANK1")
+  ),
+  "22" = list(
+    annotation = "Plasma_cell",
+    compartment = "Immune",
+    markers = c("SDC1", "XBP1", "PRDM1", "MZB1")
+  ),
+  "23" = list(
+    annotation = "Mast",
+    compartment = "Immune",
+    markers = c("HDC", "TPSG1", "CPA3", "KIT")
+  ),
+  "25" = list(
+    annotation = "Neutrophil",
+    compartment = "Immune",
+    markers = c("CSF3R", "TREM1", "SLC11A1", "ITGAX")
+  ),
+  "33" = list(
+    annotation = "Langerhans_Cell",
+    compartment = "Immune",
+    markers = c("CD207", "CD1A", "EPCAM", "LANGERIN")
+  ),
+  "34" = list(
+    annotation = "pDC",
+    compartment = "Immune",
+    markers = c("CLEC4C", "IL3RA", "IRF7", "TCF4")
+  ),
+
+  "28" = list(
+    annotation = "RBC",
+    compartment = "Other",
+    markers = c("HBB", "HBA1", "HBA2", "GYPA")
+  )
+)
+
+if (length(MANUAL_OVERRIDES) > 0) {
+  for (cluster_id in names(MANUAL_OVERRIDES)) {
+    override <- MANUAL_OVERRIDES[[cluster_id]]
+    cells_in_cluster <- which(as.character(seurat_obj@meta.data[[DEFAULT_CLUSTER_COL]]) == cluster_id)
+    if (length(cells_in_cluster) > 0) {
+      old_ann <- unique(seurat_obj$cluster_annotation[cells_in_cluster])[1]
+      seurat_obj$cluster_annotation[cells_in_cluster] <- override$annotation
+      cat(sprintf("Cluster %s: %s -> %s [%s] (%d cells)\n",
+                  cluster_id, old_ann, override$annotation, override$compartment, length(cells_in_cluster)))
+    }
+  }
+}
+
+DT::datatable(
+  seurat_obj@meta.data %>%
+    group_by(!!sym(DEFAULT_CLUSTER_COL), cluster_annotation) %>%
+    summarise(n_cells = n(), .groups = "drop"),
+  caption = "Final Cluster Annotations"
+)
+```
+
+### 3.4 Feature Plot Support for Overrides
+
+```{r annotation-feature-plots, fig.width=10, fig.height=5}
+plot_annotation_markers <- function(obj, cluster_id, annotation, markers, cluster_col = DEFAULT_CLUSTER_COL) {
+  markers_present <- markers[markers %in% rownames(obj)]
+  if (length(markers_present) < 1) return(NULL)
+
+  p <- FeaturePlot(obj, features = head(markers_present, 4), raster = FALSE, ncol = 2,
+                   pt.size = 0.4, alpha = 0.8, order = TRUE) &
+    scale_color_viridis_c()
+
+  p <- p + patchwork::plot_annotation(
+    title = paste0("Cluster ", cluster_id, " -> ", annotation),
+    theme = theme(plot.title = element_text(size = 14, face = "bold"))
+  )
+  return(p)
+}
+
+for (cluster_id in names(MANUAL_OVERRIDES)) {
+  override <- MANUAL_OVERRIDES[[cluster_id]]
+  if (length(override$markers) > 0) {
+    p <- plot_annotation_markers(seurat_obj, cluster_id, override$annotation, override$markers)
+    if (!is.null(p)) print(p)
+  }
+}
+```
+
+```{r preview_annotations}
+DimPlot(seurat_obj,
+        group.by = "cluster_annotation",
+        raster = FALSE,
+        label = TRUE,
+        pt.size = 0.4,
+        alpha = 0.5) + NoLegend()
+
+
+Idents(seurat_obj) <- "cluster_annotation"
+celltype_markers <- presto::wilcoxauc(seurat_obj, assay = "data")
+seurat_obj@misc$celltype_markers <- celltype_markers
+
+top_celltype_markers <- celltype_markers %>%
+  filter(auc > 0.6, pct_in > 25) %>%
+  group_by(group) %>%
+  slice_max(order_by = auc, n = 15) %>%
+  arrange(group, desc(auc))
+
+cat("\n=== TOP 10 MARKERS PER COMPARTMENT ===\n")
+top_celltype_markers %>%
+  group_by(group) %>%
+  slice_head(n = 10) %>%
+  select(group, feature, auc, pct_in, pct_out) %>%
+  print(n = 50)
+
+cells_downsample <- sample(colnames(seurat_obj), size = min(7500, ncol(seurat_obj)))
+cells_downsample_prop <- subset(seurat_obj, downsample = 1500) %>% colnames()
+
+markers_for_heatmap <- top_celltype_markers %>%
+  group_by(group) %>%
+  slice_head(n = ceiling(70 / length(unique(seurat_obj$cluster_annotation)))) %>%
+  pull(feature) %>%
+  unique()
+
+cat("Plotting", length(markers_for_heatmap), "markers across compartments\n")
+
+p_heatmap <- DoHeatmap(seurat_obj[, cells_downsample],
+                       features = markers_for_heatmap,
+                       group.by = "cluster_annotation",
+                       slot = "data", size = 3)
+print(p_heatmap)
+
+p_heatmap_prop <- DoHeatmap(seurat_obj[, cells_downsample_prop],
+                            features = markers_for_heatmap,
+                            group.by = "cluster_annotation",
+                            slot = "data", size = 3)
+print(p_heatmap_prop)
+```
+
+---
+
+## 4. Annotation -> Compartment Mapping
+
+```{r annotation-to-compartment}
+# Base compartment mapping for HBCA transferred labels (same structure as
+# MANUAL_OVERRIDES). These cell types come from HBCA label transfer and do
+# not need per-cluster overrides.
+BASE_ANNOTATIONS <- list(
+  Basal = list(
+    compartment = "Epithelial",
+    markers = c("KRT14", "KRT5", "TP63", "KRT17")
+  ),
+  Luminal_HR = list(
+    compartment = "Epithelial",
+    markers = c("ESR1", "PGR", "FOXA1", "GATA3")
+  ),
+  Luminal_Secretory = list(
+    compartment = "Epithelial",
+    markers = c("KRT18", "KRT8", "SLPI", "LTF")
+  ),
+  Myoepithelial = list(
+    compartment = "Epithelial",
+    markers = c("ACTA2", "TAGLN", "MYL9", "CNN1")
+  ),
+
+  Fibroblast = list(
+    compartment = "Stromal",
+    markers = c("DCN", "COL1A1", "LUM", "PDGFRA")
+  ),
+  Adipocyte = list(
+    compartment = "Stromal",
+    markers = c("ADIPOQ", "PLIN1", "FABP4", "LEP")
+  ),
+  Pericyte = list(
+    compartment = "Stromal",
+    markers = c("NOTCH3", "CALD1", "RGS5", "PDGFRB")
+  ),
+  Vascular_Endothelium = list(
+    compartment = "Stromal",
+    markers = c("VWF", "PECAM1", "CDH5", "CD34")
+  ),
+  Lymphatic_Endothelium = list(
+    compartment = "Stromal",
+    markers = c("PROX1", "LYVE1", "PDPN", "FLT4")
+  ),
+
+  T_Cell = list(
+    compartment = "Immune",
+    markers = c("CD3E", "CD3D", "CD4", "CD8A")
+  ),
+  NK = list(
+    compartment = "Immune",
+    markers = c("NCAM1", "NKG7", "GNLY", "KLRD1")
+  ),
+  Myeloid = list(
+    compartment = "Immune",
+    markers = c("CD14", "CD68", "ITGAM", "CSF1R")
+  )
+)
+
+COMPARTMENT_MAP <- c()
+
+for (ann_name in names(BASE_ANNOTATIONS)) {
+  COMPARTMENT_MAP[ann_name] <- BASE_ANNOTATIONS[[ann_name]]$compartment
+}
+
+for (cluster_id in names(MANUAL_OVERRIDES)) {
+  override <- MANUAL_OVERRIDES[[cluster_id]]
+  COMPARTMENT_MAP[override$annotation] <- override$compartment
+}
+
+cat("=== COMPARTMENT MAP (base + overrides) ===\n")
+print(data.frame(
+  annotation = names(COMPARTMENT_MAP),
+  compartment = unname(COMPARTMENT_MAP)
+))
+
+seurat_obj$compartment <- unname(sapply(seurat_obj$cluster_annotation, function(ann) {
+  if (ann %in% names(COMPARTMENT_MAP)) return(COMPARTMENT_MAP[ann])
+  for (pattern in names(COMPARTMENT_MAP)) {
+    if (grepl(pattern, ann, ignore.case = TRUE)) return(COMPARTMENT_MAP[pattern])
+  }
+  return("Unclassified")
+}))
+
+cat("\n=== COMPARTMENT SUMMARY ===\n")
+print(table(seurat_obj$compartment))
+```
+
+```{r viz-compartments}
+COMPARTMENT_COLORS <- c("Epithelial" = "#E41A1C", "Stromal" = "#377EB8",
+                        "Immune" = "#4DAF4A", "Epidermal" = "#FF7F00",
+                        "Other" = "#984EA3", "Unclassified" = "grey80")
+
+if ("umap" %in% names(seurat_obj@reductions)) {
+  p1 <- DimPlot(seurat_obj, group.by = "compartment",
+                cols = COMPARTMENT_COLORS,
+                label = TRUE, repel = TRUE, pt.size = 0.3, alpha = 0.5,
+                raster = FALSE) +
+    ggtitle("Compartment Assignment")
+  print(p1)
+
+  p2 <- DimPlot(seurat_obj, group.by = "compartment", split.by = "patient_id",
+                cols = COMPARTMENT_COLORS,
+                pt.size = 0.3, alpha = 0.5, ncol = 2,
+                raster = FALSE) +
+    ggtitle("Compartment Assignment by Patient") +
+    NoLegend()
+  print(p2)
+}
+```
+
+---
+
+## 5. Compartment Marker Discovery
+
+```{r compartment-markers}
+Idents(seurat_obj) <- "compartment"
+DefaultAssay(seurat_obj) <- "RNA"
+
+cat("=== COMPUTING COMPARTMENT MARKERS ===\n")
+compartment_markers <- presto::wilcoxauc(seurat_obj, assay = "data")
+seurat_obj@misc$compartment_markers <- compartment_markers
+
+top_compartment_markers <- compartment_markers %>%
+  filter(auc > 0.6, pct_in > 25) %>%
+  group_by(group) %>%
+  slice_max(order_by = auc, n = 25) %>%
+  arrange(group, desc(auc))
+
+cat("\n=== TOP 10 MARKERS PER COMPARTMENT ===\n")
+top_compartment_markers %>%
+  group_by(group) %>%
+  slice_head(n = 10) %>%
+  select(group, feature, auc, pct_in, pct_out) %>%
+  print(n = 50)
+
+DT::datatable(top_compartment_markers, caption = "Top 25 Markers per Compartment")
+```
+
+```{r compartment-marker-heatmap, fig.width=14, fig.height=10}
+cells_downsample <- sample(colnames(seurat_obj), size = min(7500, ncol(seurat_obj)))
+cells_downsample_prop <- subset(seurat_obj, downsample = 1500) %>% colnames()
+
+markers_for_heatmap <- top_compartment_markers %>%
+  group_by(group) %>%
+  slice_head(n = ceiling(70 / length(unique(seurat_obj$compartment)))) %>%
+  pull(feature) %>%
+  unique()
+
+cat("Plotting", length(markers_for_heatmap), "markers across compartments\n")
+
+p_heatmap <- DoHeatmap(seurat_obj[, cells_downsample],
+                       features = markers_for_heatmap,
+                       group.by = "compartment",
+                       slot = "data", size = 3) +
+  ggtitle("Compartment Markers (random sample)")
+print(p_heatmap)
+
+p_heatmap_prop <- DoHeatmap(seurat_obj[, cells_downsample_prop],
+                            features = markers_for_heatmap,
+                            group.by = "compartment",
+                            slot = "data", size = 3) +
+  ggtitle("Compartment Markers (proportional sample)")
+print(p_heatmap_prop)
+```
+
+```{r compartment-marker-dotplot, fig.width=12, fig.height=8}
+markers_for_dotplot <- top_compartment_markers %>%
+  group_by(group) %>%
+  slice_head(n = 5) %>%
+  pull(feature) %>%
+  unique()
+
+DotPlot(seurat_obj, features = markers_for_dotplot, group.by = "compartment",
+        dot.scale = 6) +
+  coord_flip() +
+  ggtitle("Top Compartment Markers") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r save-compartment-markers}
+write.csv(compartment_markers,
+          file.path(OUTPUT_BASE, "metadata/compartment_markers.csv"),
+          row.names = FALSE)
+cat("Saved compartment_markers.csv\n")
+```
+
+---
+
+## 6. Visualizations
+
+```{r viz-composition}
+if ("sample_id" %in% colnames(seurat_obj@meta.data)) {
+  comp_by_sample <- seurat_obj@meta.data %>%
+    group_by(sample_id, compartment) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(sample_id) %>%
+    mutate(pct = n / sum(n) * 100)
+
+  p_comp <- ggplot(comp_by_sample, aes(x = sample_id, y = pct, fill = compartment)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = c("Epithelial" = "#E41A1C", "Stromal" = "#377EB8",
+                                 "Immune" = "#4DAF4A", "Epidermal" = "#FF7F00",
+                                 "Other" = "#984EA3", "Unclassified" = "grey80")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
+    labs(title = "Compartment Composition by Sample", x = "Sample", y = "Percentage")
+  print(p_comp)
+
+  ggsave(file.path(OUTPUT_BASE, "visualizations/compartment_composition_by_sample.png"),
+         p_comp, width = 14, height = 8, dpi = 150)
+}
+```
+
+---
+
+## 8. Sample Flagging (Epidermal Presence)
+
+```{r sample-flagging}
+sample_stats <- seurat_obj@meta.data %>%
+  group_by(sample_id, patient_id) %>%
+  summarise(
+    total_cells = n(),
+    n_epidermal = sum(compartment == "Epidermal", na.rm = TRUE),
+    pct_epidermal = n_epidermal / total_cells * 100,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(pct_epidermal))
+
+if ("position_id" %in% colnames(seurat_obj@meta.data)) {
+  pos_map <- seurat_obj@meta.data %>%
+    select(sample_id, position_id) %>%
+    distinct()
+  sample_stats <- left_join(sample_stats, pos_map, by = "sample_id")
+} else {
+  # Extract position from sample_id pattern (e.g., "Pat1_P1" -> "P1")
+  sample_stats$position_id <- gsub("^[^_]+_", "", sample_stats$sample_id)
+}
+
+EPIDERMAL_THRESHOLD <- ALGO_PARAMS$epidermal_threshold_pct
+sample_stats$has_epidermal <- sample_stats$pct_epidermal > EPIDERMAL_THRESHOLD
+cat("Epidermal threshold:", EPIDERMAL_THRESHOLD, "%\n")
+
+cat("=== SAMPLE EPIDERMAL STATUS ===\n")
+print(sample_stats)
+
+cat("\nSamples with epidermal cells:", sum(sample_stats$has_epidermal), "/", nrow(sample_stats), "\n")
+```
+
+---
+
+## 9. Output Generation
+
+```{r output-cell-compartments}
+cell_compartments <- seurat_obj@meta.data %>%
+  select(
+    sample_id, patient_id,
+    any_of(c(DEFAULT_CLUSTER_COL, "cluster_annotation", "compartment"))
+  ) %>%
+  tibble::rownames_to_column("cell_id")
+
+write.csv(cell_compartments,
+          file.path(OUTPUT_BASE, "metadata/cell_compartments.csv"),
+          row.names = FALSE)
+
+cat("Saved cell_compartments.csv:", nrow(cell_compartments), "cells\n")
+```
+
+```{r output-epidermal-samples}
+epidermal_samples <- sample_stats %>%
+  filter(has_epidermal) %>%
+  select(sample_id, patient_id, position_id, n_epidermal, pct_epidermal)
+
+epidermal_output <- list(
+  generated = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+  threshold_pct = EPIDERMAL_THRESHOLD,
+  n_contaminated_samples = nrow(epidermal_samples),
+  n_total_samples = nrow(sample_stats),
+  epidermal_samples = lapply(seq_len(nrow(epidermal_samples)), function(i) {
+    as.list(epidermal_samples[i, ])
+  })
+)
+
+yaml::write_yaml(epidermal_output,
+                 file.path(OUTPUT_BASE, "metadata/epidermal_samples.yaml"))
+
+write.csv(epidermal_samples,
+          file.path(OUTPUT_BASE, "metadata/epidermal_samples.csv"),
+          row.names = FALSE)
+
+cat("Saved epidermal_samples.yaml and .csv\n")
+cat("Contaminated samples:\n")
+print(epidermal_samples)
+```
+
+```{r output-full-sample-stats}
+write.csv(sample_stats,
+          file.path(OUTPUT_BASE, "metadata/sample_compartment_stats.csv"),
+          row.names = FALSE)
+cat("Saved sample_compartment_stats.csv\n")
+```
+
+---
+
+## Summary
+
+```{r summary}
+cat("=== COMPARTMENT CLASSIFICATION SUMMARY ===\n\n")
+
+cat("Cells per compartment:\n")
+print(table(seurat_obj$compartment))
+
+cat("\n\nManual overrides applied:", length(MANUAL_OVERRIDES), "clusters\n")
+for (cluster_id in names(MANUAL_OVERRIDES)) {
+  override <- MANUAL_OVERRIDES[[cluster_id]]
+  cat("  Cluster", cluster_id, "->", override$annotation, "(", override$compartment, ")\n")
+}
+
+cat("\n\nOutputs generated:\n")
+cat("  - cell_compartments.csv\n")
+cat("  - compartment_markers.csv\n")
+cat("  - sample_compartment_stats.csv\n")
+cat("  - epidermal_samples.yaml/.csv\n")
+```
+
+---
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```

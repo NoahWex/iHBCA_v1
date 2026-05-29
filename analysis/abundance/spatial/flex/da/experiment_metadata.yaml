@@ -1,0 +1,228 @@
+# Track D — FLEX-only DA experiment metadata
+#
+# Locked spec for the DA layer. Adapted from
+# joint_anatomic_variation_20260424/experiment_metadata.yaml with three
+# substrate changes:
+#   1. cohort: 62 FLEX libraries only (no Xenium)
+#   2. tier formulas: drop `platform` term (single platform)
+#   3. milos: 4 FLEX-only Milos at Spatial_HBCA_DA/outputs/milo/{scope}/
+#
+# Sign convention: smaller / minority group = positive logFC (second factor
+# level under R's default treatment contrast). Inherited from joint, locked.
+#
+# Model series per contrast (locked):
+#   M0 — unconditioned       ~ patient_id + log_n_cells + group
+#   M1 — conditioned (basal) ~ patient_id + log_n_cells + basal_prop + group
+#   M2 — interaction         ~ patient_id + log_n_cells + basal_prop * group
+#
+# label_set is parameterized — initial value L1.5 (from FLEX integrated Seurat),
+# future value L2 (from Track C's flex_labels_full.csv).
+
+cohort:
+  name: flex_anatomic_variation_20260427
+  source_embedding:  /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_preprocessing/outputs/integration_intermediate/full/scvi_n100/latent.csv
+  source_obs:        /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_preprocessing/outputs/integration_intermediate/full/scvi_n100/obs.csv
+  bridge_table:      outputs/shared/flex_l1p5.csv
+  total_cells:       258317
+  patients:          [Pat1, Pat2, UCI604, UCI220228]
+  libraries:
+    total: 62
+    flex:  62
+    xenium: 0
+
+vocabulary:
+  primary: l1p5_label             # FLEX-native L1.5 from integrated_seurat.rds
+  label_set: L1.5                 # parameterized — DA runner reads this
+  label_column: l1p5_label        # column name in bridge_table for the label_set
+  label_remap: outputs/shared/label_remap.csv
+  # When Track C's flex_labels_full.csv lands, swap:
+  #   label_set: L2
+  #   label_column: L2_assignment
+  #   bridge_table: <Track C's flex_labels_full.csv>
+
+# Populations of interest per contrast — drive the section 9 deep-dive panels.
+populations_of_interest:
+  C1_p1p2_vs_p3:
+    - LASP_basal      # NAC enrichment hypothesis (renamed from LASP_PTN)
+    - LASP
+    - BMYO
+    - BMYO-NC
+    - Fibroblast_activated
+    - Fibroblast_SFRP4
+    - LumHR
+  C2a_p3_axis_A_vs_M: []   # open — fill once first results come in
+  C2b_p3_axis_P_vs_M: []
+  C3_p3_uoq_vs_rest:
+    - CD8 T cell
+    - CD4 Treg
+    - Macrophage
+    - Plasma cell
+    - Endothelial
+  C4_p3_upper_vs_lower: []
+
+# ============================================================================
+# Milos (4 scopes; canonical FLEX-only, built 2026-04-17 against scvi_n100 v1.0)
+# ============================================================================
+
+milos:
+  flex_full:
+    path:    /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_DA/outputs/milo/full/milo.rds
+    cells:   258317
+    nhoods:  23226
+    k:       30
+    prop:    0.1
+    dims:    100
+    build_summary: /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_DA/outputs/milo/full/build_summary.yaml
+  flex_Epithelial:
+    path:    /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_DA/outputs/milo/Epithelial/milo.rds
+    cells:   102952
+    nhoods:  9600
+    k:       30
+    prop:    0.1
+    dims:    100
+  flex_Immune:
+    path:    /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_DA/outputs/milo/Immune_canonical/milo.rds   # _canonical suffix
+    cells:   47942
+    nhoods:  4256
+    k:       30
+    prop:    0.1
+    dims:    100
+  flex_Stromal:
+    path:    /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_DA/outputs/milo/Stromal/milo.rds
+    cells:   119141
+    nhoods:  10839
+    k:       30
+    prop:    0.1
+    dims:    100
+
+testNhoods:
+  fdr_weighting: graph-overlap
+  test:          glmQLFTest
+  reducedDim:    scVI_100              # FLEX-only: scvi_n100 latent (joint used Concord)
+
+# ============================================================================
+# Contrasts. Each contrast has a `factor_col` (built from covars / library_id)
+# and `levels` ordered so the SECOND level = positive logFC direction.
+# Each contrast has tiers M0/M1/M2 with formulas using the locked skeleton.
+# `tiers_run` lists which tiers to actually run (matrix prioritization).
+# ============================================================================
+
+contrasts:
+
+  C1_p1p2_vs_p3:
+    description: "P1+P2 (NAC, smaller) versus P3 (peripheral, larger). Positive logFC = enriched in P1+P2."
+    factor_col: p1p2_vs_p3
+    levels: [P3, P1P2]                   # last = positive direction
+    libraries_filter: null                # all 62 FLEX libs
+    tiers_run: [M0, M1, M2]
+    tiers:
+      M0:
+        formula: "~ patient_id + log_n_cells + p1p2_vs_p3"
+      M1:
+        formula: "~ patient_id + log_n_cells + basal_prop + p1p2_vs_p3"
+      M2:
+        formula: "~ patient_id + log_n_cells + basal_prop * p1p2_vs_p3"
+    rationale: |
+      M0 is the raw axis signal. M1 conditions on basal_prop to address the PERMDISP-revealed
+      dispersion confound. M2 asks whether the axis effect itself depends on basal density.
+
+  C2a_p3_axis_A_vs_M:
+    description: "Within P3, Anterior vs Medial (reference). Positive = enriched in A."
+    factor_col: axis_amp
+    levels: [M, A]
+    libraries_filter: "p_level == P3 AND axis_amp in [A, M]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + log_n_cells + axis_amp"
+
+  C2b_p3_axis_P_vs_M:
+    description: "Within P3, Posterior vs Medial (reference). Positive = enriched in P."
+    factor_col: axis_amp
+    levels: [M, P]
+    libraries_filter: "p_level == P3 AND axis_amp in [P, M]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + log_n_cells + axis_amp"
+
+  C3_p3_uoq_vs_rest:
+    description: "Within P3, UOQ (smaller) vs other peripheral. Positive = enriched in UOQ."
+    factor_col: is_uoq
+    levels: [false, true]                 # true = UOQ = positive direction
+    libraries_filter: "p_level == P3"
+    tiers_run: [M0, M1, M2]
+    tiers:
+      M0:
+        formula: "~ patient_id + log_n_cells + is_uoq"
+      M1:
+        formula: "~ patient_id + log_n_cells + basal_prop + is_uoq"
+      M2:
+        formula: "~ patient_id + log_n_cells + basal_prop * is_uoq"
+
+  C4_p3_upper_vs_lower:
+    description: "Within P3, Upper vs Lower (reference). Positive = enriched in Upper."
+    factor_col: vertical
+    levels: [Lower, Upper]
+    libraries_filter: "p_level == P3 AND vertical in [Upper, Lower]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + log_n_cells + vertical"
+
+  C5_epi_rich_vs_sparse:
+    description: |
+      Tissue-composition contrast: epi_rich vs epi_sparse libraries.
+      epi_class is carried by an external YAML (median split on epithelial_prop,
+      cut=0.405, 31/31). Blocks patient_id + p_level so the contrast estimates
+      within-position, within-patient covariation with total epithelial content.
+      Positive logFC = enriched in epi_rich libraries.
+    factor_col: epi_class
+    levels: [epi_sparse, epi_rich]
+    libraries_filter: null
+    class_assignments_yaml: outputs/shared/epi_class_flex.yaml
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + p_level + log_n_cells + epi_class"
+    rationale: |
+      Question: regardless of position or patient, what populations co-enrich
+      or co-deplete with total per-library epithelial content?
+      Median split keeps every patient in both classes (min 3, max 13);
+      tertile rejected because UCI604=100% rich and UCI220228=0% rich would
+      alias patient. p_level blocking is required because P2 is 12/14 rich,
+      and without it the contrast partly tests "P2 vs P3" rather than the
+      tissue-composition signal of interest.
+
+scopes: [flex_full, flex_Epithelial, flex_Immune, flex_Stromal]
+
+# ============================================================================
+# Run matrix (prioritized): 40 runs total
+#   C1   × 3 tiers × 4 scopes = 12
+#   C2a  × 1 tier  × 4 scopes =  4
+#   C2b  × 1 tier  × 4 scopes =  4
+#   C3   × 3 tiers × 4 scopes = 12
+#   C4   × 1 tier  × 4 scopes =  4
+#   C5   × 1 tier  × 4 scopes =  4   (epithelial-content; added 2026-05-18)
+# ============================================================================
+
+provenance:
+  pattern_source:
+    repo: Spatial_HBCA_Xenium
+    path: DifferentialAbundance/joint_anatomic_variation_20260424/experiment_metadata.yaml
+    status: locked Phase D spec, 2026-04-26
+  build_source:
+    repo: Spatial_HBCA_DA
+    path: scripts/01_build_milo + scripts/02_sample_clustering
+    status: absorbed into Track D Phase 0/0.5
+  methodology_source:
+    repo: Spatial_HBCA
+    path: project/05_Analyses/analyses/DifferentialAbundance/anatomic_variation_analysis_20260323
+    status: superseded by Track D (preserved as historical artifact)
+  v1_da_phase_b_inheritance: |
+    V1 DA Phase B audit (2026-04-27) confirmed M0/M1/M2 tier structure on V1
+    substrate. FLEX-only inherits tier skeleton from joint (which was derived
+    against the same FLEX cohort + Xenium overlay). No separate Phase B audit
+    required.
+  execution_repo: Spatial_HBCA_Xenium
+  promotion_target: iHBCA_publication/publication/analysis/abundance/spatial/flex/

@@ -1,0 +1,20 @@
+# Per-motif DBSCAN parameters for motif-unit substrate (script 32_motif_units.py).
+#
+# eps_um and min_samples per motif (M0..M8). Selection criteria from the
+# DBSCAN parameter sweep:
+#   - Maximize n_units >= 20 cells while keeping purity >= 0.45
+#   - Match each motif's natural spatial scale (lymphoid → eps=35,
+#     diffuse stromal/adipose → eps=50-75)
+#   - min_samples=10 universal (cluster floor)
+#
+# Default fallback (if a motif key is missing): eps=35µm, min_samples=10.
+
+M0:  {eps_um: 50, min_samples: 10}  # Fb_Activated — diffuse stromal
+M1:  {eps_um: 35, min_samples: 10}  # EC — tight cluster boundaries
+M2:  {eps_um: 50, min_samples: 10}  # Fb baseline — broad
+M3:  {eps_um: 35, min_samples: 10}  # PV — clean at 35
+M4:  {eps_um: 35, min_samples: 10}  # T+cDC headline motif (immune surveillance)
+M5:  {eps_um: 50, min_samples: 10}  # LEC mono-cell, needs eps=50 for coverage
+M6:  {eps_um: 35, min_samples: 10}  # B+pDC headline motif (B-cell pocket)
+M7:  {eps_um: 75, min_samples: 10}  # adipose-Mac — genuinely diffuse, low purity expected
+M8:  {eps_um: 50, min_samples: 10}  # Plasma — sparse like lymphoid

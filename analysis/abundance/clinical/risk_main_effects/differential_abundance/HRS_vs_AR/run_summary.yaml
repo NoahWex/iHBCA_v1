@@ -1,0 +1,17 @@
+contrast: HRS_vs_AR
+cohort: HRS_vs_AR
+formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_binary
+  + risk_class
+type: coef
+coef: risk_classHRS
+tested_coef: risk_classHRS
+stratum_levels: ~
+fdr_weighting: graph-overlap
+spatial_fdr: 0.05
+adaptive_lfc_cutoff: 0.9401
+n_nhoods: 201542
+n_sig: 56335
+n_sig_up: 13215
+n_sig_dn: 43120
+n_libraries: 178
+completed_at: 2026-05-07 17:03:21

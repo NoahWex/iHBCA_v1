@@ -1,0 +1,17 @@
+contrast: BR1_vs_AR_tested
+cohort: BR1_vs_AR_tested
+formula: ~ study + facs_status + age_binary + menopausal_status_binary + parity_3level
+  + risk_class
+type: coef
+coef: risk_classBR1
+tested_coef: risk_classBR1
+stratum_levels: ~
+fdr_weighting: graph-overlap
+spatial_fdr: 0.05
+adaptive_lfc_cutoff: 2.1567
+n_nhoods: 201542
+n_sig: 7349
+n_sig_up: 466
+n_sig_dn: 6883
+n_libraries: 66
+completed_at: 2026-05-19 19:19:53

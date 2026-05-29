@@ -1,0 +1,216 @@
+meta:
+  compartment: Epithelial
+  base_resolution: '0.1'
+  luminal_resolution: '0.5'
+  basal_resolution: '0.1'
+  experiment: Epithelial_clean
+
+# Canonical full names for L1.5 labels in this compartment.
+# Sources for full-name expansions:
+#   - LHS: iHBCA_publication coordination/daily/2026-04-14.md ("LHS (Luminal Hormone Sensing)
+#     — LumHR is retired across all sessions")
+#   - LASP, BMYO: iHBCA_publication coordination/cap_mini_abstracts_20260423.md
+#     ("luminal hormone sensing (LHS), luminal adaptive secretory precursor (LASP),
+#     and basal-myoepithelial taxonomy")
+vocabulary:
+  BMYO-myo:
+    full_name: Basal-Myoepithelial (myo / contractile)
+    label_short: BMYO-myo
+    lineage: Basal
+    notes: Contractile basal-myoepithelium (ACTA2/MYH11/MYLK + KRT5/KRT14). Renamed
+      from "BMYO" 2026-04-29 to align with iHBCA L2.0 v2 / L2S naming; both layers
+      now use BMYO-myo at L1.5/L2.0/L2S, collapsed under LBridge family BMYO.
+  # NOTE 2026-04-29: BMYO-basal label retired from epi cascade. Cluster res-0.3 c3 was
+  # briefly relabeled BMYO-basal to align with iHBCA L2.0 naming, but patient/library
+  # distribution (85% Pat2, 63% from one library Pat2_P1_xenium_1, 96% Xenium-only)
+  # confirms it as a Xenium-side patient/library batch artifact rather than a true
+  # iHBCA BMYO-basal homolog. Re-routed to BMYO_artifact via xenium_only override.
+  # iHBCA BMYO-basal remains a real biological state in the iHBCA L2.0 / L2S layer
+  # (FLEX-resolved); LBridge BMYO family covers it iHBCA-side only (no Xenium 1:1).
+  LASP:
+    full_name: Luminal Adaptive Secretory Precursor
+    label_short: LASP
+    lineage: Luminal
+    notes: KIT+/PIGR+ luminal progenitor / secretory precursor (LumSec lineage)
+  LASP-basal:
+    full_name: Luminal Adaptive Secretory Precursor, basal-like
+    label_short: LASP-basal
+    lineage: Luminal
+    notes: ALDH1A3+/KRT15+/KRT7+/PTN+ ductal LP variant of LASP
+  LHS:
+    full_name: Luminal Hormone Sensing
+    label_short: LHS
+    lineage: Luminal
+    notes: FOXA1+/PGR+/GATA3+/MLPH+ hormone-responsive luminal (replaces "LumHR" terminology)
+artifact_vocabulary:
+  Immune_artifact: { full_name: "Epithelial nucleus capturing immune RNA" }
+  Stromal_artifact: { full_name: "Epithelial nucleus capturing stromal RNA" }
+  BMYO_artifact: { full_name: "Low-signal BMYO nucleus / debris (not a distinct biological state)" }
+
+base:
+  '0':
+    label: BMYO-myo
+    label_short: BMYO-myo
+    lineage: Basal
+    confidence: high
+    notes: 'Nuclear: ACTA2(5.0,96%), MYLK(6.1,92%), MYH11(5.3,69%), ACTG2(4.3,78%), KRT5(4.2,83%). Cyto: ACTA2(3.8,95%), MYLK(4.5,88%),
+      MYH11(3.8,63%), POSTN(3.3,64%). FLEX: ACTA2(6.6,96%), MYL9(5.7,93%), TAGLN(5.7,94%), TPM2(4.2,94%), FGFR1(4.4,92%).
+      Contractile program (ACTA2/MYH11/MYL9/TAGLN) confirmed across all three layers. KRT5+ in Xenium panel confirms basal
+      identity. Triple-concordant.
+
+      '
+  '1':
+    label: LASP
+    label_short: LASP
+    lineage: Luminal
+    confidence: high
+    notes: 'Nuclear: KIT(8.0,91%), PIGR(6.7,80%), SFRP1(3.4,96%), SLC5A6(4.7,65%), KRT7(2.2,97%). Cyto: KIT(6.3,79%), PIGR(5.8,75%),
+      SFRP1(2.6,93%), EPCAM(2.4,71%). FLEX: GABRP(7.9,94%), CCL28(6.1,89%), KRT15(5.9,92%), KIT(6.6,86%), ELF5(7.3,82%), EHF(4.5,82%).
+      KIT confirmed nuclear and cyto. FLEX extends with canonical LP triad (ELF5/GABRP/KIT). EHF, KRT15, CCL28 further confirm
+      LP lineage. Triple-concordant.
+
+      '
+  '2':
+    label: LHS
+    label_short: LHS
+    lineage: Luminal
+    confidence: high
+    notes: 'Nuclear: ANKRD30A(7.7,84%), MLPH(6.7,85%), FOXA1(6.8,73%), PGR(5.6,73%), KRT8(3.5,83%). Cyto: FOXA1(4.8,60%),
+      GATA3(2.7,74%), KRT8(2.9,72%), PGR(3.7,57%), SERPINA3(3.1,67%). FLEX: MLPH(6.2,97%), XBP1(6.1,95%), AZGP1(5.2,97%),
+      STC2(5.5,91%), ANKRD30A(8.3,85%), GREB1(5.0,84%). Hormone receptor program: FOXA1/PGR/GATA3 confirmed nuc+cyto. FLEX
+      adds secretory program (XBP1/AZGP1/STC2/GREB1) characteristic of HR+ luminal cells. Triple-concordant.
+
+      '
+  '3':
+    label: BMYO_artifact
+    label_short: BMYO_art
+    lineage: Artifact
+    base_label_overridden: BMYO-NC
+    qc_flag: patient_library_batch_effect
+    confidence: high
+    notes: 'Reclassified as artifact 2026-04-29. Patient/library distribution (audited
+      against joint_l1p5.csv 11,987 cells): 85% Pat2 (10,193), 14% Pat1 (1,730), <1% other
+      patients; 96% Xenium-only (FLEX 525 cells across 4 patients). Single Xenium library
+      Pat2_P1_xenium_1 contributes 7,593 cells (63%). Marker signature is real (Nuclear:
+      DSP 4.6/97%, AQP3 7.8/74%, KRT14 4.3/94%, KLF5 5.7/72%, EGFR 4.5/83%, JUP 4.6/74%;
+      FLEX: TFCP2L1, PPARGC1A) but the patient/library skew indicates a Xenium-side batch
+      effect rather than a true cross-cohort BMYO-basal homolog. iHBCA L2.0 BMYO-basal
+      remains a real biological state in the FLEX/atlas layer; this Xenium cluster does
+      not correspond to it. Routed to BMYO_artifact for biological analyses; preserved
+      with qc_flag for downstream investigation.
+
+      '
+artifacts:
+  resolution: '0.3'
+  immune_contaminant:
+    cluster: '3'
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: 'Nuclear: ACTA2+FCER1G(4.8,34%)+AIF1(3.1,31%). Cyto: ACTA2+FCER1G(3.3,31%)+AIF1(3.1,31%). Nuc+cyto predict a mixed
+      epithelial/myeloid identity (FCER1G, AIF1 = FcR/macrophage markers). FLEX: HAVCR2(5.7,34%)+KRT5(1.6,79%) — cannot support
+      a clean epithelial call. Artifact: Xenium nuclei at epithelial–immune boundary; nuc/cyto capture ambient myeloid RNA
+      that FLEX co-embedding does not corroborate as a true epithelial state.
+
+      '
+  bmyo_artifact:
+    cluster: '5'
+    label: BMYO_artifact
+    label_short: BMYO_art
+    lineage: Artifact
+    confidence: medium
+    notes: 'Near-zero signal cluster adjacent to BMYO in embedding space. Defined by absence of canonical markers rather than
+      presence of a distinct program — near-zero LFC across panel genes. Likely low-quality BMYO nuclei (low transcript count)
+      or debris at the epithelial compartment boundary; insufficient signal to resolve a clean BMYO or other epithelial identity.
+      No FLEX support for a distinct biological state. Classified as artifact at L0.5.
+
+      '
+luminal_detail:
+  resolution: '0.5'
+  principle: 'LP splits into two sub-clusters at res=0.5 (lp_secretory c1, lp_ductal c4) — both assigned LASP at L0.5; ALDH1A3-hi
+    ductal LP may warrant L2.0s subdivision. LHS nominally splits (c2/c3) but this split is NOT endorsed by FLEX: FLEX cells
+    co-embedded in both joint clusters show identical full-transcriptome profiles (ANKRD30A/MLPH/FOXA1/XBP1/AZGP1/ELOVL5 co-expressed
+    at the same level in both). At FLEX-only res=0.7, LHS fragments into 3 sub-clusters (FOXA1-hi, NEK10/MYB-hi, PRLR/CD24-hi)
+    that do not align with the joint c2/c3 boundary — the joint split reflects small Xenium panel-space differences, not full-transcriptome
+    structure. Both c2 and c3 are assigned LHS at L0.5. Sub-states are noted for L2.0s but require spatial/functional evidence
+    beyond transcriptional clustering alone.
+
+    '
+  lp_secretory:
+    cluster: '1'
+    label: LASP
+    label_short: LASP
+    lineage: Luminal
+    confidence: high
+    notes: 'Nuclear: KIT(7.6,95%), PIGR(7.4,91%), SFRP1(3.3,97%), EPCAM(3.8,87%). FLEX: ELF5(6.2,92%), GABRP(5.8,95%), KIT(5.2,91%),
+      CCL28(4.9,92%), EHF(4.5,90%). High PIGR (secretory IgA transport) and KIT, canonical LP. Same label as base.
+
+      '
+  '4':
+    label: LASP-basal
+    label_short: LASP-basal
+    lineage: Luminal
+    confidence: medium
+    notes: 'Nuclear: KRT7(2.3,97%), PTN(4.4,81%), KRT23(5.7,60%), ALDH1A3(5.1,59%), KIT(4.4,80%). Cyto: KRT7(1.9,93%), PTN(3.4,75%),
+      KRT23(4.4,45%), ALDH1A3(3.4,41%). FLEX: KRT15(4.4,93%), GABRP(4.2,91%), LMNA(2.8,93%), KRT7(2.8,91%). ALDH1A3 (aldehyde
+      dehydrogenase, mammary stem/progenitor marker), PTN (ductal morphogen), KRT23 (ductal keratin). KIT confirmed; LP identity
+      consistent. Possible ductal LP subtype. Assigned LP at L0.5; L2.0s may warrant ALDH1A3-hi LP.
+
+      '
+  lumhr_a:
+    cluster: '2'
+    label: LHS
+    label_short: LHS
+    lineage: Luminal
+    confidence: high
+    notes: 'Nuclear: ANKRD30A(6.2,84%), MLPH(5.4,84%), FOXA1(5.0,71%), PGR(4.5,74%), GATA3(2.8,84%). FLEX: XBP1(4.9,97%),
+      AZGP1(4.3,98%), MLPH(4.2,97%), STC2(4.4,94%), ELOVL5(3.4,93%). ELOVL5 (fatty acid elongase) active; XBP1-hi secretory
+      program. Assigned LumHR at L0.5.
+
+      '
+  lumhr_b:
+    cluster: '3'
+    label: LHS
+    label_short: LHS
+    lineage: Luminal
+    confidence: high
+    notes: 'Nuclear: MLPH(5.6,86%), ANKRD30A(6.0,84%), FOXA1(5.3,76%), PGR(4.3,72%), KRT8(3.0,82%). FLEX: MLPH(5.7,98%), XBP1(5.1,94%),
+      AZGP1(4.7,97%), STC2(4.7,89%), NEK10(5.3,79%). Markers are nearly identical to c2 from FLEX perspective. NEK10 appears
+      in FLEX top markers but at res=0.7 FLEX-only, NEK10-hi cells form one of 3 sub-clusters that do not map cleanly onto
+      the joint c2/c3 split. FLEX cells in both joint clusters are indistinguishable in the nuc_x_flex dot plot — the c2/c3
+      boundary is Xenium-panel-driven, not full-transcriptome-supported. Assigned LHS at L0.5 (same as c2).
+
+      '
+  stromal_contaminant:
+    cluster: '6'
+    label: Stromal_artifact
+    label_short: Stromal_art
+    lineage: Artifact
+    confidence: high
+    notes: 'Nuclear: ACTA2+MYLK+CXCL12(4.8,49%)+POSTN(2.9,69%)+LUM(5.0,41%). Cyto: CXCL12(4.4,67%)+LUM(4.0,57%)+ZEB2(3.3,48%)+PDGFRB(3.4,42%).
+      Nuc+cyto predict an ACTA2+ cell with strong fibroblast markers (CXCL12/LUM/POSTN/PDGFRB). FLEX: COL16A1+COL7A1+COL6A1
+      — pure collagen/ECM, cannot support an epithelial call. Artifact: Xenium nucleus at epithelial–stromal boundary; FLEX
+      confirms the co-embedded neighbors are fibroblasts, not epithelial cells.
+
+      '
+  immune_contaminant_c10:
+    cluster: '10'
+    label: Immune_artifact
+    label_short: Immune_art
+    lineage: Artifact
+    confidence: high
+    notes: 'Nuclear: CD83(9.7,96%)+ACTA2+MYLK+KRT5. Cyto: same ACTA2+MYLK profile. Nuc+cyto predict an ACTA2+ cell; CD83 (DC/activated
+      immune surface marker) cannot be explained by any epithelial type. FLEX cannot support a clean epithelial call. Artifact:
+      same class as res=0.3 c3 — epithelial nucleus capturing immune RNA.
+
+      '
+final_labels:
+- BMYO-myo
+- LASP
+- LASP-basal
+- LHS
+artifact_labels:
+- Immune_artifact
+- Stromal_artifact
+- BMYO_artifact

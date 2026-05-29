@@ -1,0 +1,23 @@
+{
+  "patch_id": "extras_n30",
+  "source_h5ad": "/share/crsp/lab/dalawson/nwechter/Spatial_HBCA_preprocessing/.dev/pipeline_comparison_20260401/outputs/compartments_step15/Immune/integration/scvi_n100/integrated.h5ad",
+  "use_rep": "X_emb",
+  "n_neighbors": 30,
+  "resolutions": [
+    0.4,
+    0.6,
+    1.5,
+    2.0,
+    3.0
+  ],
+  "col_prefix": "leiden_n30",
+  "random_seed": 0,
+  "n_cells": 47942,
+  "cluster_cols": [
+    "leiden_n30_r0.4",
+    "leiden_n30_r0.6",
+    "leiden_n30_r1.5",
+    "leiden_n30_r2.0",
+    "leiden_n30_r3.0"
+  ]
+}

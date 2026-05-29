@@ -1,0 +1,180 @@
+# =============================================================================
+# KUMAR STUDY - EDGE CASES
+# =============================================================================
+# Documented exceptions and known issues for the Kumar study.
+# These inform downstream processing and analysis decisions.
+# =============================================================================
+
+study: kumar
+last_updated: 2026-01-20
+
+# =============================================================================
+# CONFIRMED EDGE CASES
+# =============================================================================
+
+confirmed:
+  - id: "kumar-no-continuous-age"
+    category: "metadata_quality"
+    severity: "limitation"
+    summary: "Only binary age (Y/O) available, no continuous age"
+    details: |
+      The Kumar study collected age as a binary variable only:
+      - Y = Young (<50 years)
+      - O = Old (>=50 years)
+
+      This was a deliberate study design choice, not a data collection error.
+      No continuous age values exist in the original supplemental data.
+    impact:
+      - "Cannot perform continuous age regression analyses"
+      - "Must use age_binary column for DA testing"
+      - "Age cutoff at 50 matches common pre/post menopausal boundary"
+    resolution: "Use age_binary (Y/O) for differential abundance tests"
+    source: "Supplementary Table 1 legend (KUMAR_table1_extracted.txt)"
+    linked_knowledge_entry: "knowledge.md: kumar-no-continuous-age"
+
+  - id: "kumar-incomplete-extraction"
+    category: "data_availability"
+    severity: "informational"
+    summary: "Extracted file contains 102/167 samples"
+    details: |
+      The extracted KUMAR_table1_extracted.txt contains samples hbca_c66 through hbca_c167.
+      The original table legend states 167 tissue samples from 126 women.
+      Samples hbca_c01 through hbca_c65 are not in the extracted file.
+
+      PARTIAL EXPLANATION: Some Kumar samples are nuclear-only preparations (different
+      processing pipeline). The missing samples may represent nuclear preps vs whole-cell.
+      Also note some patients have multiple samples.
+    impact:
+      - "Track 2 RDS extraction should verify actual sample coverage"
+      - "May need to obtain full supplemental table if samples are missing"
+      - "Need to determine if nuclear vs whole-cell explains the gap"
+    resolution: "Verify against RDS file sample IDs during Track 2; document nuclear vs whole-cell split"
+    source: "KUMAR_table1_extracted.txt header vs content"
+
+  - id: "kumar-capitalization-inconsistency"
+    category: "data_quality"
+    severity: "minor"
+    summary: "Inconsistent capitalization in Tissue_Source and BMI_Group columns"
+    details: |
+      Tissue_Source: "prophylatic Mastectomy" (n=5) vs "Prophylatic Mastectomy" (n=4)
+      BMI_Group: "normal" (n=6) vs "Normal" (n=3)
+
+      Also note: "prophylatic" is a typo for "prophylactic"
+    impact:
+      - "String matching must be case-insensitive"
+      - "Normalization required before analysis"
+    resolution: "Normalize during harmonization step"
+    source: "KUMAR_table1_extracted.txt"
+
+# =============================================================================
+# POTENTIAL ISSUES (TO VERIFY IN TRACK 2)
+# =============================================================================
+
+to_verify:
+  - id: "kumar-cell-id-format"
+    description: "Cell ID format in RDS needs UNSUPERVISED discovery"
+    notes: |
+      CRITICAL: Do NOT assume cell ID format. Track 2 must perform unsupervised
+      pattern analysis on cell IDs to discover the actual format.
+      - Detect separators automatically
+      - Count components
+      - Identify which component is barcode vs sample ID vs other
+      - Document ALL observed patterns
+    verify_in: "Track 2 RDS extraction - unsupervised analysis"
+
+  - id: "kumar-sample-to-cell-mapping"
+    description: "Verify Sample_ID (hbca_c##) maps correctly to cell IDs"
+    notes: "Cell IDs may contain sample ID as prefix component - verify empirically"
+    verify_in: "Track 2 RDS extraction"
+
+  - id: "kumar-risk-status-clarification"
+    description: "Cancer Mastectomy patients have UNKNOWN risk_status"
+    notes: |
+      10 samples are Cancer Mastectomy (post-cancer patients).
+      These patients had cancer but we have NO genotype information.
+      Cancer history ≠ BRCA carrier status.
+      Resolution: Classify as risk_status = unknown (not HR).
+    verify_in: "Track 2 - confirm no BRCA genotype data in RDS metadata"
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+
+open_questions:
+
+  missing_samples_explanation:
+    question: "What explains the c01-c65 gap in extracted supplemental?"
+    context: |
+      102/167 samples present. Possible explanations:
+      - Nuclear vs whole-cell preparation split
+      - Different processing batches
+      - Extraction artifact from PDF
+    resolve_by: "Track 2 - compare RDS sample IDs to supplemental"
+    status: OPEN
+
+  cell_id_unsupervised_analysis:
+    question: "What is the actual cell ID format?"
+    context: |
+      MUST discover format through unsupervised analysis:
+      - Split by potential separators (_, -, :)
+      - Count unique values per component
+      - Identify barcode component (16bp, ACGT only)
+      - Document ALL conformations observed
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+
+  metadata_column_mapping:
+    question: "How do supplemental columns map to RDS @meta.data?"
+    context: |
+      Supplemental: Sample_ID, Patient_ID, Institution, Tissue_Source, Age, Ethnicity, Parity, Menopause, BMI, BMI_Group
+      RDS may have different column names or additional columns.
+    resolve_by: "Track 2 - explicit mapping table"
+    status: OPEN
+
+  ethnicity_as_condition:
+    question: "Is ethnicity a testable condition for DA?"
+    context: |
+      Good contrast: 60 African-American vs 30 Caucasian
+      Scientifically relevant for breast cancer disparities research.
+      Need to confirm ethnicity present in RDS metadata.
+    resolve_by: "Scientific decision + Track 2 verification"
+    status: OPEN
+
+  bmi_as_condition:
+    question: "Is BMI a testable condition for DA?"
+    context: |
+      BMI available: continuous (16.64-47.44) and categorical (obese/overweight/normal/underweight)
+      Could binarize as obese (BMI>=30) vs non-obese
+      69 obese vs 32 non-obese in extracted subset
+    resolve_by: "Scientific decision + Track 2 verification"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do 714,331 cells distribute across samples?"
+    context: |
+      714K cells total (from knowledge.md)
+      Need per-sample cell counts from RDS
+    resolve_by: "Track 2 - table(obj$sample_column)"
+    status: OPEN
+
+# =============================================================================
+# STUDY CHARACTERISTICS
+# =============================================================================
+
+study_characteristics:
+  total_cells: 714331
+  total_donors: 126
+  tissue_source_breakdown:
+    "Reduction Mammoplasty": "majority (normal tissue)"
+    "Prophylactic Mastectomy": "minority"
+    "Cancer Mastectomy": "10 samples (UCI only)"
+
+  institutions:
+    bcm: "Baylor College of Medicine"
+    uci: "UC Irvine"
+
+  notable_features:
+    - "Large African-American cohort (60 samples)"
+    - "BMI data available (continuous + categorical)"
+    - "Good parity coverage (86%)"
+    - "Strong pre-menopausal representation (80/102)"

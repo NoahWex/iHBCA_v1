@@ -1,0 +1,161 @@
+# =============================================================================
+# MURROW STUDY - EDGE CASES AND KNOWN ISSUES
+# =============================================================================
+# Documented exceptions from knowledge.md, confirmed or updated by Track 1 extraction
+# =============================================================================
+
+study: murrow
+last_updated: 2026-01-20
+extraction_source: supplemental_extraction.yaml
+
+# =============================================================================
+# CONFIRMED ISSUES (from knowledge.md)
+# =============================================================================
+
+confirmed_issues:
+
+  murrow-no-age-contrast:
+    issue_id: murrow-no-age-contrast
+    status: CONFIRMED
+    description: "All donors pre-menopausal (<50)"
+    resolution: "Skip age_binary DA tests"
+    evidence:
+      source: "MURROW_NIHMS1824429-supplement-2.xlsx Table S1"
+      age_min: 19
+      age_max: 47
+      scrnaseq_samples: 35
+      samples_under_50: 35
+      samples_50_plus: 0
+    notes: "All 35 scRNAseq samples have ages 19-47, confirming no age contrast available"
+
+  murrow-no-brca-contrast:
+    issue_id: murrow-no-brca-contrast
+    status: CONFIRMED
+    description: "All donors AR (reduction mammoplasty)"
+    resolution: "Skip risk_status DA tests"
+    evidence:
+      source: "MURROW_NIHMS1824429-supplement-2.xlsx Table S1"
+      sample_types:
+        RM: "Reduction Mammoplasty - healthy controls"
+        KTB: "Komen Tissue Bank - healthy donors"
+      brca_column_present: false
+    notes: "No BRCA/genetic risk column in source data; study design is healthy tissue only"
+
+# =============================================================================
+# NEW OBSERVATIONS (from Track 1 extraction)
+# =============================================================================
+
+new_observations:
+
+  sample_count_discrepancy:
+    observation_id: murrow-sample-count-mismatch
+    severity: low
+    description: "STUDY.md states 28 donors but supplemental shows 35 scRNAseq samples"
+    details:
+      study_md_donors: 28
+      supplemental_scrnaseq_samples: 35
+      rm_samples: 28
+      ktb_samples: 7
+    resolution: "Reconcile with Track 2 RDS extraction"
+    hypothesis: "STUDY.md may count only RM samples, or RDS may have different donor count"
+
+  ktb_age_distribution:
+    observation_id: murrow-ktb-older
+    severity: info
+    description: "KTB samples (37-47) are systematically older than most RM samples (18-39)"
+    details:
+      ktb_age_range: [37, 47]
+      rm_age_range: [18, 39]
+      overlap: "RM253 (39) overlaps with KTB range"
+    relevance: "May indicate source-age confounding if pooled"
+
+  parity_coverage:
+    observation_id: murrow-parity-coverage
+    severity: info
+    description: "Parity available for 82.9% of scRNAseq samples"
+    details:
+      known_parity: 29
+      unknown_parity: 6
+      nulliparous: 11
+      parous: 18
+    relevance: "Parity is testable condition - good coverage"
+
+# =============================================================================
+# CONDITION TESTABILITY SUMMARY
+# =============================================================================
+
+condition_summary:
+  age_binary:
+    testable: false
+    reason: "No contrast - all <50"
+
+  menopausal_status:
+    testable: false
+    reason: "All pre-menopausal based on age (19-47)"
+    harmonized_value: "pre"
+    no_contrast: true
+    notes: "All donors assigned 'pre' - no testable contrast for DA"
+
+  risk_status:
+    testable: false
+    reason: "All AR (healthy controls)"
+
+  parity_binary:
+    testable: true
+    coverage: 82.9%
+    contrast: "11 nulliparous vs 18 parous"
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+# These must be resolved during Track 2 extraction before marking complete.
+
+open_questions:
+
+  cell_id_format:
+    question: "What is the cell ID format in murrow.rds?"
+    context: "Supplemental uses Sample IDs like RM###, KTB###. How do these map to cell IDs?"
+    resolve_by: "Track 2 extraction - examine colnames(obj)"
+    status: OPEN
+
+  metadata_column_mapping:
+    question: "How do supplemental columns map to RDS @meta.data?"
+    context: |
+      Supplemental has: Sample ID, Source, Sex, Age, BMI, Parity, HC use
+      RDS column names may differ. Need explicit mapping.
+    resolve_by: "Track 2 extraction - compare colnames(obj@meta.data)"
+    status: OPEN
+
+  hc_use_as_condition:
+    question: "Is hormonal contraceptive use (HC use) a testable condition?"
+    context: |
+      Supplemental shows contrast: 33 none vs 21 on HC (various types)
+      Not currently listed in condition_availability.
+      Is this biologically relevant for breast tissue DA?
+    resolve_by: "Biological assessment + verify HC use present in RDS"
+    status: OPEN
+
+  bmi_as_condition:
+    question: "Is BMI a condition of interest for DA testing?"
+    context: |
+      72% coverage (41/57 known), continuous values 20-44
+      Could be binarized (e.g., <30 vs >=30 for obesity)
+    resolve_by: "Determine if BMI is scientifically relevant for study goals"
+    status: OPEN
+
+  cell_distribution:
+    question: "How do 86,136 cells distribute across 35 samples?"
+    context: |
+      knowledge.md states Murrow has 86,136 cells
+      35 scRNAseq samples in supplemental
+      Need per-sample cell counts from RDS
+    resolve_by: "Track 2 extraction - table(obj$sample_column)"
+    status: OPEN
+
+  sample_id_in_rds:
+    question: "What column in RDS contains sample/donor ID?"
+    context: |
+      Need to join supplemental metadata to cells
+      Common candidates: orig.ident, sample, donor, Sample_ID
+    resolve_by: "Track 2 extraction - inspect @meta.data columns"
+    status: OPEN

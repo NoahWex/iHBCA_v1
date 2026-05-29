@@ -1,0 +1,229 @@
+# =============================================================================
+# PAL NORM B1 - EDGE CASES AND KNOWN ISSUES
+# =============================================================================
+# Documented exceptions, known issues, and required handling for pal_norm_b1.
+# =============================================================================
+
+study: pal_norm_b1
+last_updated: 2026-01-20
+
+# =============================================================================
+# CRITICAL ISSUES
+# =============================================================================
+
+critical_issues:
+
+  - id: "pal-0123-collision"
+    severity: critical
+    status: resolved
+    description: "Donor 0123 barcode collision with donor 0023"
+
+    details: |
+      The NormB1Total.rds object contains normal controls from the NormTotal
+      substudy. Among these, donor N-0123 maps to iHBCA donor MH0023. However,
+      the BRCA1 donor B1-0023 also maps to iHBCA donor MH0023.
+
+      Since 10x barcodes are unique within a batch but can repeat across batches,
+      cells from N-0123 and B1-0023 may share identical barcodes. When both are
+      mapped to MH0023_mix, this creates ambiguous cell IDs.
+
+    root_cause: |
+      iHBCA Pal subset uses a unified donor naming scheme where both N-0123
+      (via its original donor 0123) and B1-0023 (BRCA1 carrier) map to the
+      same iHBCA identifier MH0023.
+
+    affected_cells: ~500  # Estimated cells from N-0123
+    affected_donors:
+      - source_id: "N-0123"
+        ihbca_donor: "MH0023"
+        sample_type: "total"  # N_0123_total -> MH0023_mix
+      - source_id: "B1-0023"
+        ihbca_donor: "MH0023"
+        sample_type: "mix"  # B1_0023 -> MH0023_mix
+
+    resolution:
+      action: "Exclude donor 0123 from pal_norm_b1 cell ID mapping"
+      implementation: |
+        In create_cell_id_mapping.R, the norm_b1 substudies config includes:
+        exclude_donors = c("0123")
+
+        This ensures N-0123 cells are not included in the pal_norm_b1 Milo
+        object, avoiding barcode collisions with B1-0023.
+
+      validation: |
+        After exclusion, all remaining cell IDs in pal_norm_b1 should have
+        unique mappings to iHBCA cell IDs. Verify no duplicate barcodes
+        within the MH0023_mix batch.
+
+    references:
+      - "create_cell_id_mapping.R:141-145"
+      - "knowledge.md: pal-0123-collision"
+
+# =============================================================================
+# DA TESTING CONSTRAINTS
+# =============================================================================
+
+da_testing_constraints:
+
+  - id: "pal-parity-confounding"
+    applies_to: all_pal_substudies
+    condition: parity
+    constraint: "Skip parity DA tests"
+    reason: |
+      Parity is confounded with menopausal status in all Pal substudies.
+      In NormB1 specifically, all 4 BRCA1 donors are Nulliparous, making
+      parity comparisons impossible within the BRCA1 group.
+
+  - id: "pal-b1-small-sample"
+    applies_to: pal_norm_b1
+    condition: menopausal_status
+    constraint: "Skip menopausal DA tests or interpret with caution"
+    reason: |
+      Only 4 BRCA1 donors total: 2 pre-menopausal, 2 post-menopausal.
+      Sample size insufficient for reliable menopausal effects within
+      the BRCA1 group. Cross-comparison with normal (8 pre, 5 post)
+      would confound menopausal and BRCA1 status.
+
+  - id: "pal-b1-no-age-contrast"
+    applies_to: pal_norm_b1
+    condition: age_binary
+    constraint: "Skip age_binary DA tests"
+    reason: |
+      BRCA1 donor ages: 30, 31, 42, 43. All relatively young.
+      Normal control ages span 19-69, but comparison would confound
+      age with BRCA1 status.
+
+# =============================================================================
+# CELL COMPOSITION NOTES
+# =============================================================================
+
+cell_composition:
+
+  total_cells: 59766
+
+  brca1_cells:
+    count: 23240
+    percentage: 38.9
+    donors: 4
+    cell_ids_pattern: "B1_{donor}_{barcode}-1"
+
+  normal_cells:
+    count: 36526
+    percentage: 61.1
+    donors: 13  # Same as NormTotal, minus 0123 after exclusion = 12
+    cell_ids_pattern: "N_{donor}_total_{barcode}-1"
+    note: "Overlaps entirely with NormTotal substudy"
+
+  after_0123_exclusion:
+    normal_donors: 12  # 13 - 1 (0123 excluded)
+    estimated_normal_cells: ~36000  # Approximately
+    notes: "Exact count depends on N-0123 cell count in object"
+
+# =============================================================================
+# VALIDATION CHECKS
+# =============================================================================
+
+validation_checks:
+
+  - check: "No duplicate cell IDs after mapping"
+    test: |
+      After cell ID mapping, verify:
+      length(unique(mapped_ids)) == length(mapped_ids)
+    expected: true
+
+  - check: "0123 donor excluded"
+    test: |
+      Verify no cells with prefix N_0123_ in final Milo object
+      sum(grepl("N_0123_", cell_ids)) == 0
+    expected: true
+
+  - check: "All B1 donors mapped"
+    test: |
+      Verify all 4 BRCA1 donors present:
+      c("KCF0894", "MH0033", "MH0023", "MH0090") all in mapped donors
+    expected: true
+
+# =============================================================================
+# OPEN QUESTIONS FOR TRACK 2
+# =============================================================================
+
+open_questions:
+
+  cell_id_format_b1:
+    question: "Confirm BRCA1 cell ID format is B1_{donor}_{barcode}-1?"
+    context: |
+      Expected from supplemental extraction:
+      - BRCA1: B1_{donor}_{barcode}-1 (e.g., B1_0894_AAACCTGAGACTAGGC-1)
+      - Normal: N_{donor}_total_{barcode}-1 OR N_{donor}_mix_{barcode}-1
+
+      Need UNSUPERVISED pattern analysis to confirm.
+    resolve_by: "Track 2 - pattern analysis on colnames(obj)"
+    status: OPEN
+    priority: HIGH
+
+  cell_count_verification:
+    question: "Confirm total cell count breakdown"
+    context: |
+      Expected:
+      - Total: 59,766 cells
+      - BRCA1: 23,240 cells
+      - Normal: 36,526 cells
+
+      After 0123 exclusion, normal count should decrease.
+    resolve_by: "Track 2 - ncol(obj) and table(obj$sample_column)"
+    status: OPEN
+
+  donor_0123_exclusion_verification:
+    question: "Verify 0123 exclusion doesn't create gaps"
+    context: |
+      The 0123 collision resolution requires excluding N-0123.
+      Need to verify:
+      - How many cells are excluded?
+      - Does exclusion affect menopausal group balance?
+      - N-0123 is pre-menopausal, age 48, parous
+    resolve_by: "Track 2 - count N_0123 cells before exclusion"
+    status: OPEN
+
+  metadata_columns_in_rds:
+    question: "What metadata columns exist in RDS @meta.data?"
+    context: |
+      Need to verify:
+      - Is risk_status or BRCA1 indicator present?
+      - Is menopausal_status present?
+      - Is donor/specimen ID present?
+      - How are B1 vs N donors distinguished?
+    resolve_by: "Track 2 - colnames(obj@meta.data)"
+    status: OPEN
+
+  cell_distribution_by_donor:
+    question: "How do cells distribute across BRCA1 vs Normal donors?"
+    context: |
+      Need per-donor cell counts:
+      - 4 BRCA1 donors (B1-0894, B1-0033, B1-0023, B1-0090)
+      - 13 Normal donors (same as NormTotal)
+
+      This determines statistical power for risk_status DA.
+    resolve_by: "Track 2 - table(obj$donor_column)"
+    status: OPEN
+
+  ihbca_donor_mapping_verification:
+    question: "Verify iHBCA donor ID mappings are correct"
+    context: |
+      Expected mappings:
+      - B1-0894 -> KCF0894
+      - B1-0033 -> MH0033
+      - B1-0023 -> MH0023
+      - B1-0090 -> MH0090
+
+      This is critical for cell ID mapping to iHBCA.
+    resolve_by: "Track 2 - cross-reference with iHBCA metadata"
+    status: OPEN
+
+# =============================================================================
+# REFERENCES
+# =============================================================================
+
+references:
+  knowledge_base: ".claude/rules/integration-assessment/knowledge.md"
+  mapping_script: "scripts/preprocessing/create_cell_id_mapping.R"
+  source_object: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormB1Total.rds"

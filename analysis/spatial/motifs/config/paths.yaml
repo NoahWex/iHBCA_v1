@@ -1,0 +1,44 @@
+# Motifs pipeline internal layout.
+#
+# This file specifies only the module's internal output layout. All filesystem
+# roots, HPC containers, bind mounts, R/Python library paths, and cross-repo
+# substrate tokens are resolved by sourcing publication/config/load_paths.{sh,py}
+# BEFORE this file's load_paths.{sh,py} (hybrid config pattern, Option B).
+#
+# Schema:
+#   project_name:   module identifier
+#   pipeline:       output layout relative to motif_pipeline_root
+#                   (publication/analysis/spatial/motifs/)
+#
+# To reach a global publication artifact (e.g. xenium_joint_l1p5 substrate,
+# Singularity container, or a published motif output) use the canonical
+# resolver — see config/load_paths.sh for envvar names exported.
+
+project_name: motifs
+project_stage: publication
+
+# ----------------------------------------------------------------------------
+# Output layout (relative to motif_pipeline_root, which is resolved from
+# publication/config/paths.yaml as SOURCE_MOTIF_PIPELINE_ROOT).
+#
+# Single outputs/ directory consolidates what the dev pipeline split across
+# data/{nmf,inputs,validation} + reports/. Subdirs preserve fine-grained
+# organization where it matters (e.g. outputs/validation/{s05,s36,s37,s38}).
+# ----------------------------------------------------------------------------
+
+pipeline:
+  scripts: scripts
+  run: run
+  outputs:
+    root: outputs
+    nmf: outputs                           # basis.csv, basis_K{6,11}.csv, diagnostics.csv, ...
+    validation: outputs/validation         # s36_*, s37_*, s38_*, s05_* subdirs
+    inputs: outputs                        # nmf_input_features.parquet, joint_l1p5_xenium_cells_v2.parquet
+    motif_units: outputs/motif_units       # motif_units.parquet, motif_cells.parquet, motif_units.audit.json
+
+# Canonical-resolver keys this module reads (for documentation; resolved via
+# SOURCE_* envvars exported by publication/config/load_paths.sh).
+canonical_inputs:
+  - xenium_joint_l1p5         # per-cell L1.5 vocabulary (joint Xenium+FLEX)
+  - xenium_manifest           # 67-sample Xenium roster (xenium_id + patient_id)
+  - xenium_spaceflow_dir      # per-sample Gautham-annotated h5ads (.../annotated_corrected/)

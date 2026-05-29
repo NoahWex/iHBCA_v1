@@ -1,0 +1,137 @@
+# inquiry.yaml — risk_l2_voom_20260519
+# Per-L2 limma voom DE for BRCA1 vs AR, with a rigor sweep across blocking
+# covariates and cohort definitions.
+#
+# Substrate: iHBCA V1 atlas (2.12M cells, 159 donors AR+BR1).
+# Tested on the same donor set as risk_main_effects_20260507/BR1_vs_AR,
+# but at the gene level (limma voom on pseudobulk L2 x donor counts)
+# rather than the abundance level (Milo on per-nhood logFC).
+
+inquiry: risk_l2_voom_20260519
+inquiry_schema_version: 1
+description: |
+  Gene-level differential expression of BR1 carriers vs AR donors,
+  computed per L2 cell type via limma voom on pseudobulk (L2 x donor)
+  counts. Eight designs span two cohort definitions and four blocking
+  combinations each.
+
+# Cohort definitions
+cohorts:
+
+  A_full:
+    description: |
+      All 159 donors (AR=125, BR1=34) from the risk_main_effects cohort.
+      Cannot block `study` cleanly (kumar/murrow/nee are class-unbalanced).
+      Use technical-batch proxies (sample_type, facs_status) instead.
+    donor_filter:
+      risk_class: [AR, BR1]
+      parity_binary: [parous, nulliparous]
+      study: {exclude: [twigger]}
+    n_donors_expected:
+      AR: 125
+      BR1: 34
+
+  B_balanced:
+    description: |
+      Studies with both AR and BR1 donors: reed + gray + pal.
+      n_donors = 65 (AR=39, BR1=26). Allows blocking on `study`.
+      All covariates fully informative; age_continuous has 0% NA on
+      this subset (vs 40% NA on full cohort).
+    donor_filter:
+      risk_class: [AR, BR1]
+      parity_binary: [parous, nulliparous]
+      study: {include: [reed, gray, pal]}
+    n_donors_expected:
+      AR: 39
+      BR1: 26
+
+# Formula ladder — 8 designs total, 4 per cohort
+# All use age_binary (continuous age has 40% NA on Cohort A; menopausal
+# is aliased with age — chi2 p < 1e-17). risk_class is the test variable.
+formulas:
+
+  # Cohort A (full)
+  A0_bare:
+    cohort: A_full
+    formula: "~ risk_class"
+    rationale: "Sensitivity floor: no blocking. Maximum power, maximum confounding."
+
+  A1_bio:
+    cohort: A_full
+    formula: "~ parity_binary + age_binary + risk_class"
+    rationale: "Minimal bio blocking only."
+
+  A2_sampletype:
+    cohort: A_full
+    formula: "~ sample_type + parity_binary + age_binary + risk_class"
+    rationale: "+ technical batch proxy (sample_type)."
+
+  A3_full:
+    cohort: A_full
+    formula: "~ sample_type + facs_status + parity_binary + age_binary + risk_class"
+    rationale: "+ sort method. Maximum blocking achievable on full cohort."
+
+  # Cohort B (balanced studies — reed + gray + pal only)
+  B1_study:
+    cohort: B_balanced
+    formula: "~ study + parity_binary + age_binary + risk_class"
+    rationale: "Block study (now feasible on balanced subset)."
+
+  B2_study_facs:
+    cohort: B_balanced
+    formula: "~ study + facs_status + parity_binary + age_binary + risk_class"
+    rationale: "+ sort method."
+
+  B3_full:
+    cohort: B_balanced
+    formula: "~ study + facs_status + sample_type + parity_binary + age_binary + risk_class"
+    rationale: "Maximum blocking. Likely rank-deficient on small L2s."
+
+  # B4_austin removed 2026-05-19 — Austin's design used sample_type_coarse,
+  # which on iHBCA donors is 77% NA (only Reed/Pal samples populate it).
+  # A2_sampletype/B-equivalent uses the fully-populated sample_type column
+  # and gives a comparable substitute.
+
+# Test contrast
+contrasts:
+  - name: BR1_vs_AR
+    type: coef
+    coef: risk_classBR1
+    description: "BRCA1 main effect on gene expression, parity- and other-covariate-adjusted."
+
+# Pseudobulk filters
+pseudobulk:
+  level2_column: level2          # iHBCA V1 L2.0c label column
+  donor_column: patientID
+  study_column: dataset
+  min_cells_per_donor_l2: 5      # min cells per (L2 x donor) pseudobulk
+  min_donors_per_class: 5        # min AR and BR1 donors per L2 (per cohort).
+                                 # Stricter than existing stageF3_L2_markers_risk.R
+                                 # (which uses 2) but lenient enough to test rare L2s.
+
+# Gene filter — matches stageF3_L2_markers_risk.R convention (NOT filterByExpr)
+gene_filter:
+  method: rowSums_min10          # dge[rowSums(counts) >= 10, , keep.lib.sizes = FALSE]
+  min_expressed_genes: 200       # skip L2 if fewer than 200 genes expressed in >=3 samples
+
+# Significance thresholds (for hit-count summaries, not for raw DE table)
+significance:
+  fdr_threshold: 0.05
+  logfc_threshold: 0.5
+
+# Tissue indication caveat — flag in Methods, do NOT block
+# (perfectly aliased with risk_class: AR=100% reduction, BR1=100% mastectomy)
+caveats:
+  - id: tissue_indication_alias
+    description: "tissue_indication is a structural confounder of risk_class (AR=reduction, BR1=mastectomy). Cannot be blocked. Methods text must note this."
+  - id: study_unbalance
+    description: "kumar/murrow donors are AR-only; nee donors are BR1-only. Including study in the model on Cohort A produces inefficient estimates. Cohort B restricts to balanced studies."
+  - id: facs_partial_alias
+    description: "live_sorted donors (Reed/Murrow live-FACS) have zero BR1. Excluded informativeness when facs_status is blocked."
+  - id: age_menopause_alias
+    description: "age_binary and menopausal_status_binary have chi2 p < 1e-17 (full cohort) / 8e-6 (balanced). Including both would over-parameterize. Use age_binary only."
+
+# Naming for downstream reference
+naming:
+  output_csv_pattern: "{cohort_id}__{formula_id}__{l2_safe_name}.csv"
+  # e.g. A_full__A2_sampletype__epi__LASP_major.csv

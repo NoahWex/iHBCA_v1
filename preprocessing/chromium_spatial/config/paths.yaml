@@ -1,0 +1,192 @@
+# Path resolution for FLEX preprocessing pipeline
+#
+# This is the FLEX pipeline's INTERNAL token namespace. It declares the
+# 74 tokens consumed by run/_common.sh and the per-stage wrappers.
+#
+# Path roots are NOT hardcoded here. _common.sh sources publication-tier
+# load_paths.sh first to populate ${user_root} and ${shared_datasets},
+# then _expand_refs resolves ${...} references below at runtime.
+#
+# Reviewer-facing tokens (consumer-visible handoffs) are declared in
+# publication/config/paths.yaml as flex_* tokens. This file's tokens are
+# scoped to the FLEX pipeline's internal contract.
+#
+# Variable substitution: ${key} references are resolved by _common.sh.
+# Max 1 level of indirection.
+
+# Project root — relative to publication's user_root, resolved by _common.sh
+project_root: ${user_root}/iHBCA_publication/publication/preprocessing/chromium_spatial
+
+# Promoted pipeline outputs (canonical, written by stages 01–20)
+outputs_root: ${project_root}/outputs
+
+# Upstream outputs (immutable canonical inputs from the source preprocessing run).
+# These tokens reach into the source repo's .dev/pipeline_comparison_20260401/
+# tree because that tree holds the frozen sidecars produced by the canonical
+# atlas run (assembly merged_counts, contamination flags, singler labels,
+# passing-cells gate). The .dev/ location is the canonical source — these are
+# not regenerable outputs of *this* pipeline but inputs *to* it. Consumers:
+# step_16 (bigsur_vfs sweep substrate), step_19b 08_compartment_integration_report.Rmd,
+# run_recluster_integration / run_export_h5ad_intermediate utility wrappers.
+upstream_root: ${user_root}/Spatial_HBCA_preprocessing/.dev/pipeline_comparison_20260401/outputs
+upstream_assembly: ${upstream_root}/assembly_step15
+upstream_merged_counts: ${upstream_root}/assembly_step15/merged_counts.h5ad
+upstream_cell_metadata: ${upstream_root}/assembly_step15/cell_metadata.csv
+upstream_contamination: ${upstream_root}/contamination/cell_compartments.csv
+upstream_singler_labels: ${upstream_root}/singler_labels_all.csv
+upstream_passing_cells: ${upstream_root}/passing_cells_step15.csv
+upstream_sample_outputs: ${upstream_root}
+compartment_cell_lists: ${upstream_root}/../compartments_step15/cell_lists
+
+# Sample manifest (committed alongside upstream tree)
+sample_list: ${user_root}/Spatial_HBCA_preprocessing/.dev/pipeline_comparison_20260401/config/sample_list.tsv
+
+# Module configuration manifest (algorithm parameters + SLURM specs per step)
+module_configs: ${project_root}/config/module_configs.yaml
+
+# Scripts and run dirs (relative to project_root)
+scripts_dir: ${project_root}/scripts
+run_dir: ${project_root}/run
+
+# Logs (publication-tier canonical location, not pipeline-local)
+logs_dir: ${user_root}/iHBCA_publication/logs
+
+# Temp (HPC job scratch; outside USER_ROOT to avoid CRSP write contention)
+temp_root: ${user_root}/Spatial_HBCA_preprocessing/.pipeline_temp
+
+# HPC account
+account: dalawson_lab
+
+# L1 annotation reference (legacy v1; retained for provenance)
+l1_pseudobulk_csv: ${user_root}/Spatial_HBCA/project/05_Analyses/outputs/l1_reannotation_20260323/intermediate/l1_pseudobulk_reference.csv
+
+# L1 reference build inputs (09_build_l1_reference.py)
+# DEPRECATED — preintegration "inner" NPZ has only 15K genes (7-study intersection),
+# giving 33% FLEX coverage. Kept for provenance only. Current source is the
+# per-compartment 10x H5 set under ihbca_assembly_components_root below.
+ihbca_author_share_root: ${shared_datasets}/iHBCA_Reed_2024/author_share
+ihbca_counts_npz: ${shared_datasets}/iHBCA_Reed_2024/author_share/preintegration_HBCA_inner_ENSEMBL_simple_counts_matrix.npz
+ihbca_level15_annotations: ${shared_datasets}/iHBCA_Reed_2024/author_share/ihbca_level1.5_annotations.csv
+ihbca_gene_data: ${shared_datasets}/iHBCA_Reed_2024/author_share/scVI_100Dims/gene_data.csv
+gene_symbol_to_ensembl: ${user_root}/iHBCAv1_upload/publication/mappings/gene_symbol_to_ensembl_full.tsv
+
+# Current L1 reference source: per-compartment 10x H5 extracted from canonical
+# all-breast-cells_final.h5ad. Provenance: extraction_manifest source_hash
+# 0cbef095 matches HCA-validated canonical.
+#
+# CROSS-REPO DEPENDENCY: this token reaches into iHBCAv1_upload/.dev/. Consumed
+# only by run_build_l1_reference.sh, which drives the FROZEN-for-provenance
+# step_19a_l1_annotation pathway (do-not-run; superseded by Track C). When
+# iHBCAv1_upload promotes its assembly outputs to its publication/ tree, this
+# token should be redirected to the canonical iHBCA reference path. Until then,
+# the .dev/ reference is acceptable because the consumer is frozen.
+ihbca_assembly_components_root: ${user_root}/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components
+ihbca_h5_epi: ${ihbca_assembly_components_root}/10x_h5/epi_counts.h5
+ihbca_h5_str: ${ihbca_assembly_components_root}/10x_h5/str_counts.h5
+ihbca_h5_imm: ${ihbca_assembly_components_root}/10x_h5/imm_counts.h5
+ihbca_assembly_cell_metadata: ${ihbca_assembly_components_root}/cell_metadata.csv
+
+# =====================================================================
+# CANONICAL PREPROCESSING ROOTS
+# =====================================================================
+# Per-stage sidecar directories under outputs/preprocessing/.
+
+preprocessing_root: ${outputs_root}/preprocessing
+
+# L1 per-step (steps 01–07)
+preprocessing_step_01: ${preprocessing_root}/01_BaselineVFs
+preprocessing_step_02: ${preprocessing_root}/02_CellFiltering
+preprocessing_step_03: ${preprocessing_root}/03_DoubletDetection
+preprocessing_step_04: ${preprocessing_root}/04_LabelTransfer
+preprocessing_step_05: ${preprocessing_root}/05_PostQCVFs
+preprocessing_step_06: ${preprocessing_root}/06_FilteredPreview
+preprocessing_step_07: ${preprocessing_root}/07_FinalReport
+
+# L1 aggregation (gates everything downstream)
+preprocessing_qc_status: ${preprocessing_root}/qc_status
+preprocessing_central_cell_status: ${preprocessing_root}/qc_status/central_cell_status.csv
+
+# L2 per-step (steps 08–13)
+preprocessing_step_08: ${preprocessing_root}/08_ScviIntegration
+preprocessing_step_09: ${preprocessing_root}/09_IntegrationPreview
+preprocessing_step_10a: ${preprocessing_root}/10a_AddResidualNormalizedData
+preprocessing_step_10b: ${preprocessing_root}/10b_InteractiveExploration
+preprocessing_step_11: ${preprocessing_root}/11_FilteredVFs
+preprocessing_step_12: ${preprocessing_root}/12_FilteredScviIntegration
+preprocessing_step_13: ${preprocessing_root}/13_FilteredIntegrationPreview
+
+# L3 per-step (steps 14–20)
+# Disk directory for stage 19b preview remains 18_IntegrationPreview/ for continuity
+# with existing job outputs; the *script* directory is renamed to 19b in the publication tree.
+preprocessing_step_14: ${preprocessing_root}/14_CompartmentClassification
+preprocessing_step_15: ${preprocessing_root}/15_MiloContamination
+preprocessing_step_16: ${preprocessing_root}/16_BigSurVFs
+# Step 17 sweep outputs — read-only upstream input (sweep winner locked).
+# Lives in the source repo's outputs tree; not mirrored to publication.
+# Downstream tracks (B/C/D) consume the step 20 finalize bundle, not these
+# raw sweep outputs, so promotion-time mirroring is unnecessary.
+preprocessing_step_17: ${user_root}/Spatial_HBCA_preprocessing/outputs/preprocessing/17_ScviIntegration
+preprocessing_step_18_deseq: ${outputs_root}/deseq
+preprocessing_step_19b: ${preprocessing_root}/18_IntegrationPreview
+
+# =====================================================================
+# FROZEN CANONICAL HANDOFF ARTIFACTS
+# =====================================================================
+
+preprocessing_cell_retention_list: ${preprocessing_step_10b}/exports/step10b_manifest_update.csv
+preprocessing_step_08_model: ${preprocessing_step_08}/model
+preprocessing_step_12_model: ${preprocessing_step_12}/model
+
+preprocessing_cell_compartments: ${preprocessing_step_14}/metadata/cell_compartments.csv
+preprocessing_epidermal_samples: ${preprocessing_step_14}/metadata/epidermal_samples.yaml
+preprocessing_contamination_cells: ${preprocessing_step_15}/metadata/contamination_specific_cells.csv
+preprocessing_da_testing_results: ${preprocessing_step_15}/metadata/da_testing_results.csv
+
+# Step 16 VFs — post-five-way-filter per-sample VFs; canonical input for stage 17 sweep.
+preprocessing_step16_vf_dir: ${preprocessing_step_16}/features/filtered_vfs
+preprocessing_step16_retention: ${preprocessing_step_16}/retention_metrics
+
+# =====================================================================
+# CANONICAL OUTPUT PATHS (post-sweep, post-annotation)
+# =====================================================================
+
+# Stage 17 sweep outputs
+canonical_sweep_root: ${preprocessing_step_17}/sweep
+canonical_sweep_full_object: ${preprocessing_step_17}/sweep/full_object
+canonical_sweep_compartments: ${preprocessing_step_17}/sweep/compartments
+canonical_sweep_scib: ${preprocessing_step_17}/sweep/scib_results
+canonical_sweep_winner: ${preprocessing_step_17}/winner
+canonical_sweep_svd: ${preprocessing_step_17}/diagnostics/svd
+
+# Final atlas sidecars (after winner selection)
+canonical_latent: ${canonical_sweep_winner}/latent.csv
+canonical_umap: ${canonical_sweep_winner}/umap.csv
+canonical_leiden: ${canonical_sweep_winner}/leiden_multi.csv
+canonical_metadata: ${canonical_sweep_winner}/metadata_with_umap.csv
+canonical_scvi_model: ${canonical_sweep_winner}/model
+
+# L1 annotation outputs (under outputs_root for cross-stage reference)
+canonical_l1_labels: ${outputs_root}/annotation/l1/harmonized_l1_labels.csv
+
+# =====================================================================
+# INTEGRATION INTERMEDIATE (canonical per-compartment handoff)
+# =====================================================================
+# Produced by stage 17 sweep winner selection. Read by stage 18 DESeq and
+# stage 20b manifest builder. Canonical, not a sidecar.
+
+integration_intermediate: ${outputs_root}/integration_intermediate
+
+# =====================================================================
+# CANONICAL MANIFEST
+# =====================================================================
+# Written by stage 20b (20_build_manifest.py). Single index file referenced by
+# downstream pipelines via the publication-tier flex_canonical_manifest token.
+
+canonical_manifest: ${outputs_root}/manifest.yaml
+
+# =====================================================================
+# RAW DATA ROOTS
+# =====================================================================
+
+raw_data_root: ${shared_datasets}/spatial_hbca_raw
+raw_data_sample_manifest: ${preprocessing_root}/raw_data_manifest.tsv

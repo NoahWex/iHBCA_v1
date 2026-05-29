@@ -1,0 +1,672 @@
+# =============================================================================
+# Cell ID Canonicalization Rules
+# =============================================================================
+# Generated: 2026-01-20
+# Purpose: Define mapping rules from native cell ID formats to canonical iHBCA format
+# Source: Track 2 raw_data_extraction.yaml files for each study
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CANONICAL FORMAT (Reed/iHBCA)
+# -----------------------------------------------------------------------------
+# Reed defines the target format since iHBCA was built around Reed's integration.
+# All other studies must map TO this format for cross-study comparison.
+
+canonical_format:
+  reference_study: reed
+  description: |
+    Reed cell IDs use a unique format where the barcode and sample ID are joined
+    with an underscore, making the cell ID globally unique across the atlas.
+  pattern: "{barcode}-{sample_id}"
+  example: "ATAGGCTGTTCCATTT-SLX-19864_SIGAF10"
+  components:
+    - name: barcode
+      description: "16bp 10x barcode (no -N suffix in Reed)"
+      position: "first component before final underscore"
+      format: "16 ACGT characters"
+    - name: sample_id
+      description: "Sequencing run and sample identifier"
+      position: "last component after underscore"
+      format: "SLX-NNNNN[_NNNNN]_SIGXX"
+      examples:
+        - "SLX-19864_SIGAF10"
+        - "SLX-20005-20446_SIGAB12"
+        - "SLX-20261-20448_SIGAD6"
+  total_cells: 803283
+  unique_samples: 154
+  note: |
+    Reed barcodes do NOT have the -N suffix common in other 10x datasets.
+    The sample_id component contains sequencing batch info (SLX) and sample index (SIGA*).
+
+# -----------------------------------------------------------------------------
+# STUDY-SPECIFIC FORMATS AND NORMALIZATION RULES
+# -----------------------------------------------------------------------------
+
+studies:
+
+  # ---------------------------------------------------------------------------
+  # REED (CANONICAL - NO TRANSFORMATION NEEDED)
+  # ---------------------------------------------------------------------------
+  reed:
+    is_canonical: true
+    native_format: "{barcode}-{sample_id}"
+    total_cells: 803283
+    normalization: none
+    barcode_properties:
+      length: 16
+      has_suffix: false
+      suffix_rate: 0.0
+    examples:
+      - "ATAGGCTGTTCCATTT-SLX-19864_SIGAF10"
+      - "CTGCTCAGTATAGGAT-SLX-20005-20446_SIGAB12"
+      - "CAACCTCGTACGGTTT-SLX-20261-20448_SIGAD6"
+    notes: |
+      Reed is the canonical format. All mappings are identity.
+      Cell IDs are globally unique within Reed.
+
+  # ---------------------------------------------------------------------------
+  # KUMAR (COMPLEX - TWO PATTERNS)
+  # ---------------------------------------------------------------------------
+  kumar:
+    is_canonical: false
+    total_cells: 714331
+    native_formats:
+      pattern_4_components:
+        pattern: "{run}_{hbca}_{sample}_{barcode}"
+        count: 349209
+        fraction: 0.489
+        components:
+          - name: run
+            position: 1
+            values: ["r1", "r2"]
+            description: "Sequencing run identifier"
+          - name: hbca
+            position: 2
+            value: "hbca"
+            description: "Constant identifier"
+          - name: sample
+            position: 3
+            format: "cNN or cNNN"
+            description: "Sample number (c01-c95)"
+          - name: barcode
+            position: 4
+            format: "16bp ACGT"
+            description: "10x barcode WITHOUT -N suffix"
+        examples:
+          - "r1_hbca_c01_AACCATGGTATGCTTG"
+          - "r1_hbca_c03_AAACCTGAGATCCCAT"
+          - "r2_hbca_c95_ATGTCCCGTAGTGGCA"
+
+      pattern_5_components:
+        pattern: "{hbca}_{sample}_{hbca}_{sample}_{barcode}-1"
+        count: 365122
+        fraction: 0.511
+        components:
+          - name: hbca
+            positions: [1, 3]
+            value: "hbca"
+            description: "Constant identifier (duplicated)"
+          - name: sample
+            positions: [2, 4]
+            format: "cNNN"
+            description: "Sample number (duplicated) c101-c167"
+          - name: barcode
+            position: 5
+            format: "16bp ACGT with -1 suffix"
+            description: "10x barcode WITH -1 suffix"
+        examples:
+          - "hbca_c132_hbca_c132_AAACCCAGTCTACGTA-1"
+          - "hbca_c150_hbca_c150_TTACTGTAGACCAGAC-1"
+          - "hbca_c116_hbca_c116_TACCCGTTCTCTCGAC-1"
+
+    barcode_extraction:
+      method: "last_component_stripped"
+      description: |
+        Extract last component (after final underscore).
+        If it has -N suffix, strip it.
+        Result is 16bp barcode.
+
+    normalization:
+      description: |
+        Kumar cell IDs require pattern-specific parsing:
+
+        For 4-component pattern (r1_hbca_* or r2_hbca_*):
+          Input: r1_hbca_c01_AACCATGGTATGCTTG
+          Parse: run=r1, sample=hbca_c01, barcode=AACCATGGTATGCTTG
+
+        For 5-component pattern (hbca_cNNN_hbca_cNNN_*):
+          Input: hbca_c132_hbca_c132_AAACCCAGTCTACGTA-1
+          Parse: sample=hbca_c132, barcode=AAACCCAGTCTACGTA (strip -1)
+
+        Donor mapping requires sample_id -> donor_id lookup from metadata.
+
+      code_pattern: |
+        # Pseudocode for barcode extraction
+        parts = cell_id.split('_')
+        if len(parts) == 4:
+            # r1_hbca_cNN_BARCODE
+            barcode = parts[3]
+            sample = f"{parts[1]}_{parts[2]}"
+        elif len(parts) == 5:
+            # hbca_cNNN_hbca_cNNN_BARCODE-1
+            barcode = parts[4].split('-')[0]  # strip -1
+            sample = f"{parts[0]}_{parts[1]}"
+
+  # ---------------------------------------------------------------------------
+  # MURROW (SIMPLE - CONSISTENT FORMAT)
+  # ---------------------------------------------------------------------------
+  murrow:
+    is_canonical: false
+    total_cells: 86136
+    native_format: "{batch}_{barcode}-N"
+    pattern: "2 components separated by underscore"
+    components:
+      - name: batch
+        position: 1
+        unique_count: 4
+        values:
+          V2.RMs: 37124
+          V3.BC.RMs: 26345
+          V3.RMs: 16111
+          V2.BC.RMs: 6556
+        description: "Chemistry version and sample type"
+      - name: barcode
+        position: 2
+        format: "16bp ACGT with -N suffix"
+        suffix_pattern: "-1 through -13"
+        description: "10x barcode with lane suffix"
+
+    barcode_extraction:
+      method: "second_component_stripped"
+      description: |
+        Split by underscore, take second component.
+        Strip -N suffix to get 16bp barcode.
+
+    examples:
+      - "V3.RMs_AAACCCAAGAGGATGA-1"
+      - "V2.BC.RMs_CGTCCATAGCTAGTTC-3"
+      - "V2.RMs_TACCTTACATGCGCAC-4"
+
+    normalization:
+      description: |
+        Murrow uses batch prefixes indicating chemistry version (V2/V3)
+        and sample processing (BC = something, RMs = reduction mammoplasty samples).
+
+        To extract barcode:
+          Input: V3.RMs_AAACCCAAGAGGATGA-1
+          Barcode: AAACCCAAGAGGATGA (strip -1)
+
+        Donor mapping requires Sample metadata column.
+
+      code_pattern: |
+        parts = cell_id.split('_')
+        barcode_with_suffix = parts[1]
+        barcode = barcode_with_suffix.rsplit('-', 1)[0]
+
+  # ---------------------------------------------------------------------------
+  # TWIGGER (COMPLEX - MIXED STANDARD/REVERSED FORMAT)
+  # ---------------------------------------------------------------------------
+  twigger:
+    is_canonical: false
+    total_cells: 110744
+    native_formats:
+      standard_format:
+        pattern: "{batch}_{barcode}-1"
+        count: 84824
+        fraction: 0.766
+        description: "Standard format with batch prefix"
+        examples:
+          - "RB5_AAACCCAAGAGGTCAC-1"
+          - "HMC1_AAACCCAAGCACAAAT-1"
+          - "RB4_AAACGAACATCGCTGG-1"
+
+      reversed_format:
+        pattern: "{barcode}-{batch}"
+        count: 17349
+        fraction: 0.157
+        description: "Reversed format with barcode first"
+        batches_affected: ["HMC9", "RB1", "RB2", "RB3"]
+        examples:
+          - "AAACCTGAGAAGGACA-HMC"
+          - "AAACCTGAGACATAAC-RB1"
+          - "AAACCTGAGATGCCTT-RB3"
+
+      edge_cases:
+        count: 8571
+        description: "Cells without recognizable batch code (HMC9/RB8 donors)"
+
+    batch_codes:
+      known_values: ["HMC", "HMC1", "HMC2", "HMC2B", "HMC3", "HMC4", "HMC5",
+                     "HMC6", "HMC7", "HMC8", "RB1", "RB2", "RB3", "RB4", "RB5",
+                     "RB6", "RB7"]
+      note: "HMC9 and RB8 donors exist in donor_id but batch code not in cell_id"
+
+    barcode_extraction:
+      method: "pattern_detection_then_extract"
+      description: |
+        Must detect which format (standard vs reversed) then extract accordingly.
+        Standard: split by _, take component containing 16bp ACGT, strip suffix
+        Reversed: split by -, first component is barcode
+
+    normalization:
+      description: |
+        Twigger requires detection of cell ID orientation:
+
+        Standard (majority):
+          Input: RB5_AAACCCAAGAGGTCAC-1
+          Barcode: AAACCCAAGAGGTCAC
+          Batch: RB5
+
+        Reversed (17,349 cells):
+          Input: AAACCTGAGAAGGACA-HMC
+          Barcode: AAACCTGAGAAGGACA
+          Batch: HMC (actually HMC9)
+
+        IMPORTANT: During Milo build, these were normalized by normalize_twigger_cell_ids()
+        to standard format. Milo object has 93,395 cells (post-QC filtered).
+
+      code_pattern: |
+        def normalize_twigger_cell_id(cell_id):
+            parts = cell_id.split('_')
+            if len(parts) == 2:
+                # Check if first part looks like barcode (16bp ACGT)
+                if re.match(r'^[ACGT]{16}', parts[0]):
+                    # Reversed format: BARCODE-BATCH
+                    barcode_batch = parts[0].split('-')
+                    return f"{barcode_batch[1]}_{barcode_batch[0]}-1"
+                else:
+                    # Standard format: BATCH_BARCODE-N
+                    return cell_id
+            return cell_id
+
+  # ---------------------------------------------------------------------------
+  # NEE (COMPLEX - MULTI-COHORT FORMAT)
+  # ---------------------------------------------------------------------------
+  nee:
+    is_canonical: false
+    total_cells: 230100
+    native_format: "{cohort}_{patient}_{sort}_{barcode}-1"
+
+    components:
+      - name: cohort_prefix
+        position: "variable prefix"
+        values:
+          UCI_Patients_: "UCI cohort samples"
+          COH_: "City of Hope cohort samples (inferred)"
+        description: "Institution/cohort identifier"
+
+      - name: patient_id
+        position: "after cohort prefix"
+        format: "BRCA_IndN or Ctrl_IndN or CANNN_BRCA or CANNN_Ctrl etc"
+        description: "Patient identifier with risk status embedded"
+
+      - name: sort_type
+        position: "varies by format"
+        values: ["Epi", "Stroma"]
+        description: "FACS sort type"
+
+      - name: barcode
+        position: "last"
+        format: "14-16bp ACGT with -1 suffix"
+        note: "Some barcodes are 14bp (older 10x chemistry)"
+
+    format_complexity: |
+      Nee has the most complex cell ID format with institution-specific patterns:
+
+      UCI format: UCI_Patients _BRCA_Ind2_BRCA_Ind2_Epi_AAACATACGCCAAT-1
+                  (note the space after "Patients")
+
+      COH format: CA075_BRCA, CA1140_Ctrl, CB468_BRCA, CB375_Ctrl patterns
+
+      The patient ID often appears duplicated or contains the sort type.
+
+    examples:
+      - "UCI_Patients _BRCA_Ind2_BRCA_Ind2_Epi_AAACATACGCCAAT-1"
+      - "UCI_Patients _Ctrl_Ind1_Ctrl_Ind1_Stroma_AAACGCTGACCTTT-1"
+      # COH examples would follow different pattern
+
+    barcode_extraction:
+      method: "last_underscore_component_stripped"
+      description: |
+        Extract the last underscore-separated component, strip -N suffix.
+        Handle both 14bp and 16bp barcodes.
+
+    risk_status_extraction:
+      method: "prefix_pattern_matching"
+      description: |
+        CRITICAL: iHBCA metadata has incorrect risk_status for Nee.
+        Must extract from cell ID pattern:
+        - "Ctrl" in patient_id -> AR (Average Risk / Control)
+        - "BRCA" in patient_id -> HR (High Risk / BRCA1 carrier)
+      code_pattern: |
+        if 'Ctrl' in cell_id:
+            risk_status = 'AR'
+        elif 'BRCA' in cell_id:
+            risk_status = 'HR'
+
+    normalization:
+      description: |
+        Nee requires careful parsing due to format complexity:
+
+        1. Handle the "UCI_Patients " prefix (with space)
+        2. Extract patient_id from middle components
+        3. Use patient_id pattern to determine risk_status
+        4. Extract barcode from last component
+
+        The 'patient' metadata column provides clean patient IDs:
+        BRCA_Ind2, BRCA_Ind3, CA075_BRCA, CA1140_Ctrl, etc.
+
+  # ---------------------------------------------------------------------------
+  # PAL_NORM_EPI (SIMPLE - CONSISTENT FORMAT)
+  # ---------------------------------------------------------------------------
+  pal_norm_epi:
+    is_canonical: false
+    total_cells: 53716
+    native_format: "N_{donor}_{type}_{barcode}-1"
+
+    components:
+      - name: prefix
+        position: 1
+        value: "N"
+        description: "Normal tissue indicator"
+
+      - name: donor
+        position: 2
+        unique_count: 11
+        values:
+          "0372": 11162
+          "0093": 8319
+          "0342": 7505
+          "0275": 6096
+          "1105": 4938
+          "0064": 4047
+          "0408": 3004
+          "1469": 2858
+          "0123": 2831
+          "0230.16": 1847
+          "0280": 1109
+        description: "Donor ID number"
+
+      - name: type
+        position: 3
+        value: "epi"
+        description: "Epithelial sort"
+
+      - name: barcode
+        position: 4
+        format: "14 or 16bp ACGT with -1 suffix"
+        note: "14.3% are 14bp, rest are 16bp"
+
+    barcode_properties:
+      length_distribution:
+        14: 7685
+        16: 45759
+      valid_16bp_rate: 0.857
+
+    examples:
+      - "N_1105_epi_AAACCTGAGTATGACA-1"
+      - "N_0372_epi_AAACGGGAGACGCACA-1"
+      - "N_0093_epi_AAACGGGTCAAGAAGT-1"
+
+    normalization:
+      description: |
+        Pal norm_epi has consistent 4-component format.
+
+        Extraction:
+          Input: N_1105_epi_AAACCTGAGTATGACA-1
+          Donor: 1105
+          Type: epi
+          Barcode: AAACCTGAGTATGACA
+
+        Note: 14.3% (7,695 cells) do not match iHBCA Pal subset due to
+        different filtering criteria between original Pal object and iHBCA integration.
+
+  # ---------------------------------------------------------------------------
+  # PAL_NORM_TOTAL (SIMPLE - CONSISTENT FORMAT)
+  # ---------------------------------------------------------------------------
+  pal_norm_total:
+    is_canonical: false
+    total_cells: 54332
+    native_format: "N_{donor}_{type}_{barcode}-1"
+
+    components:
+      - name: prefix
+        position: 1
+        value: "N"
+        description: "Normal tissue indicator"
+
+      - name: donor
+        position: 2
+        unique_count: 13
+        values:
+          "0019": 6361
+          "0021": 1551
+          "0064": 1336
+          "0092": 4443
+          "0093": 5130
+          "0123": 6498
+          "0169": 4267
+          "0230.17": 3292
+          "0233": 5199
+          "0275": 1469
+          "0288": 1904
+          "0342": 9076
+          "0372": 3806
+        description: "Donor ID number"
+
+      - name: type
+        position: 3
+        value: "total"
+        description: "Total (unsorted) cells"
+
+      - name: barcode
+        position: 4
+        format: "16bp ACGT with -1 suffix"
+
+    examples:
+      - "N_0123_total_AAACCTGAGAACAATC-1"
+      - "N_0342_total_AAACCCAAGTCTAGCT-1"
+      - "N_0019_total_AAACCTGAGCACACAG-1"
+
+    normalization:
+      description: |
+        Pal norm_total has consistent 4-component format.
+
+        Extraction:
+          Input: N_0123_total_AAACCTGAGAACAATC-1
+          Donor: 0123
+          Type: total
+          Barcode: AAACCTGAGAACAATC
+
+        Note: 11.9% (6,440 cells) do not match iHBCA Pal subset.
+
+  # ---------------------------------------------------------------------------
+  # PAL_NORM_B1 (TWO FORMATS - BRCA1 vs NORMAL)
+  # ---------------------------------------------------------------------------
+  pal_norm_b1:
+    is_canonical: false
+    total_cells: 59766
+
+    native_formats:
+      brca1_format:
+        pattern: "B1_{donor}_{barcode}-1"
+        count: 23240
+        components:
+          - name: prefix
+            position: 1
+            value: "B1"
+            description: "BRCA1 carrier indicator"
+          - name: donor
+            position: 2
+            unique_count: 4
+            values:
+              "0894": 7330
+              "0033": 5931
+              "0023": 5019
+              "0090": 4960
+            description: "Donor ID number"
+          - name: barcode
+            position: 3
+            format: "16bp ACGT with -1 suffix"
+        examples:
+          - "B1_0894_AAACCTGAGCAAATCA-1"
+          - "B1_0033_AAACCTGCACCGCTAG-1"
+          - "B1_0023_AAACCTGGTCCGAACC-1"
+
+      normal_format:
+        pattern: "N_{donor}_{type}_{barcode}-1"
+        count: 36526
+        components:
+          - name: prefix
+            position: 1
+            value: "N"
+            description: "Normal tissue indicator"
+          - name: donor
+            position: 2
+            unique_count: 8
+            values:
+              "0019": 6361
+              "0064": 1336
+              "0092": 4443
+              "0093": 5130
+              "0123": 6498
+              "0169": 4267
+              "0230.17": 3292
+              "0233": 5199
+            description: "Donor ID number"
+          - name: type
+            position: 3
+            value: "total"
+            description: "Total (unsorted) cells"
+          - name: barcode
+            position: 4
+            format: "16bp ACGT with -1 suffix"
+        examples:
+          - "N_0019_total_AAACCTGAGCACACAG-1"
+          - "N_0123_total_AAACCTGAGAACAATC-1"
+
+    known_issues:
+      donor_0123_collision:
+        description: |
+          Donor 0123 appears in both N_ cells (6,498 cells) and maps to
+          potential collision with B1_0023 (5,019 cells) if donor IDs
+          are truncated. The MH0023 iHBCA donor could match either.
+        recommendation: "Exclude N_0123 from pal_norm_b1 analysis"
+        cells_affected: 6498
+
+    normalization:
+      description: |
+        Pal norm_b1 contains BRCA1 carriers (B1_*) and normal controls (N_*).
+
+        BRCA1 format (3 components):
+          Input: B1_0894_AAACCTGAGCAAATCA-1
+          Risk: HR (BRCA1 carrier)
+          Donor: 0894 (maps to KCF0894 in iHBCA)
+          Barcode: AAACCTGAGCAAATCA
+
+        Normal format (4 components):
+          Input: N_0123_total_AAACCTGAGAACAATC-1
+          Risk: AR (Normal)
+          Donor: 0123
+          Barcode: AAACCTGAGAACAATC
+
+        iHBCA donor mapping:
+          B1_0894 -> KCF0894
+          B1_0033 -> MH0033
+          B1_0023 -> MH0023
+          B1_0090 -> MH0090
+
+# -----------------------------------------------------------------------------
+# IMPLEMENTATION NOTES
+# -----------------------------------------------------------------------------
+
+implementation_notes:
+
+  barcode_normalization:
+    description: |
+      All barcodes should be normalized to bare 16bp format (no suffix) for matching.
+      However, some studies have 14bp barcodes (older 10x chemistry).
+
+    steps:
+      - "Strip -N suffix if present"
+      - "Verify remaining string is 14 or 16 characters"
+      - "Verify all characters are A, C, G, or T"
+
+    code_example: |
+      def normalize_barcode(barcode_with_suffix):
+          # Strip -N suffix
+          if '-' in barcode_with_suffix:
+              barcode = barcode_with_suffix.rsplit('-', 1)[0]
+          else:
+              barcode = barcode_with_suffix
+
+          # Validate
+          if len(barcode) not in [14, 16]:
+              raise ValueError(f"Invalid barcode length: {len(barcode)}")
+          if not re.match(r'^[ACGT]+$', barcode):
+              raise ValueError(f"Invalid barcode characters: {barcode}")
+
+          return barcode
+
+  donor_mapping_strategy:
+    description: |
+      Cell IDs alone are not sufficient for donor mapping in most studies.
+      Must use metadata columns to establish cell_id -> donor_id mapping.
+
+    by_study:
+      reed: "donor_id column in metadata"
+      kumar: "donor_id column in metadata"
+      murrow: "Sample column in metadata"
+      twigger: "donor_id column in metadata"
+      nee: "patient column in metadata"
+      pal_norm_epi: "Extract from cell_id (component 2) or group column"
+      pal_norm_total: "Extract from cell_id (component 2) or group column"
+      pal_norm_b1: "Extract from cell_id (component 2) or group column"
+
+  cross_study_matching:
+    description: |
+      To match cells across studies in the iHBCA joint embedding:
+      1. Each study has its own cell ID format
+      2. iHBCA integration preserves original cell IDs
+      3. Use study-specific extraction to get barcodes
+      4. Match via iHBCA cell_id index
+
+    warning: |
+      Barcodes alone are NOT unique across studies (or even within large studies).
+      Full cell_id must be used for matching. The combination of
+      (study, donor_id, barcode) provides uniqueness.
+
+# -----------------------------------------------------------------------------
+# VALIDATION CHECKLIST
+# -----------------------------------------------------------------------------
+
+validation:
+  per_study:
+    reed:
+      - "[ ] All 803,283 cells parseable"
+      - "[ ] Sample IDs match sampleID metadata column"
+    kumar:
+      - "[ ] 349,209 cells match 4-component pattern"
+      - "[ ] 365,122 cells match 5-component pattern"
+      - "[ ] All barcodes validate as 16bp ACGT"
+    murrow:
+      - "[ ] All 86,136 cells match 2-component pattern"
+      - "[ ] Batch codes match known values"
+    twigger:
+      - "[ ] 84,824 cells match standard format"
+      - "[ ] 17,349 cells match reversed format"
+      - "[ ] Normalization produces valid cell IDs"
+    nee:
+      - "[ ] All 230,100 cells parseable"
+      - "[ ] Risk status extractable from cell ID pattern"
+      - "[ ] Patient IDs match patient metadata column"
+    pal_norm_epi:
+      - "[ ] All 53,716 cells match N_{donor}_epi_{barcode}-1"
+      - "[ ] 11 unique donors match expected"
+    pal_norm_total:
+      - "[ ] All 54,332 cells match N_{donor}_total_{barcode}-1"
+      - "[ ] 13 unique donors match expected"
+    pal_norm_b1:
+      - "[ ] 23,240 BRCA1 cells match B1_{donor}_{barcode}-1"
+      - "[ ] 36,526 Normal cells match N_{donor}_total_{barcode}-1"
+      - "[ ] Donor 0123 collision documented and handled"

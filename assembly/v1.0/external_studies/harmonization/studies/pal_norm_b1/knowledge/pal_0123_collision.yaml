@@ -1,0 +1,95 @@
+# =============================================================================
+# PAL 0123 COLLISION INVESTIGATION
+# =============================================================================
+# Wave 2 Edge Case Investigation: Barcode collision between N-0123 and B1-0023
+# =============================================================================
+
+issue_id: pal-0123-collision
+investigation_date: 2026-01-20
+summary: |
+  The ~500 cell estimate in knowledge.md is incorrect. Donor N-0123 contains
+  6,498 cells in pal_norm_b1. This donor appears in the Normal (N_) subset
+  of the NormB1Total.rds object and maps to iHBCA donor MH0023. The BRCA1
+  donor B1-0023 (5,019 cells) also maps to MH0023, creating potential barcode
+  collisions when both are merged into the iHBCA joint embedding.
+
+findings:
+  n_0123_cells_b1: 6498
+  n_0123_cells_total: 6498
+  same_donor_in_both: yes
+  cell_id_pattern: "N_0123_total_{barcode}-1"
+  cell_id_examples:
+    - N_0123_total_AAACCTGAGAACAATC-1
+    - N_0123_total_AAACCTGAGAAGATTC-1
+    - N_0123_total_AAACCTGAGCGATATA-1
+    - N_0123_total_AAACCTGCAACTGGCC-1
+    - N_0123_total_AAACCTGCATAAGACA-1
+  subset_membership: "Normal (N_ prefix)"
+  group_value: "N_0123_total"
+
+  collision_partner:
+    source_id: "B1-0023"
+    cell_count: 5019
+    cell_id_pattern: "B1_0023_{barcode}-1"
+    ihbca_mapping: "MH0023"
+
+  barcode_collision_details: |
+    Both N-0123 and B1-0023 map to iHBCA donor MH0023. In the iHBCA joint
+    embedding, cell IDs would be constructed as MH0023_{sample_type}_{barcode}.
+
+    - N-0123 cells would become: MH0023_mix_{barcode} (or similar)
+    - B1-0023 cells would become: MH0023_mix_{barcode}
+
+    Since 10x barcodes are unique within a batch but can repeat across batches,
+    and N-0123 and B1-0023 were processed in different batches, barcode
+    collisions are possible (potentially up to 100% if barcodes fully overlap).
+
+exclusion_criteria:
+  cells_to_exclude: "All cells matching pattern ^N_0123_"
+  count_to_exclude: 6498
+  reason: |
+    N-0123 cells cannot be reliably mapped to iHBCA due to barcode collision
+    with B1-0023. Both donors map to iHBCA donor MH0023, but were processed
+    in separate batches with potentially overlapping 10x barcodes.
+
+    Excluding N-0123 (6,498 cells) preserves all BRCA1 cells (23,240) and
+    the remaining Normal cells (30,028 = 36,526 - 6,498) for risk_status
+    differential abundance testing.
+
+updated_estimate: 6498  # Corrected from ~500
+
+cells_after_exclusion:
+  total: 53268  # 59,766 - 6,498
+  brca1: 23240  # Unchanged
+  normal: 30028  # 36,526 - 6,498
+  normal_donors: 7  # 8 - 1 (0123 excluded)
+
+recommendation: |
+  1. Update knowledge.md to correct the ~500 estimate to 6,498 cells
+  2. Confirm the exclude_donors = c("0123") logic in create_cell_id_mapping.R
+     is correctly implemented
+  3. After exclusion, pal_norm_b1 will have:
+     - 23,240 BRCA1 cells (4 donors)
+     - 30,028 Normal cells (7 donors)
+     - Risk_status DA testing remains well-powered
+  4. The N-0123 cells are NOT lost - they exist in pal_norm_total as well,
+     which focuses on menopausal_status comparisons (no BRCA1 donors)
+
+validation_steps:
+  - step: "Verify exclusion in Milo build"
+    check: "sum(grepl('^N_0123_', cell_ids)) == 0"
+    expected: 0
+
+  - step: "Verify total cell count after exclusion"
+    check: "ncol(milo_object)"
+    expected: 53268
+
+  - step: "Verify no barcode collisions remain"
+    check: "No duplicate cell IDs in mapped iHBCA identifiers"
+    expected: true
+
+references:
+  pal_norm_b1_extraction: "extracted/raw_data_extraction.yaml"
+  pal_norm_total_extraction: "../pal_norm_total/extracted/raw_data_extraction.yaml"
+  edge_cases: "edge_cases.yaml"
+  knowledge_base: ".claude/rules/integration-assessment/knowledge.md"

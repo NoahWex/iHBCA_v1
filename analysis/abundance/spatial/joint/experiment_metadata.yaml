@@ -1,0 +1,218 @@
+# Joint FLEX+Xenium DA — experiment metadata (locked Phase D plan)
+#
+# Sign convention: smaller / minority group = positive logFC (second factor level
+# under R's default treatment contrast). Every contrast must be readable as
+# "[smaller group] enriched on the right, [larger group] enriched on the left".
+#
+# Model series per contrast (locked):
+#   M0 — unconditioned       ~ patient_id + platform + log_n_cells + group
+#   M1 — conditioned (basal) ~ patient_id + platform + log_n_cells + basal_prop + group
+#   M2 — interaction         ~ patient_id + platform + log_n_cells + basal_prop * group
+#
+# Methodology source: Spatial_HBCA/.../anatomic_variation_analysis_20260323
+# Refinements vs FLEX-only: + platform, + log_n_cells, sign convention flipped.
+
+cohort:
+  name: joint_anatomic_variation_20260424
+  source_embedding: pipeline/outputs/embedding/joint_latent.csv
+  source_obs:        pipeline/outputs/embedding/joint_obs.csv
+  bridge_table:      pipeline/outputs/annotations/joint_l1p5.csv
+  total_cells:       958796
+  non_artifact_cells: 900096
+  patients: [Pat1, Pat2, UCI604, UCI220228]
+  libraries:
+    total: 127
+    flex: 62
+    xenium: 65
+
+vocabulary:
+  primary: l1p5_label   # 25 joint-Concord-validated subtypes; THIS resolution throughout
+  label_remap: outputs/shared/label_remap.csv   # display-time rename (e.g. LASP_PTN -> LASP_basal)
+  # L1.5 ↔ L1.0 ↔ L0.5 cross-walk is a Fig 3 deliverable, NOT this analysis.
+
+# Populations of interest per contrast — drive the section 9 deep-dive panels.
+# Replaces the SNR scatter (decided 2026-04-26).
+populations_of_interest:
+  C1_p1p2_vs_p3:
+    - LASP_basal      # NAC enrichment hypothesis (renamed from LASP_PTN)
+    - LASP
+    - BMYO
+    - BMYO-NC
+    - Fibroblast_activated
+    - Fibroblast_SFRP4
+    - LumHR
+  C2a_p3_axis_A_vs_M: []   # open — fill once first results come in
+  C2b_p3_axis_P_vs_M: []
+  C3_p3_uoq_vs_rest:
+    - CD8 T cell
+    - CD4 Treg
+    - Macrophage
+    - Plasma cell
+    - Endothelial
+  C4_p3_upper_vs_lower: []
+
+milos:
+  joint_full:
+    path: ../outputs/All/All_milo.rds
+    cells: 958796
+    nhoods: 61889
+    k: 30
+    prop: 0.1
+    dims: 100
+  joint_Epithelial:
+    path: ../outputs/Epithelial/Epithelial_milo.rds
+  joint_Immune:
+    path: ../outputs/Immune/Immune_milo.rds
+  joint_Stromal:
+    path: ../outputs/Stromal/Stromal_milo.rds
+
+testNhoods:
+  fdr_weighting: graph-overlap
+  test: glmQLFTest
+
+# ============================================================================
+# Contrasts. Each contrast has a `factor_col` (built from covars / library_id)
+# and `levels` ordered so the SECOND level = positive logFC direction.
+# Each contrast has tiers M0/M1/M2 with formulas using the locked skeleton.
+# `tiers_run` lists which tiers to actually run (matrix prioritization).
+# ============================================================================
+
+contrasts:
+
+  C1_p1p2_vs_p3:
+    description: "P1+P2 (NAC, smaller) versus P3 (peripheral, larger). Positive logFC = enriched in P1+P2."
+    factor_col: p1p2_vs_p3
+    levels: [P3, P1P2]                   # last = positive direction
+    libraries_filter: null                # all 127 libs
+    tiers_run: [M0, M1, M2]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + p1p2_vs_p3"
+      M1:
+        formula: "~ patient_id + platform + log_n_cells + basal_prop + p1p2_vs_p3"
+      M2:
+        formula: "~ patient_id + platform + log_n_cells + basal_prop * p1p2_vs_p3"
+    rationale: |
+      M0 is the raw axis signal. M1 conditions on basal_prop to address the PERMDISP-revealed
+      dispersion confound (P3 has wider compositional spread driven by ductal density variation).
+      M2 asks whether the axis effect itself depends on ductal density.
+
+  C2a_p3_axis_A_vs_M:
+    description: "Within P3, Anterior (32) vs Medial (reference, 31). Positive = enriched in A. Blocked by quadrant (added 2026-05-17)."
+    factor_col: axis_amp
+    levels: [M, A]
+    libraries_filter: "p_level == P3 AND axis_amp in [A, M]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + quadrant + axis_amp"
+
+  C2b_p3_axis_P_vs_M:
+    description: "Within P3, Posterior (32) vs Medial (reference, 31). Positive = enriched in P. Blocked by quadrant (added 2026-05-17)."
+    factor_col: axis_amp
+    levels: [M, P]
+    libraries_filter: "p_level == P3 AND axis_amp in [P, M]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + quadrant + axis_amp"
+
+  C3_p3_uoq_vs_rest:
+    description: "Within P3, UOQ (smaller, 23) vs other peripheral (72). Positive = enriched in UOQ. Blocked by axis_amp (depth) (added 2026-05-17)."
+    factor_col: is_uoq
+    levels: [false, true]                 # true = UOQ = positive direction
+    libraries_filter: "p_level == P3"
+    tiers_run: [M0, M1, M2]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + is_uoq"
+      M1:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + basal_prop + is_uoq"
+      M2:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + basal_prop * is_uoq"
+
+  C3a_p3_uiq_vs_rest:
+    description: "Within P3, UIQ (24) vs other peripheral (71). Positive = enriched in UIQ. Blocked by axis_amp (depth). Added 2026-05-17 for quadrant family completeness."
+    factor_col: is_uiq
+    levels: [false, true]
+    libraries_filter: "p_level == P3"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + is_uiq"
+
+  C3b_p3_loq_vs_rest:
+    description: "Within P3, LOQ (24) vs other peripheral (71). Positive = enriched in LOQ. Blocked by axis_amp (depth). Added 2026-05-17 for quadrant family completeness."
+    factor_col: is_loq
+    levels: [false, true]
+    libraries_filter: "p_level == P3"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + is_loq"
+
+  C3c_p3_liq_vs_rest:
+    description: "Within P3, LIQ (24) vs other peripheral (71). Positive = enriched in LIQ. Blocked by axis_amp (depth). Added 2026-05-17 for quadrant family completeness."
+    factor_col: is_liq
+    levels: [false, true]
+    libraries_filter: "p_level == P3"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + axis_amp + is_liq"
+
+  C4_p3_upper_vs_lower:
+    description: "Within P3, Upper (47) vs Lower (48, reference). Positive = enriched in Upper."
+    factor_col: vertical
+    levels: [Lower, Upper]
+    libraries_filter: "p_level == P3 AND vertical in [Upper, Lower]"
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + log_n_cells + vertical"
+
+  C5_epi_rich_vs_sparse:
+    description: |
+      Tissue-composition contrast: epi_rich vs epi_sparse libraries.
+      epi_class is carried by an external YAML (median split on the joint 127-lib
+      epithelial_prop distribution, cut=0.306, 64/63). Blocks patient_id + p_level
+      + platform so the contrast estimates within-position, within-patient,
+      within-platform covariation with total epithelial content.
+      Positive logFC = enriched in epi_rich libraries.
+    factor_col: epi_class
+    levels: [epi_sparse, epi_rich]
+    libraries_filter: null
+    class_assignments_yaml: outputs/shared/epi_class_joint.yaml
+    tiers_run: [M0]
+    tiers:
+      M0:
+        formula: "~ patient_id + platform + p_level + log_n_cells + epi_class"
+    rationale: |
+      Question: regardless of position, patient, or platform, what populations
+      co-enrich or co-deplete with total per-library epithelial content?
+      Joint cut differs from FLEX (0.405) because Xenium libraries skew sparser
+      (Xenium median 0.275 vs FLEX 0.405). platform-blocking is mechanically
+      required since FLEX skews rich (36/26) and Xenium skews sparse (28/37).
+
+scopes: [joint_full, joint_Epithelial, joint_Immune, joint_Stromal]
+
+# ============================================================================
+# Run matrix (prioritized): 48 runs total (was 36 pre-2026-05-17 quadrant family expansion)
+#   C1   × 3 tiers × 4 scopes = 12
+#   C2a  × 1 tier  × 4 scopes =  4   (now quadrant-blocked, invalidates prior C2a results)
+#   C2b  × 1 tier  × 4 scopes =  4   (now quadrant-blocked, invalidates prior C2b results)
+#   C3   × 3 tiers × 4 scopes = 12   (now depth-blocked, invalidates prior C3 results)
+#   C3a  × 1 tier  × 4 scopes =  4   (NEW: UIQ vs rest, depth-blocked)
+#   C3b  × 1 tier  × 4 scopes =  4   (NEW: LOQ vs rest, depth-blocked)
+#   C3c  × 1 tier  × 4 scopes =  4   (NEW: LIQ vs rest, depth-blocked)
+#   C4   × 1 tier  × 4 scopes =  4
+# ============================================================================
+
+provenance:
+  methodology_source:
+    repo: Spatial_HBCA
+    path: project/05_Analyses/analyses/DifferentialAbundance/anatomic_variation_analysis_20260323
+    status: frozen, canonical FLEX-only baseline
+  execution_repo: Spatial_HBCA_Xenium
+  promotion_target: iHBCA_publication/publication/analysis/abundance/spatial/joint/
+  pipeline_plan: DA_PIPELINE_PLAN.md

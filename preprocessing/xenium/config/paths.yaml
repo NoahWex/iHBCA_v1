@@ -1,0 +1,121 @@
+# paths.yaml — Track B (Xenium pipeline) internal path namespace
+#
+# Single source of truth for all paths referenced by Track B scripts and
+# SLURM wrappers across sub-tracks 4a-counts, 4b-joint, 4c-annotation.
+#
+# Two classes of entries:
+#   - RELATIVE paths (no leading /): joined against ${user_root} or
+#     ${project_root} at runtime by load_paths.{sh,py}.
+#   - ABSOLUTE paths (leading / or shared lab token): pass through unchanged.
+#
+# This file is consumed by the Track B `_common.sh` (each sub-track sources
+# the same shared `_common.sh` from `coordination/staging/track_b/run/`).
+# Outward-facing tokens (consumed by figures/, analysis/spatial/) are
+# additionally registered in publication/config/paths.yaml.
+
+# ============================================================
+# Roots (resolved by publication/config/load_paths.sh)
+# ============================================================
+# user_root and shared_lab come pre-exported from publication/config/load_paths.sh
+# (CFG_USER_ROOT, CFG_SHARED_LAB). Don't redefine here.
+
+# ============================================================
+# Project root (for the Track B promotion)
+# ============================================================
+project_root: ${user_root}/iHBCA_publication
+preprocessing_xenium_root: ${project_root}/publication/preprocessing/xenium
+annotation_xenium_root:    ${project_root}/publication/analysis/annotation/xenium
+
+# ============================================================
+# Upstream source repos (Spatial_HBCA + Spatial_HBCA_Xenium)
+# ============================================================
+# Spatial_HBCA — owns the methodological core (load_counts.py pattern source)
+upstream_spatial_hbca:           ${user_root}/Spatial_HBCA
+spatial_hbca_xenium_shared:      ${upstream_spatial_hbca}/project/06_Xenium/shared
+
+# Spatial_HBCA_Xenium — runtime-input data residing in dev tree, frozen 04-17
+upstream_spatial_hbca_xenium:    ${user_root}/Spatial_HBCA_Xenium
+xenium_legacy_counts:            ${upstream_spatial_hbca_xenium}/.dev/_legacy/03_xenium_counts/outputs
+xenium_legacy_panel_intersection: ${upstream_spatial_hbca_xenium}/.dev/_legacy/01_flex_concord_panel/outputs/feature_audit
+xenium_uci604_v2_legacy:         ${upstream_spatial_hbca_xenium}/.dev/01_qc/outputs/xenium_counts_v2
+
+# Library covariates (from DA work, promoted as canonical input)
+xenium_da_library_covariates:    ${upstream_spatial_hbca_xenium}/DifferentialAbundance/joint_anatomic_variation_20260424/outputs/shared/library_covariates.csv
+
+# Upstream pre-computed Phase 01/02 outputs (canonical archive in source repo).
+# Phase 01/02 of the promoted Track B pipeline will REPRODUCE these at the
+# publication-tier paths, but until that runs, downstream phases read from
+# these upstream archives. Token suffix `_upstream` denotes "exists today,
+# not yet at publication-tier path".
+xenium_flex_qc_upstream:           ${upstream_spatial_hbca_xenium}/pipeline/outputs/qc/flex_qc.csv
+xenium_qc_upstream:                ${upstream_spatial_hbca_xenium}/pipeline/outputs/qc/xenium_qc_clean.csv
+xenium_pooled_nuclear_upstream:    ${upstream_spatial_hbca_xenium}/pipeline/outputs/counts/pooled_nuclear
+xenium_pooled_cytoplasmic_upstream: ${upstream_spatial_hbca_xenium}/pipeline/outputs/counts/pooled_cytoplasmic
+flex_concord_upstream:             ${upstream_flex_prep}/outputs/integration_intermediate
+
+# FLEX upstream (Track 3 destination — when Track A lands, switch to publication tokens)
+upstream_flex_prep:              ${user_root}/Spatial_HBCA_preprocessing
+flex_concord_dir:                ${upstream_flex_prep}/outputs/integration_intermediate
+
+# ============================================================
+# 4a-counts: per-position 3-segmentation counts
+# ============================================================
+# Inputs (canonical entry point: xenium-ranger via xenium_manifest.tsv)
+xenium_manifest:                 ${preprocessing_xenium_root}/counts/config/xenium_manifest.tsv
+xenium_panel_genes:              ${preprocessing_xenium_root}/counts/config/xenium_panel_genes.txt
+
+# Outputs (canonical, post-promotion locations — replaces .dev/ paths)
+xenium_counts_root:              ${preprocessing_xenium_root}/counts/outputs
+xenium_counts_per_position:      ${xenium_counts_root}/counts_per_position    # one subdir per xenium_id
+xenium_counts_v2_uci604:         ${xenium_counts_root}/counts_v2_uci604       # UCI604 dtype-fixed re-ingest
+xenium_qc:                       ${xenium_counts_root}/qc/xenium_qc.csv
+xenium_qc_clean:                 ${xenium_counts_root}/qc/xenium_qc_clean.csv
+flex_qc:                         ${xenium_counts_root}/qc/flex_qc.csv
+cohort_qc_audit:                 ${xenium_counts_root}/qc/cohort_qc_audit.csv
+
+# ============================================================
+# 4b-joint: joint integration outputs (FLEX + Xenium)
+# ============================================================
+xenium_integration_root:         ${preprocessing_xenium_root}/integration/outputs
+xenium_pooled_nuclear:           ${xenium_integration_root}/counts/pooled_nuclear
+xenium_pooled_cytoplasmic:       ${xenium_integration_root}/counts/pooled_cytoplasmic
+xenium_joint_latent:             ${xenium_integration_root}/embedding/joint_latent.csv
+xenium_joint_umap:               ${xenium_integration_root}/embedding/joint_umap.csv
+xenium_joint_obs:                ${xenium_integration_root}/embedding/joint_obs.csv
+xenium_joint_leiden:             ${xenium_integration_root}/embedding/joint_leiden_assignments.csv
+xenium_joint_markers_nuclear:    ${xenium_integration_root}/annotations/joint_markers_nuclear.csv
+xenium_joint_markers_flex_panel: ${xenium_integration_root}/annotations/joint_markers_flex_panel.csv
+xenium_joint_markers_flex_full:  ${xenium_integration_root}/annotations/joint_markers_flex_full.csv
+xenium_l0p5:                     ${xenium_integration_root}/annotations/l0p5_xenium.csv
+xenium_three_axis_filter:        ${xenium_integration_root}/annotations/three_axis_filter.csv
+xenium_nmp_scored:               ${xenium_integration_root}/nmp/xenium_nmp_scored.csv
+xenium_cell_annotations:         ${xenium_integration_root}/annotations/cell_annotations.csv      # MASTER L0.5 TABLE
+lbridge_vocabulary:              ${xenium_integration_root}/annotations/lbridge_vocabulary.csv    # 28 cross-cohort families (xenium L1.5 ↔ iHBCA L2.0)
+xenium_manifest_provenance:      ${xenium_integration_root}/manifest.json
+
+# ============================================================
+# 4c-annotation: per-compartment L1.5 labels
+# ============================================================
+xenium_annotation_root:          ${annotation_xenium_root}/outputs
+xenium_compartment_dir:          ${xenium_annotation_root}/compartment
+xenium_compartment_all:          ${xenium_annotation_root}/compartment/all_compartments.csv
+xenium_joint_l1p5:               ${xenium_annotation_root}/joint_l1p5.csv     # MASTER L1.5 TABLE
+xenium_library_covariates:       ${xenium_annotation_root}/library_covariates.csv
+xenium_cascades_dir:             ${annotation_xenium_root}/config/cascades
+
+# ============================================================
+# Containers + execution environment (read from publication/config/paths.yaml)
+# ============================================================
+# CONTAINER_PYTHON_SCVI_GPU_2025Q3, CONTAINER_R_SPATIAL_4_3_3, etc. are
+# exported by publication/config/load_paths.sh. Pre-set for Track B:
+#   - 02_joint_train, 02_compartment_analysis (RAPIDS GPU): python_scvi_gpu_2025Q3
+#   - cluster_alignment R scripts: r_spatial_4.3.3
+#   - non-GPU Python: python_spatial_2025Q4E2
+
+account: dalawson_lab
+partition_default: standard
+partition_gpu: free-gpu
+# Pre-write-gate phase: logs land in staging tree to keep publication/ clean.
+# Post-promotion: CFG_HPC_LOGS_DIR can be re-pointed to publication/preprocessing/xenium/run/.logs
+# in the published copy of paths.yaml.
+hpc_logs_dir: ${project_root}/coordination/staging/track_b/run/.logs

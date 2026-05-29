@@ -1,0 +1,214 @@
+---
+title: "SingleR L1 Classification — FLEX `r params$compartment` vs iHBCA L1 Reference"
+subtitle: "11-type iHBCA L1 pseudobulk reference, restricted to FLEX panel"
+params:
+  compartment: "Epithelial"
+  seurat_rds: ""
+  reference_csv: ""
+  outdir: ""
+  dry_run: false
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 7)
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(SingleR)
+  library(SingleCellExperiment)
+  library(SummarizedExperiment)
+  library(ggplot2)
+  library(dplyr)
+})
+
+COMPARTMENT   <- params$compartment
+SEURAT_RDS    <- params$seurat_rds
+REFERENCE_CSV <- params$reference_csv
+OUTDIR        <- params$outdir
+DRY_RUN       <- isTRUE(params$dry_run)
+dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
+```
+
+# Parameters
+
+```{r params_echo}
+cat("Compartment:   ", COMPARTMENT, "\n")
+cat("Seurat RDS:    ", SEURAT_RDS, "\n")
+cat("Reference CSV: ", REFERENCE_CSV, "\n")
+cat("Output dir:    ", OUTDIR, "\n")
+cat("Dry run:       ", DRY_RUN, "\n")
+```
+
+# Validation Preamble
+
+```{r validate}
+required <- list(
+  seurat_rds    = SEURAT_RDS,
+  reference_csv = REFERENCE_CSV
+)
+missing_items <- character(0)
+for (nm in names(required)) {
+  f <- required[[nm]]
+  ok <- file.exists(f)
+  cat(sprintf("  [%s] %-15s %s\n", if (ok) "OK " else "MISS", nm, f))
+  if (!ok) missing_items <- c(missing_items, nm)
+}
+if (length(missing_items) > 0) {
+  stop("Missing required inputs: ", paste(missing_items, collapse = ", "))
+}
+if (DRY_RUN) {
+  cat("\nVALIDATION PASSED (dry run) — exiting before heavy computation\n")
+  knitr::knit_exit()
+}
+```
+
+# Load L1 Pseudobulk Reference
+
+Pattern source: `singler_l1.Rmd:36-44`. Reference is 11 L1 types x ~18K FLEX
+panel genes (rebuilt by `09_build_l1_reference.py`).
+
+```{r load-reference}
+cat("Loading pseudobulk reference:", REFERENCE_CSV, "\n")
+pb_df <- read.csv(REFERENCE_CSV, row.names = 1, check.names = FALSE)
+cat("Reference:", nrow(pb_df), "types x", ncol(pb_df), "genes\n")
+cat("\nL1 types:\n")
+cat(paste(" ", rownames(pb_df)), sep = "\n")
+
+pb_mat <- as.matrix(pb_df)
+```
+
+# Load FLEX Seurat
+
+Pattern source: `singler_l1.Rmd:48-59`.
+
+```{r load-seurat}
+cat("Loading Seurat:", SEURAT_RDS, "\n")
+srt <- readRDS(SEURAT_RDS)
+srt <- UpdateSeuratObject(srt)
+cat("Cells:", ncol(srt), "\nGenes:", nrow(srt), "\n")
+
+has_data <- !is.null(tryCatch(GetAssayData(srt, layer = "data"), error = function(e) NULL))
+if (!has_data || length(GetAssayData(srt, layer = "data")@x) == 0) {
+  cat("Normalizing...\n")
+  srt <- NormalizeData(srt, verbose = FALSE)
+}
+```
+
+# Gene Matching
+
+Pattern source: `singler_l1.Rmd:63-74`. With the rebuilt reference, we expect
+~17,500+ shared genes (vs 5,970 under the old reference).
+
+```{r gene-matching}
+ref_genes <- colnames(pb_mat)
+query_genes <- rownames(srt)
+shared_genes <- intersect(ref_genes, query_genes)
+
+cat("Reference genes:", length(ref_genes), "\n")
+cat("Query genes:   ", length(query_genes), "\n")
+cat("Shared genes:  ", length(shared_genes), "\n")
+cat("Coverage:      ", sprintf("%.1f%%", 100 * length(shared_genes) / length(ref_genes)), "\n")
+
+stopifnot(length(shared_genes) >= 100)
+if (length(shared_genes) < 15000) {
+  cat("WARNING: shared gene count is lower than expected (~17,500) for rebuilt reference\n")
+}
+```
+
+# Run SingleR
+
+Pattern source: `singler_l1.Rmd:78-105`. Uses `de.method = "classic"` to match
+the validated L1 pipeline; the reference is pseudobulk-mean so we log-transform
+once here.
+
+```{r run-singler}
+ref_mat <- t(pb_mat[, shared_genes])
+ref_log <- log1p(ref_mat)
+
+ref_sce <- SummarizedExperiment(
+  assays = list(logcounts = ref_log),
+  colData = DataFrame(label = rownames(pb_mat))
+)
+
+query_sce <- SingleCellExperiment(
+  assays = list(logcounts = GetAssayData(srt, layer = "data")[shared_genes, ])
+)
+
+cat("Running SingleR (de.method='classic', 11 L1 types)...\n")
+t0 <- proc.time()
+
+results <- SingleR(
+  test = query_sce,
+  ref = ref_sce,
+  labels = rownames(pb_mat),
+  de.method = "classic"
+)
+
+elapsed <- (proc.time() - t0)["elapsed"]
+cat(sprintf("Completed in %.1f seconds\n", elapsed))
+```
+
+# Save Results
+
+Pattern source: `singler_l1.Rmd:109-131`, with added `raw_label` column (the
+non-pruned assignment — useful for the confusogram downstream).
+
+```{r save}
+max_scores <- apply(results$scores, 1, max)
+deltas <- results$delta.next
+
+# raw = argmax assignment (labels column). pruned = pruned.labels (NA if
+# below-threshold). Both are reported; downstream scripts consume pruned_label
+# as the authoritative SingleR L1.
+raw_labels <- results$labels
+
+n_pruned <- sum(is.na(results$pruned.labels))
+cat(sprintf("Total: %d, Pruned: %d (%.1f%%)\n",
+            ncol(srt), n_pruned, 100 * n_pruned / ncol(srt)))
+
+out_df <- data.frame(
+  cell_id       = colnames(srt),
+  pruned_label  = results$pruned.labels,
+  raw_label     = raw_labels,
+  score         = max_scores,
+  delta_next    = deltas,
+  stringsAsFactors = FALSE
+)
+
+out_csv <- file.path(OUTDIR, sprintf("singler_l1_predictions_%s.csv", COMPARTMENT))
+write.csv(out_df, out_csv, row.names = FALSE)
+cat("Saved:", out_csv, "\n")
+
+cat("\nL1 pruned label distribution:\n")
+print(sort(table(out_df$pruned_label, useNA = "ifany"), decreasing = TRUE))
+
+cat("\nL1 raw label distribution:\n")
+print(sort(table(out_df$raw_label), decreasing = TRUE))
+```
+
+# Score Summary
+
+```{r score-summary, fig.width=10, fig.height=6}
+score_by_type <- out_df %>%
+  filter(!is.na(pruned_label)) %>%
+  group_by(pruned_label) %>%
+  summarise(
+    n            = n(),
+    median_score = median(score),
+    median_delta = median(delta_next),
+    .groups      = "drop"
+  ) %>%
+  arrange(desc(n))
+
+print(score_by_type)
+```
+
+```{r session-info}
+cat("\nSingleR:", as.character(packageVersion("SingleR")), "\n")
+cat("Seurat: ", as.character(packageVersion("Seurat")), "\n")
+```

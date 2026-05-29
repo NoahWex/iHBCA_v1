@@ -1,0 +1,160 @@
+# =============================================================================
+# EXTRACTION FORMATS - Discovery Phase
+# =============================================================================
+# Standardized output formats for both extraction tracks.
+# All extractions must conform to these schemas for traceability.
+# =============================================================================
+
+version: "1.0"
+created: 2026-01-20
+
+# =============================================================================
+# TRACK 1: SUPPLEMENTAL DATA EXTRACTION
+# =============================================================================
+# Output: studies/{study}/extracted/supplemental_extraction.yaml
+
+track1_supplemental:
+  description: "Data extracted from supplemental files (xlsx, csv, pdf, docx)"
+  output_file: "extracted/supplemental_extraction.yaml"
+
+  schema:
+    study: string          # Study name
+    extraction_date: date
+
+    sources:               # List of files processed
+      - file: string       # Filename
+        type: string       # xlsx, csv, pdf, docx
+        tables_extracted: int
+        notes: string
+
+    donors:                # Donor-level metadata
+      columns_found:       # List of column names
+        - name: string
+          source_file: string
+          source_table: string
+          raw_values: list   # All unique values observed
+
+      raw_data:            # Actual extracted data
+        - donor_id: string
+          # ... all columns as found
+          _source: string  # Which file/table
+
+    cells:                 # Cell-level metadata (if available in supplementals)
+      columns_found: list
+      sample_values: list  # First 10 rows as example
+
+    conditions:            # Condition variables identified
+      - name: string       # e.g., "age", "parity"
+        source_column: string
+        raw_values: list   # All unique values
+        value_counts: dict # Value -> count
+        coverage: float    # Fraction non-null
+        notes: string
+
+# =============================================================================
+# TRACK 2: RAW DATA EXTRACTION
+# =============================================================================
+# Output: studies/{study}/extracted/raw_data_extraction.yaml
+
+track2_raw_data:
+  description: "Schema and metadata extracted from source data files (RDS, h5ad)"
+  output_file: "extracted/raw_data_extraction.yaml"
+
+  schema:
+    study: string
+    extraction_date: date
+
+    source_file:
+      path: string
+      type: string         # seurat_rds, h5ad, mtx_directory
+      size_bytes: int
+
+    cell_ids:
+      total_count: int
+
+      format:
+        pattern: string    # Detected pattern (e.g., "{prefix}_{barcode}-1")
+        has_suffix: bool   # Whether -1 suffix present
+
+      components:          # Parsed components
+        - name: string     # e.g., "prefix", "barcode", "suffix"
+          position: int
+          unique_values: list  # All unique values for this component
+          value_counts: dict   # Value -> count
+
+      unique_conformations:  # Different formats observed
+        - pattern: string
+          example: string
+          count: int
+          notes: string    # e.g., "reversed format"
+
+      raw_samples:         # First 20 cell IDs verbatim
+        - string
+
+    barcodes:
+      unique_count: int
+      length_distribution: dict  # Length -> count
+      valid_10x_format: float    # Fraction matching [ACGT]{16}
+
+    metadata_columns:      # From obs/meta.data
+      - name: string
+        dtype: string
+        unique_values: list  # If <100 unique
+        n_unique: int
+        n_null: int
+        sample_values: list  # First 10
+
+    embeddings:            # Available embeddings
+      - name: string       # e.g., "X_pca", "X_umap"
+        dims: int
+
+    batches:               # Batch structure
+      column_name: string
+      unique_values: list
+      value_counts: dict
+
+# =============================================================================
+# UNIFIED OUTPUT (After Review)
+# =============================================================================
+# Output: studies/{study}/knowledge/unified_extraction.yaml
+
+unified:
+  description: "Merged and verified data from both tracks"
+  output_file: "knowledge/unified_extraction.yaml"
+
+  schema:
+    study: string
+    unification_date: date
+
+    cell_id_schema:
+      canonical_pattern: string
+      components: list
+      conformations:       # All observed formats
+        - pattern: string
+          count: int
+          source: string   # "track1" or "track2"
+
+    donor_metadata:
+      donors: list
+      columns:
+        - name: string
+          source: string   # "supplemental", "raw_data", or "both"
+          agreement: bool  # Whether sources agree
+          discrepancies: list  # If sources disagree
+
+    condition_mapping:
+      - condition: string  # Canonical name (e.g., "age_binary")
+        source_column: string
+        raw_values: list
+        mapped_values: dict  # raw -> canonical
+        coverage: float
+        testable: bool
+        notes: string
+
+    collisions:            # Detected collisions
+      - type: string       # "barcode", "donor_id", etc.
+        description: string
+        affected_count: int
+        resolution: string
+
+    review_status: string  # PENDING_REVIEW, APPROVED, NEEDS_REVISION

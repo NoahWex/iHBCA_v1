@@ -1,0 +1,30 @@
+# =============================================================================
+# GRAY STUDY CONFIGURATION
+# =============================================================================
+# Schema: A_DataPreparation/config/output_schemas/study_config.schema.yaml
+# =============================================================================
+
+study_name: gray
+source_path: "${SOURCE_COMPONENT_STUDIES}/gray.rds"
+ihbca_dataset: "Gray"
+
+# -----------------------------------------------------------------------------
+# CELL ID FORMAT
+# -----------------------------------------------------------------------------
+
+cell_id_format:
+  pattern: "{donor}_{barcode}"
+  has_suffix: false
+  example: "PM-D_AAACCTGAGAATCTCC"
+  notes: "No -1 suffix unlike most studies"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues:
+  - GRAY_DONOR_MISMATCH  # 37% of cells had incorrect RM-* donor assignment
+
+notes: |
+  Simple study - proof of concept candidate.
+  Known issue: RM-* donor mismatch (documented in knowledge/edge_cases.yaml).
+  Testable conditions to be determined during discovery phase.

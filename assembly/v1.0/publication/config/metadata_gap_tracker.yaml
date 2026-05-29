@@ -1,0 +1,470 @@
+# =============================================================================
+# HCA TIER 1 METADATA GAP TRACKER
+# =============================================================================
+# Per-study × per-field gap status for HCA Atlas Ingestion.
+# Source: Gap assessment (2026-02-11) against hca_atlas_ingestion.yaml schema
+#         + harmonized_donor_metadata.csv (287 donors × 24 columns)
+#
+# Status values:
+#   complete       - Value present and correct for all donors/cells
+#   partial        - Present for some donors, missing for others
+#   missing        - Not present in any current object
+#   hardcodable    - Same value for all cells, can be set programmatically
+#   needs_mapping  - Value exists but needs ontology term mapping
+#   in_outreach    - Actively requesting from external contacts
+#   not_applicable - Field does not apply to this study
+#
+# Updated: 2026-02-11
+# =============================================================================
+# It's metadata all the way down.
+
+version: "1.0"
+
+# ---------------------------------------------------------------------------
+# CONSTANT FIELDS — identical across all studies
+# ---------------------------------------------------------------------------
+# These can be hardcoded in any packaging script.
+constant_fields:
+  organism_ontology_term_id:
+    value: "NCBITaxon:9606"
+    note: "Homo sapiens — all studies are human"
+  tissue_ontology_term_id:
+    value: "UBERON:0000310"
+    note: "breast — all studies sample breast tissue"
+  sex_ontology_term_id:
+    value: "PATO:0000383"
+    note: "female — all donors are female"
+  disease_ontology_term_id:
+    value: "PATO:0000461"
+    note: "normal — healthy tissue atlas. BRCA carriers without active cancer are still 'normal' per HCA conventions"
+  is_primary_data:
+    value: true
+    note: "All source datasets contain original observations"
+  suspension_type:
+    value: "cell"
+    note: "All Chromium studies used cell suspensions. Xenium is NA (in situ)."
+    xenium_override: "na"
+
+# ---------------------------------------------------------------------------
+# PER-STUDY GAP STATUS
+# ---------------------------------------------------------------------------
+studies:
+
+  lawson:
+    description: "Lawson lab — 4 patients, Chromium FLEX + Xenium (unpublished)"
+    donors: 4
+    fields:
+      donor_id:
+        status: complete
+        source: "preprocessing metadata"
+        note: "Pat1, Pat2, UCI604, UCI220228"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — Chromium FLEX-seq + Xenium"
+        action: "Map to EFO terms: EFO:0030080 (10x 3' v3) or check FLEX-specific term; EFO:0030062 (Xenium)"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous in harmonized metadata"
+        action: "Map continuous age to HsapDv terms (e.g., HsapDv:0000087 for adult)"
+      self_reported_ethnicity_ontology_term_id:
+        status: missing
+        source: null
+        action: "Request from Dawson lab core facility records"
+        priority: high
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "Step 15 annotations + CellTypist"
+        action: "Map cluster labels to CL ontology terms (plan A2)"
+      gene_annotation_version:
+        status: complete
+        value: "GENCODE v32 / Ensembl 98"
+        source: "Cell Ranger GRCh38-2020-A reference (verified 2026-02-11)"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      # --- Sequencing metadata (not in obs but needed for Tracker) ---
+      alignment_software:
+        status: complete
+        value: "Cell Ranger 7.1.0"
+        source: "Pat1/CellRangerMulti/config.csv + web_summary.html (verified 2026-02-11)"
+      library_id:
+        status: missing
+        action: "Request from Dawson lab core"
+      library_prep_batch:
+        status: missing
+        action: "Request from Dawson lab core"
+      library_seq_run:
+        status: missing
+        action: "Request from Dawson lab core"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Dawson lab core (likely fresh dissociation)"
+
+  gray:
+    description: "Gray et al. 2022, Developmental Cell — 16 donors"
+    donors: 16
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata (ihbca_donor_id)"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous available for 14/16 donors"
+        action: "Map to HsapDv terms"
+        note: "2 donors missing age_continuous"
+      self_reported_ethnicity_ontology_term_id:
+        status: partial
+        source: "ethnicity_verbatim in harmonized metadata"
+        donors_present: 14
+        donors_missing: 2
+        action: "Map existing values to HANCESTRO; request missing from Austin Reed"
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "author cellSubtype column (17 unique types)"
+        action: "Map to CL terms"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  kumar:
+    description: "Kumar et al. 2023, Nature — 126 donors"
+    donors: 126
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: partial
+        source: "age_binary only (young/old); continuous age MISSING for all 126 donors"
+        donors_with_continuous_age: 0
+        donors_with_binary_age: 126
+        action: "Request continuous age from Austin Reed. Fallback: HsapDv:0000087 (adult) for all"
+        priority: high
+        note: "Binary age is insufficient for HsapDv mapping. This is the largest metadata gap."
+      self_reported_ethnicity_ontology_term_id:
+        status: partial
+        source: "ethnicity_verbatim in harmonized metadata"
+        donors_present: 119
+        donors_missing: 7
+        action: "Map existing to HANCESTRO; request missing 7 from Austin Reed"
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "author_cell_type column (57 unique types)"
+        action: "Map to CL terms"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  murrow:
+    description: "Murrow et al. 2022, Cell Systems — 28 donors"
+    donors: 28
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous available for all 28 donors"
+        action: "Map to HsapDv terms"
+      self_reported_ethnicity_ontology_term_id:
+        status: missing
+        source: null
+        donors_missing: 28
+        action: "Contact Murrow/Bhatt lab. May be GDPR-restricted → use 'unknown'"
+        priority: medium
+        note: "All 28 donors missing. Likely not collected or restricted."
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "Type column (8 unique types)"
+        action: "Map to CL terms"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  nee:
+    description: "Nee et al. 2023, Nature Genetics — 22 donors"
+    donors: 22
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous available for all 22 donors"
+        action: "Map to HsapDv terms"
+      self_reported_ethnicity_ontology_term_id:
+        status: complete
+        source: "ethnicity_verbatim in harmonized metadata"
+        note: "All 22 donors have ethnicity"
+        action: "Map to HANCESTRO terms"
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "cell_type column (11 unique types)"
+        action: "Map to CL terms"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  twigger:
+    description: "Twigger et al. 2022, Nature Communications — 18 donors"
+    donors: 18
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+        note: "16 in studies.yaml but 18 in harmonized metadata (includes additional samples)"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous — verify coverage in harmonized metadata"
+        action: "Map to HsapDv terms; verify age availability"
+      self_reported_ethnicity_ontology_term_id:
+        status: missing
+        source: null
+        donors_missing: 18
+        action: "Contact Twigger/Khaled lab. Likely not collected → use 'unknown'"
+        priority: medium
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "original_celltype column (9 unique types)"
+        action: "Map to CL terms"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  reed:
+    description: "Reed et al. 2024, Nature Genetics — 55 donors (iHBCA)"
+    donors: 55
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous available for all 55 donors"
+        action: "Map to HsapDv terms"
+      self_reported_ethnicity_ontology_term_id:
+        status: partial
+        source: "ethnicity_verbatim in harmonized metadata"
+        donors_present: 26
+        donors_missing: 29
+        action: "Request missing 29 from Austin Reed"
+        priority: high
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "cell_type column (10 unique types — already ontology-style)"
+        action: "Verify existing terms map to CL; may be closest to compliant already"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+  pal:
+    description: "Pal et al. 2021, EMBO J — 22 donors across 3 sub-studies (epi, total, b1)"
+    donors: 22
+    sub_studies: [pal_norm_epi, pal_norm_total, pal_norm_b1]
+    note: "Consolidated as one source study for HCA. 3 sub-cohorts share donor pool."
+    fields:
+      donor_id:
+        status: complete
+        source: "harmonized metadata"
+      assay_ontology_term_id:
+        status: needs_mapping
+        source: "known — 10x scRNA-seq"
+        action: "Map to EFO term"
+      development_stage_ontology_term_id:
+        status: needs_mapping
+        source: "age_continuous available for all 22 donors"
+        action: "Map to HsapDv terms"
+      self_reported_ethnicity_ontology_term_id:
+        status: missing
+        source: null
+        donors_missing: 22
+        action: "Check EMBO J Table S1 first; if absent, contact Pal/Visvader lab"
+        priority: high
+        note: "All 22 donors missing. Check publication supplementary data before outreach."
+      cell_type_ontology_term_id:
+        status: needs_mapping
+        source: "seurat_clusters (numeric only — no author labels)"
+        action: "Map cluster numbers to CL terms using our annotations"
+        note: "Pal sub-studies only have numeric cluster IDs, not named types"
+      gene_annotation_version:
+        status: missing
+        action: "Request from Austin Reed"
+      reference_genome:
+        status: hardcodable
+        value: "GRCh38"
+      library_id:
+        status: missing
+        action: "Request from Austin Reed"
+      library_prep_batch:
+        status: missing
+        action: "Request from Austin Reed"
+      library_seq_run:
+        status: missing
+        action: "Request from Austin Reed"
+      alignment_software:
+        status: missing
+        action: "Request from Austin Reed"
+      sample_preservation_method:
+        status: missing
+        action: "Request from Austin Reed"
+
+# ---------------------------------------------------------------------------
+# GAP SUMMARY
+# ---------------------------------------------------------------------------
+summary:
+  total_studies: 8
+  total_donors: 287
+  critical_gaps:
+    - field: self_reported_ethnicity_ontology_term_id
+      description: "68 donors missing ethnicity across 4 studies (pal=22, twigger=18, murrow=28 fully missing; reed=29/55, kumar=7/126, gray=2/16 partial)"
+      total_missing: 97
+    - field: development_stage_ontology_term_id
+      description: "Kumar has NO continuous age for 126 donors (binary only). All other studies have continuous age."
+      total_affected: 126
+    - field: gene_annotation_version
+      description: "Resolved for Lawson (GENCODE v32 / Ensembl 98 via Cell Ranger 7.1.0). Extractable from publication Methods sections for 7 external studies (Cell Ranger version → 10x reference release notes → GENCODE/Ensembl version)."
+      total_affected: 7
+    - field: cell_type_ontology_term_id
+      description: "All studies have labels but none are CL ontology terms. Requires mapping table."
+      total_affected: 8
+
+  sequencing_metadata_gap:
+    description: "library_id, library_prep_batch, library_seq_run, alignment_software, sample_preservation_method missing for ALL studies"
+    action: "Consolidated outreach to Austin Reed (external) and Dawson lab core (native)"
+    note: "These are Tracker fields, not obs fields — may not block validator but block submission"
+
+  hardcodable_count: 7
+  needs_mapping_count: 5
+  truly_missing_count: 8

@@ -1,0 +1,51 @@
+{
+  "Nee2023_preCAF_inflam": [
+    "CXCL3",
+    "MMP12",
+    "FST",
+    "CXCL2",
+    "MMP3",
+    "CXCL8",
+    "FGF7",
+    "CXCL5",
+    "IL1RL1",
+    "INHBA",
+    "TNFRSF12A",
+    "MMP10",
+    "PHLDA1",
+    "SERPINE2"
+  ],
+  "Reed2024_FB2_top30": [
+    "CNIH3",
+    "MMP3",
+    "ARSG",
+    "C11orf53",
+    "GAL",
+    "SDK1",
+    "SLC12A8",
+    "THBS2",
+    "PTGES",
+    "WNT2",
+    "RSPO3",
+    "TWIST2",
+    "NMB",
+    "FHAD1",
+    "SH3PXD2B",
+    "LIMK1",
+    "ADPRHL1",
+    "MMP12",
+    "TNFAIP6",
+    "LHFPL2",
+    "WIPI1",
+    "CLMP",
+    "MEDAG",
+    "SERPINE2",
+    "TAC1",
+    "MAP3K4"
+  ],
+  "MMP_convergent": [
+    "MMP3",
+    "MMP10",
+    "MMP12"
+  ]
+}

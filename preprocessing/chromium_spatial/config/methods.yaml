@@ -1,0 +1,78 @@
+# Method configuration for FLEX preprocessing pipeline
+# Algorithmic parameters, metric definitions, and sweep configs
+
+# Compartments in the pipeline
+compartments: [Epithelial, Stromal, Immune]
+
+# Integration methods and their configs
+integration:
+  scvi:
+    n_latents: [20, 50, 75, 100, 125, 150, 200]
+    defaults:
+      n_layers: 3
+      dropout_rate: 0.1
+      batch_size: 128
+      max_epochs: 300
+      early_stopping_patience: 15
+
+  scvi_austin:
+    n_latents: [20, 50, 100, 200]
+    defaults:
+      n_layers: 2
+      dropout_rate: 0.2
+      batch_size: 1024
+      max_epochs: 400
+      early_stopping_patience: 45
+
+  harmony:
+    n_latents: [50]
+
+  pca:
+    n_latents: [50]
+
+# Common integration parameters
+integration_defaults:
+  pca_comps: 50
+  n_neighbors: 30
+  leiden_resolutions: [0.3, 0.5, 0.8, 1.0, 5.0]
+  batch_key: patient_id
+
+# scIB evaluation
+scib:
+  metrics: [ASW_batch, ASW_label, NMI, ARI, graph_conn, isolated_labels, kBET]
+  scoring:
+    bio_keys: [ASW_label, NMI, ARI]
+    batch_keys: [ASW_batch, graph_conn]
+    sidecar_keys: [isolated_labels, kBET]
+    weights:
+      bio: 0.6
+      batch: 0.4
+    # Source: Phase 4 design decision. Bio-weighted because batch effects
+    # are modest in this 4-patient cohort.
+  metric_defaults:
+    n_neighbors_embedding: 15
+    n_neighbors_kbet: 50
+    pca_comps: 50
+    leiden_resolution: 1.0
+
+# SVD diagnostic thresholds
+svd_diagnostic:
+  pr_low_warn: 1.5
+  pc1_high_warn: 0.90
+  load_high_warn: 0.90
+
+# Milo DA
+milo:
+  defaults:
+    k: 30
+    prop: 0.1
+    dims: 100
+  hnsw:  # only used when --approx is set
+    nlinks: 16
+    ef_construction: 200
+    ef_search: 100
+
+# BigSur per-compartment VFs
+bigsur:
+  min_cells: 2
+  tissue_source: breast

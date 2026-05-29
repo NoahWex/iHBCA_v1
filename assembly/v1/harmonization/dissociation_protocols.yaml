@@ -1,0 +1,273 @@
+# dissociation_protocols.yaml
+# Per-study dissociation protocol reference for iHBCA v1.0 (7 studies)
+#
+# This file is NOT derived from the iHBCAv1 uploaded object.
+# It is curated from each study's published methods section.
+# Kumar per-donor assignments are derived from per-cell metadata
+# (iHBCAv1_upload/external_studies/harmonization/outputs/study_objects/kumar/metadata.csv,
+#  column: suspension_dissociation_time, grouped by ihbca_donor_id mode).
+#
+# This file populates the dissociation_minutes column in harmonized_donor_metadata.csv.
+# Source: build_harmonized_donors.py uses _KUMAR_DISSOC_MINUTES dict derived from this file.
+#
+# Key finding: Kumar is the ONLY within-study heterogeneous protocol.
+# All other studies use a single consistent protocol per study,
+# so dissociation time is absorbed by the study covariate for those cohorts.
+# Kumar's three protocols were INTENTIONAL study design to assess protocol bias.
+
+version: "1.0"
+created: "2026-05-04"
+studies:
+
+  reed:
+    paper: "Reed et al. (2024) Nat Genet 56:652-662"
+    doi: "10.1038/s41588-024-01688-9"
+    pmid: "38548988"
+    protocol_class: enzymatic_short
+    reagents: "0.025% Trypsin + 0.4 mg/ml DNase I"
+    temperature_c: 37
+    minutes_typical: 5
+    minutes_max: 10
+    consistent_within_study: true
+    note: >
+      Frozen epithelial-enriched or stromal-enriched fractions thawed and incubated at 37C
+      with pipetting every 2-3 min until smoothly digested, up to 10 min maximum.
+      Actual times recorded per-donor (5/7/10 min) in harmonized_donor_metadata.csv.
+
+  kumar:
+    paper: "Kumar et al. (2023) Nature 620:181-191"
+    doi: "10.1038/s41586-023-06252-9"
+    pmid: "37380767"
+    protocol_class: variable_by_design
+    consistent_within_study: false
+    note: >
+      Three dissociation protocols used by STUDY DESIGN to assess protocol bias:
+      short (~1 h), medium (~6 h), long (~24 h). Donors equally distributed across
+      protocols. Per-cell suspension_dissociation_time values in Seurat metadata
+      reflect actual processing time per donor. This is the ONLY iHBCA study with
+      within-study protocol heterogeneity. All other studies use consistent protocols
+      absorbed by the study covariate.
+    protocol_groups:
+      short_enzymatic:
+        description: "Short enzymatic dissociation, ~15 min trypsin"
+        minutes: 15
+      medium_digestion:
+        description: "Medium overnight digestion, ~2 h"
+        minutes: 120
+      extended_digestion_3h:
+        description: "Extended digestion, ~3 h"
+        minutes: 180
+      extended_digestion_4h:
+        description: "Extended digestion, ~4 h"
+        minutes: 240
+      extended_digestion_6h:
+        description: "Extended digestion, ~6 h"
+        minutes: 360
+      long_overnight:
+        description: "Long overnight digestion, ~12 h"
+        minutes: 720
+      unknown:
+        description: "Protocol not recorded (UCI cohort subset)"
+        minutes: null
+    per_donor:
+      P01: 15
+      P02: 15
+      P03: 15
+      P04: 15
+      P05: 15
+      P06: 15
+      P07: 15
+      P08: 15
+      P09: 720
+      P10: 15
+      P11: 720
+      P12: null  # unknown — UCI cohort
+      P13: null  # unknown — UCI cohort
+      P14: null  # unknown — UCI cohort
+      P15: null  # unknown — UCI cohort
+      P16: null  # unknown — UCI cohort
+      P17: null  # unknown — UCI cohort
+      P18: null  # unknown — UCI cohort
+      P19: null  # unknown — UCI cohort
+      P20: 720
+      P21: 720
+      P22: 15
+      P23: 720
+      P24: 720
+      P25: 720
+      P26: 720
+      P27: 15
+      P28: 720
+      P29: 720
+      P30: 720
+      P31: 720
+      P32: 720
+      P33: 720
+      P34: 720
+      P35: 720
+      P36: 720
+      P37: 15
+      P38: 180
+      P39: 180
+      P40: 15
+      P41: 240
+      P42: 15
+      P43: 15
+      P44: 720
+      P45: 15
+      P46: 15
+      P47: 120
+      P48: 120
+      P49: 240
+      P50: 180
+      P51: 180
+      P52: 15
+      P53: 15
+      P54: 180
+      P55: 180
+      P56: 360
+      P57: 180
+      P58: 180
+      P59: 180
+      P60: 180
+      P61: 240
+      P62: 120
+      P63: 180
+      P64: 120
+      P65: 120
+      P66: 180
+      P67: 180
+      P68: 120
+      P69: 120
+      P70: 180
+      P71: 180
+      P72: 120
+      P73: 180
+      P74: 120
+      P75: 180
+      P76: 180
+      P77: 180
+      P78: 120
+      P79: 180
+      P80: 120
+      P81: 120
+      P82: 180
+      P83: 180
+      P84: 120
+      P85: 120
+      P86: 120
+      P87: 180
+      P88: 180
+      P89: 120
+      P90: 180
+      P91: 360
+      P92: 120
+      P93: 120
+      P94: 180
+      P95: 360
+      P96: 120
+      P97: 180
+      P98: 180
+      P99: 180
+      P100: 120
+      P101: 180
+      P102: 120
+      P103: 180
+      P104: 120
+      P105: 180
+      P106: 180
+      P107: 180
+      P108: 180
+      P109: 240
+      P110: 180
+      P111: 180
+      P112: 180
+      P113: 180
+      P114: 180
+      P115: 180
+      P116: 180
+      P117: 180
+      P118: 180
+      P119: 180
+      P120: 180
+      P121: 180
+      P122: 180
+      P123: 180
+      P124: 180
+      P125: 180
+      P126: 180
+
+  nee:
+    paper: "Nee et al. (2023) Nat Genet 55:595-606"
+    doi: "10.1038/s41588-023-01298-x"
+    pmid: "37002399"
+    protocol_class: enzymatic_short
+    reagents: "20 U/ml DNase I"
+    temperature_c: 37
+    minutes_typical: 5
+    consistent_within_study: true
+    note: >
+      Human tissue samples processed with DNase I for ~5 min.
+      Separate collagenase 1h protocol used for mouse mammary glands (not human donors).
+      All human donors receive consistent short enzymatic protocol.
+
+  gray:
+    paper: "Gray et al. (2022) Dev Cell 57:1400-1420"
+    doi: "10.1016/j.devcel.2022.05.003"
+    pmid: "35617956"
+    protocol_class: collagenase_medium
+    reagents: "Collagenase XI + TrypLE"
+    temperature_c: 37
+    minutes_collagenase: 120
+    minutes_tryple: 5
+    minutes_total: 125
+    consistent_within_study: true
+    note: >
+      Tissue digested with collagenase XI at 37C 150 rpm for 2h (scRNA-seq),
+      then further dissociated with TrypLE for 5 min. Consistent protocol across all donors.
+      Long relative to Reed/Murrow/Nee but consistent, so absorbed by study covariate.
+
+  twigger:
+    paper: "Twigger et al. (2022) Nat Commun 13:562"
+    doi: "10.1038/s41467-021-27895-0"
+    pmid: "35091553"
+    protocol_class: no_dissociation
+    minutes_typical: null
+    consistent_within_study: true
+    note: >
+      Cells isolated DIRECTLY from human milk — no enzymatic tissue dissociation.
+      Fresh milk samples diluted in equal volume PBS and processed within <2h of
+      collection. dissociation_minutes is not applicable for Twigger donors.
+
+  murrow:
+    paper: "Murrow et al. (2022) Cell Syst 13:644-664"
+    doi: "10.1016/j.cels.2022.06.005"
+    pmid: "35863345"
+    protocol_class: enzymatic_short
+    reagents: "0.05% Trypsin + 5 U/ml Dispase + 1 mg/ml DNase I"
+    temperature_c: 37
+    minutes_trypsin: 2
+    minutes_dispase_dnase: 2
+    minutes_total: 4
+    consistent_within_study: true
+    note: >
+      Banked tissue fragments thawed and dissociated by trituration in 0.05% trypsin
+      for 2 min, then trituration in dispase + DNase I for 2 min. Very short protocol.
+      Consistent across all donors.
+
+  pal:
+    paper: "Pal et al. (2021) EMBO J 40:e107333"
+    doi: "10.15252/embj.2020107333"
+    pmid: "33950524"
+    protocol_class: collagenase_long
+    reagents: "Collagenase + 100 U/ml DNase I, then 0.25% Trypsin/EGTA"
+    temperature_c: 37
+    minutes_collagenase: 480  # 8h for normal tissue
+    minutes_collagenase_max: 540  # up to 9h
+    minutes_trypsin: 3
+    consistent_within_study: true
+    note: >
+      Normal breast tissue digested for 8-9h with collagenase + DNase I at 37C with
+      agitation, then trypsin/EGTA for 1-3 min to single-cell suspension.
+      Long protocol but CONSISTENT across donors — absorbed by study covariate.
+      Tumor tissue uses shorter protocol (up to 60 min) but iHBCA uses normal tissue only.

@@ -1,0 +1,60 @@
+{
+  "params_yaml": "publication/analysis/spatial/motifs/config/motif_units_params.yaml",
+  "per_motif_params": {
+    "P0": {
+      "eps_um": 50.0,
+      "min_samples": 10
+    },
+    "P1": {
+      "eps_um": 35.0,
+      "min_samples": 10
+    },
+    "P2": {
+      "eps_um": 50.0,
+      "min_samples": 10
+    },
+    "P3": {
+      "eps_um": 35.0,
+      "min_samples": 10
+    },
+    "P4": {
+      "eps_um": 35.0,
+      "min_samples": 10
+    },
+    "P5": {
+      "eps_um": 50.0,
+      "min_samples": 10
+    },
+    "P6": {
+      "eps_um": 35.0,
+      "min_samples": 10
+    },
+    "P7": {
+      "eps_um": 75.0,
+      "min_samples": 10
+    },
+    "P8": {
+      "eps_um": 50.0,
+      "min_samples": 10
+    }
+  },
+  "default_eps_um": 35.0,
+  "default_min_samples": 10,
+  "alpha_r_um": 20.0,
+  "n_cells_input": 433825,
+  "n_cells_in_units": 170617,
+  "n_cells_noise_or_below_min_samples": 263208,
+  "n_units_total": 7576,
+  "units_per_motif": {
+    "P1": 2453,
+    "P2": 1823,
+    "P3": 844,
+    "P7": 545,
+    "P0": 530,
+    "P5": 501,
+    "P8": 440,
+    "P6": 296,
+    "P4": 144
+  },
+  "runtime_s": 62.8
+}

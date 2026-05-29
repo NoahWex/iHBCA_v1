@@ -1,0 +1,24 @@
+# =============================================================================
+# TWIGGER STUDY CONFIGURATION
+# =============================================================================
+
+study_name: twigger
+source_path: "${SOURCE_COMPONENT_STUDIES}/twigger_l1_fastmnn.rds"
+ihbca_dataset: "Twigger"
+
+cell_id_format:
+  pattern: "{batch}_{barcode}-1"
+  has_suffix: true
+  example: "RB5_AAACCCAAGAGGTCAC-1"
+  notes: "Some cells had reversed format (BARCODE-BATCH) - now fixed"
+
+# Testable conditions: TO BE DETERMINED during discovery
+testable_conditions: []
+
+known_issues:
+  - TWIGGER_REVERSED_CELLIDS  # 17,349 cells had reversed format
+
+notes: |
+  Complex study - some cells had reversed cell ID format.
+  110,744 cells total.
+  Testable conditions to be determined during discovery phase.

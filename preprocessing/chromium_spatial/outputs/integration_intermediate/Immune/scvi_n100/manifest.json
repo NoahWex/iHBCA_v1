@@ -1,0 +1,19 @@
+{
+  "source_h5ad": "/share/crsp/lab/dalawson/nwechter/Spatial_HBCA_preprocessing/.dev/pipeline_comparison_20260401/outputs/compartments_step15/Immune/integration/scvi_n100/integrated.h5ad",
+  "compartment": "Immune",
+  "config_label": "scvi_n100",
+  "n_cells": 47942,
+  "n_genes": 18082,
+  "latent_key": "X_emb",
+  "umap_key": "X_umap",
+  "obs_columns": [
+    "sample_id",
+    "patient_id",
+    "position",
+    "leiden_0.3",
+    "leiden_0.5",
+    "leiden_0.8",
+    "leiden_1.0",
+    "leiden_5.0"
+  ]
+}

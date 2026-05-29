@@ -1,0 +1,20 @@
+scope: joint_full
+contrast: C3_p3_uoq_vs_rest
+tier: M0
+formula_yaml: ~ patient_id + platform + log_n_cells + axis_amp + is_uoq
+formula_resolved: ~ patient_id + platform + log_n_cells + axis_amp + contrast_factor
+contrast_levels:
+- 'FALSE'
+- 'TRUE'
+positive_level: 'TRUE'
+n_libraries: 95
+n_per_group:
+  'false': 72
+  'true': 23
+n_nhoods: 61889
+n_sig_FDR_0.1: 4339
+n_sig_FDR_0.05: 2441
+fdr_weighting: graph-overlap
+design_dim: 95 x 9
+date: 2026-05-17 14:07:56.804354
+milo: /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_Xenium/DifferentialAbundance/outputs/All/All_milo.rds

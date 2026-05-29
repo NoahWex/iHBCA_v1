@@ -1,0 +1,228 @@
+schema_version: 2_flex
+compartment: epi
+generated: 2026-04-27
+source_pipeline: Spatial_HBCA_preprocessing/.dev/flex_annotation_20260427
+anchor_resolution: '0.3'
+resolutions_used: ['0.3', '0.5', '0.8', '1.0', '1.5', '3.0']
+resolution_cap: '3.0'
+
+note: |
+  Track C FLEX Epithelial L2S annotation. Anchor at leiden_0.3 (10 clusters) — chosen
+  to avoid BMYO overclustering (at 1.0 BMYO splits into 7 myo + 3 basal sub-clusters
+  reflecting continuous variation, not real substates). At 0.3 BMYO collapses to
+  c0 (myo-core, 53K) + c3 (basal-core, 5K) + c5/c6 (small variants).
+  Debris cluster c4 (CD74+IGHA1+heavy MT-* + ribosomal) flagged as ARTIFACT_lowqc.
+  Substates folded at this anchor (recoverable via fine_cluster_overrides if needed):
+    LASP-basal transitional (KLK5/7+KRT6B+RARRES1, ~5.7K cells at 1.0_c8) → folds into c1
+    Apocrine-LHS (ABCC11+PIP+TAT, ~6.3K at 1.0_c7) → folds into c2
+    HSP-high BMYO sub-state (~1.1K at 1.0_c12) → folds into c0 (FFPE blocks
+      dissociation HSP induction, so this likely reflects real HSP-elevated biology
+      rather than artifact; held within BMYO-myo because no biologically distinct
+      identity emerges beyond elevated chaperones)
+    Cycling LASP (HIST1H1+MCM7+HELLS, ~612 at 1.0_c13) → folds into c1
+    CD74+ epithelial (~431 at 1.0_c16) → folds into c1
+  No fine_cluster overrides applied initially — keep simple, lift specific substates if
+  the canonical/top heatmaps reveal under-resolved biology.
+  Evidence per cluster:
+    - ucell_top, ucell_top_score, ucell_runner_up, ucell_margin: UCell argmax against V1 yaml signatures
+    - limma_top_markers: top de novo markers from limma-voom (one-vs-rest, ~ library_id + condition)
+    - novelty_flags: low_confidence / tight_margin / marker_mismatch (informational, not auto-relabel)
+
+evidence_paths:
+  ucell_per_cluster: outputs/ucell/Epithelial_ucell_per_cluster.csv
+  ucell_per_cell: outputs/ucell/Epithelial_ucell_per_cell.csv
+  limma_top: outputs/limma/limma_top_markers_Epithelial_leiden_*.csv
+  limma_full: outputs/limma/limma_markers_Epithelial_leiden_*.csv
+  assignments: outputs/assignments/Epithelial_leiden_*_assignments.csv
+  structural_plots: outputs/Epithelial/structural/
+
+clusters_by_resolution:
+  '0.3':
+    c0:
+      n_cells: 53125
+      ucell_top: BMYO-myo
+      ucell_top_score: 0.5847
+      ucell_runner_up: BMYO-basal
+      ucell_margin: 0.2334
+      limma_top_markers: [GOLGA7B, TNNI2, ALDH7A1, CCDC136, SPATA6, TESC, OVCH2, LOXL2, SYT8, CYB5R2, KLHL29, NRG2, NTF4, NEXN, RAPGEF3, ADGRD2, ITGA11, POSTN, MSRB3, GRIA4, CACNA1C, MAMDC2, MPDZ]
+      novelty_flags: [marker_mismatch]
+      assigned_label: BMYO-myo
+      review_status: auto_suggested
+      review_notes: |
+        Core BMYO myoepithelial signature: TNNI2 (troponin), NEXN, CACNA1C, GRIA4
+        (myo Ca/contraction), POSTN, ITGA11, COL14A1, LOXL2 (ECM/myo). Spans the bulk
+        of the BMYO compartment (52% of all Epi cells).
+    c1:
+      n_cells: 22972
+      ucell_top: LASP-major
+      ucell_top_score: 0.5375
+      ucell_runner_up: Lactocyte-LC1
+      ucell_margin: 0.2060
+      limma_top_markers: [EML4, DTNB, NCALD, KAT2A, SLC25A37, SH3YL1, BBOX1, INSR, ATL2, EPHB3, NOP16, ARID5A, CD55, KIT, PROM1, EGF, ELF5, RGS2, PADI2, ALDH1A3, TPD52L1, SLC34A2, RARRES1, CCL28]
+      novelty_flags: [marker_mismatch]
+      assigned_label: LASP-major
+      review_status: auto_suggested
+      review_notes: |
+        Clean LASP-major: ELF5+KIT+PROM1+EGF+ALDH1A3 + secretory program (RARRES1,
+        CCL28, SLC34A2, PADI2, TMPRSS2). Lactocyte-LC1 runner-up reflects shared
+        secretory machinery — V1 doesn't use Lactocyte-LC1 as an epi label here.
+        At 1.0 this cluster splits into LASP-major core (1.0_c0, 15.6K) + LASP-basal
+        transitional (1.0_c8, 5.7K, KLK5/7+KRT6B) + cycling LASP (1.0_c13) +
+        CD74+ subset (1.0_c16). Held at 0.3 — lift to override only if needed.
+    c2:
+      n_cells: 18030
+      ucell_top: LHS-major
+      ucell_top_score: 0.4325
+      ucell_runner_up: LASP-KIT
+      ucell_margin: 0.3262
+      limma_top_markers: [RABEP1, ARHGAP40, SYTL2, MYB, INPP4B, PREX1, ANKRD30A, KDM4B, AGR3, ACADSB, CAPN8, AR, TTC6, FOXA1, HCAR1, AGR2, TAT, TBX3, PGR, CITED1, TFF3, TFF1, SLC7A2, SLC26A3]
+      novelty_flags: [marker_mismatch]
+      assigned_label: LHS-major
+      review_status: auto_suggested
+      review_notes: |
+        Clean LumHR/LHS: AGR2/AGR3+FOXA1+AR+PGR+TFF1/3+AREG+ANKRD30A. At 1.0 splits
+        into LHS-core (1.0_c3, 10.3K) + apocrine-LHS subset (1.0_c7, 6.3K, ABCC11+PIP+
+        TAT) + small low-conf c18/c19. Held at 0.3.
+    c3:
+      n_cells: 5150
+      ucell_top: BMYO-basal
+      ucell_top_score: 0.6277
+      ucell_runner_up: BMYO-myo
+      ucell_margin: 0.0475
+      limma_top_markers: [ABCC3, DZIP1L, CRYBG1, EPPK1, TPM4, PDLIM3, F3, PDLIM5, FAT1, ESYT1, JPH2, CIC, CD200, LAMC2, TNC, NNMT, OSMR, ID4, COL14A1, COL7A1, COL16A1, KRT17, KRT14, COL6A1, COL9A2]
+      novelty_flags: [tight_margin, marker_mismatch]
+      assigned_label: BMYO-basal
+      review_status: auto_suggested
+      review_notes: |
+        BMYO-basal core: KRT14+KRT17+COL7A1+COL14A1+COL6A1/2+LAMC2+TP63 (basal lamina /
+        keratin program). Tight margin vs BMYO-myo because basal & myo share the
+        BMYO compartment — V1 yaml splits them on differentiation axis.
+    c4:
+      n_cells: 2175
+      ucell_top: LASP-major
+      ucell_top_score: 0.3577
+      ucell_runner_up: LASP-basal
+      ucell_margin: 0.0491
+      limma_top_markers: [CD74, IGHA1, EEF2, GSN, MT-ND4, RACK1, S100A6, PNRC1, EEF1G, MT-ATP6, EIF3A, MT-CO2, MT-ND2, APP, MT-CO3, MT-ND4L, MT-CYB, JCHAIN, IGKC, B2M, HSP90AB1, NOP53, TMSB10, MT-ND6, MT-ND1]
+      novelty_flags: [tight_margin, marker_mismatch]
+      assigned_label: ARTIFACT_lowqc
+      review_status: auto_suggested
+      review_notes: |
+        Debris cluster (visually a ball in the middle of the UMAP). Heavy MT-* (15+
+        mitochondrial transcripts in top markers) + ambient immunoglobulin (IGHA1,
+        IGKC, JCHAIN) + ribosomal (RACK1, EEF1G, EIF3A, EEF2, B2M) + CD74. Classic
+        low-quality / dying-cell + ambient plasma RNA contamination. Drop or flag.
+    c5:
+      n_cells: 567
+      ucell_top: BMYO-basal
+      ucell_top_score: 0.2904
+      ucell_runner_up: LASP-basal
+      ucell_margin: 0.1348
+      limma_top_markers: [SYNE2, SLC12A7, AHNAK, IVNS1ABP, PCMTD1, FXYD3, DSP, SH3D21, TRAK1, DDR1, MACF1, LAMA5, TFCP2L1]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: BMYO-basal
+      review_status: auto_suggested
+      review_notes: |
+        Small basal variant — junction / cytoskeletal program (DSP desmoplakin,
+        AHNAK, MACF1, DDR1, LAMA5 laminin). Low UCell scores but clearly basal
+        epithelium phenotype.
+    c6:
+      n_cells: 340
+      ucell_top: BMYO-myo
+      ucell_top_score: 0.6866
+      ucell_runner_up: BMYO-basal
+      ucell_margin: 0.2034
+      limma_top_markers: [EPS8L2, GNAQ, SETD1B, CSRP1, MYH11, RBPMS, LIFR, COL9A2, SPEG, TNS1, THBS1, ZBTB16]
+      novelty_flags: [marker_mismatch]
+      assigned_label: BMYO-myo
+      review_status: auto_suggested
+      review_notes: |
+        Pure myo small cluster — MYH11+SPEG+TNS1+CSRP1 (vascular smooth-muscle-like
+        myoepithelial). Highest UCell BMYO-myo score in the compartment (0.69).
+    c7:
+      n_cells: 336
+      ucell_top: LASP-major
+      ucell_top_score: 0.4028
+      ucell_runner_up: LASP-KIT
+      ucell_margin: 0.1396
+      limma_top_markers: []
+      wilcox_top_markers: [PGGHG, PIGR, CCL28, TFCP2L1, ELF5, CRACR2B, PDCD4, EHF, TMEM63A, MUC1, KRT19, KRT15, FASN, KIT, KRT15, ERRFI1, SFRP1, ATP13A4, AFDN, EPS8L2]
+      novelty_flags: [marker_mismatch]
+      assigned_label: LASP-major
+      review_status: auto_suggested
+      review_notes: |
+        Drifter SW of LASP main body (centroid 1.6, 3.0 vs c1 at 2.5, 7.0). Limma
+        pseudobulk failed (n=336); wilcox shows secretory/mature LASP signature:
+        ELF5+KIT+TFCP2L1+EHF (LASP master regulators) + secretory program
+        (PIGR, CCL28, MUC1, MUCL1, FASN — IgA-secretion/lactational metabolism).
+        Higher-res 1.0_c15 fragment had HSP/IEG markers; FFPE embedding largely
+        blocks dissociation-stress signatures (which is why we use it), so the
+        residual signal is most parsimoniously real biology rather than a fixation
+        artifact. Held as LASP-major (not splitting LASP-secretory subset) — the
+        secretory program is the dominant identity.
+    c8:
+      n_cells: 175
+      ucell_top: LHS-major
+      ucell_top_score: 0.4870
+      ucell_runner_up: LASP-basal
+      ucell_margin: 0.4808
+      limma_top_markers: []
+      wilcox_top_markers: [TAT, MYBPC1, PI15, NEK10, ANKRD30A, FASN, MLPH, XBP1, SCUBE2, AZGP1, AREG, EVL, MGP, GREB1, ELOVL5, PDZK1, PIEZO2, FHL2, ERRFI1, RUNX1, RERG, STC2, CAPN8, INPP4B, BHLHE40, SLC7A2]
+      novelty_flags: [marker_mismatch]
+      assigned_label: LHS-apocrine
+      review_status: auto_suggested
+      review_notes: |
+        Drifter at top of UMAP (centroid y≈17.9), separated from main LHS body at y≈14.
+        Limma pseudobulk failed (n=175 too small); wilcox markers (vs all other Epi cells)
+        show apocrine + classical LumHR signature: TAT (tyrosine aminotransferase, apocrine),
+        AZGP1 (zinc-alpha-2-glycoprotein, apocrine sweat) PLUS canonical LumHR estrogen
+        response (ANKRD30A=NY-BR-1, XBP1, AREG, GREB1, STC2, INPP4B, PDZK1, RERG,
+        BHLHE40). Companion of c9 (also apocrine, more pure). New label LHS-apocrine
+        introduced — V1 epi yaml doesn't subset apocrine LumHR; this is FLEX-specific.
+    c9:
+      n_cells: 82
+      ucell_top: LHS-major
+      ucell_top_score: 0.2321
+      ucell_runner_up: LASP-major
+      ucell_margin: 0.0885
+      limma_top_markers: []
+      wilcox_top_markers: [APOD, DHRS2, ALOX15B, SERHL2, CLU, ABCC11, MUCL1, FASN, PIP, SULT1C3, HMGCS2, ALDH3B2, GSTT2B, ACSM1, HPGD, SCP2, SCD, TSKU, AACS, IDI1, ACSL3, GUSB, FADS2, UGT2B28, DHCR24, AKR1B15]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: LHS-apocrine
+      review_status: auto_suggested
+      review_notes: |
+        Drifter at top of UMAP (centroid y≈18.0), adjacent to c8. Pure apocrine signature:
+        APOD, ABCC11, PIP, MUCL1, ALOX15B, DHRS2, SULT1C3, AKR1B15 (textbook apocrine
+        breast/sweat markers) plus heavy lipid biosynthesis (SCD, FADS2, DHCR24, ACSL3,
+        HMGCS2, AACS, ELOVL — apocrine sebum/lipid program). Smaller and more "pure"
+        apocrine than c8 (which mixes apocrine with LumHR estrogen response). UCell
+        weak only because V1 yaml has no apocrine signature to score against.
+
+# fine_cluster_overrides — recover LASP-basal substate that 0.3 anchor folds into LASP-major.
+fine_cluster_overrides:
+  lasp_basal_recovery:
+    resolution: '1.0'
+    anchor_clusters: [c1]
+    rationale: |
+      At 0.3 anchor c1 (LASP-major, 22.9K cells) hides a large LASP-basal transitional
+      substate. At 1.0 it splits cleanly into LASP-major core (1.0_c0, 15.6K) and a
+      LASP-basal subset (1.0_c8, n=5653) with markers RGS2+KLK5/7+RARRES1+KRT6B+KRT23+
+      ALDH1A3+CHI3L1+PTN — KRT6B/KRT23 are basal keratins, KLK5/7 are LASP secretory
+      kallikreins. UCell tight margin (0.04) confirms it sits between LASP-major and
+      LASP-basal. Also 1.0_c8 has runner_up = LASP-basal in UCell.
+    overrides:
+      - {resolution: '1.0', cluster: 8, label: LASP-basal}
+
+  lhs_apocrine_aggregation:
+    resolution: '1.0'
+    anchor_clusters: [c2, c9]
+    rationale: |
+      0.3_c8 + 0.3_c9 (n=257 combined) are the apocrine drifters at top of UMAP and
+      get LHS-apocrine via the anchor — but their pseudobulk limma is empty (too few
+      libraries). 1.0_c18 (n=255) traces the same apocrine signature with adequate
+      limma support (DHRS2+SERHL2+ABCC11+APOD+ALOX15B+PIP+ALDH3B2+SCP2+ACACA+ACAA1
+      — textbook apocrine). Adding 1.0_c18 override pulls ~173 additional apocrine
+      cells out of LHS-major (0.3_c2 mass) AND gives LHS-apocrine a marker row in
+      heatmap_top. Final LHS-apocrine ≈ 430 cells.
+    overrides:
+      - {resolution: '1.0', cluster: 18, label: LHS-apocrine}

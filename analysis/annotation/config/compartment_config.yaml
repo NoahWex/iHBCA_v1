@@ -1,0 +1,250 @@
+# compartment_config.yaml
+# Per-compartment scientific parameters for annotation_pipeline_v2.
+# Pipeline-wide settings (flagging thresholds, heatmap tile resolutions) at top.
+# Marker lists are review-ready drafts — edit before first pipeline run.
+#
+# See iHBCA_publication/coordination/plans/annotation_pipeline_v2.md for
+# design rationale, schema details, and decision point references.
+
+schema_version: 2
+generated: 2026-04-23
+
+# -----------------------------------------------------------------------------
+# Pipeline-wide settings (apply to all compartments)
+# -----------------------------------------------------------------------------
+pipeline:
+  # D1 + D6 resolved 2026-04-23: Loose flagging. Thresholds trigger NOTE flags
+  # in the evidence report; they do NOT auto-fail labels (see design §7).
+  flagging:
+    multi_study:
+      min_studies: 2
+      min_cells_per_study: 5
+      min_frac_per_study: 0.02
+      flag_label: single-study
+      flag_trigger: label_is_entirely_one_study
+    multi_patient:
+      min_donors: 2
+      min_cells_per_donor: 3
+      min_frac_per_donor: 0.01
+      flag_label: single-donor
+      flag_trigger: label_is_entirely_one_donor
+    artifact_enrichment:
+      z_threshold: 3.0
+      flag_label: possible-artifact
+      flag_trigger: any_artifact_marker_z_ge_threshold_and_not_is_artifact
+    canonical_marker_count:
+      min_count: 3
+      flag_label: sparse-markers
+      flag_trigger: canonical_markers_present_below_min
+
+  # D3 resolved 2026-04-23: curated 3-5 tiles for lineage/artifact heatmaps.
+  # Pipeline appends any resolution used by fine_cluster labels in the YAML.
+  heatmap_tile_resolutions: [0.5, 1.0, 2.0]
+
+  # Cell-state signature scoring (Isam suggestion, 2026-04-23). Opt-in
+  # per label: a label's YAML entry may declare a `scoring_signature`
+  # (list of gene symbols) to support a specific claim (e.g., CD4_T_naive
+  # declares [CCR7, SELL, LEF1, TCF7]; IFNg_T declares [IFNG, TNF, TBX21]).
+  # When present, the pipeline scores cells within that label against the
+  # signature and records the score distribution in the evidence report.
+  # Labels without a scoring_signature are not scored.
+  scoring:
+    method: UCell                   # rank-based, robust to dropouts, no threshold tuning
+    scope: per_label_opt_in          # only labels with a scoring_signature in the YAML
+    report_columns: [signature_score_median, signature_score_q25, signature_score_q75]
+
+  # Hard-fail conditions (see design §7.1). These block the pipeline; not tunable here.
+  # Listed for reference only:
+  # - required_gene_missing
+  # - schema_violation
+  # - unassigned_cells
+
+  # Native labels — primary source is the pre-extracted CSV. Columns:
+  # cell_id, native_kumar, native_nee, native_gray, native_murrow,
+  # native_twigger, native_pal, native_reed. Coverage verified 2026-04-24
+  # against the full 2.12M-cell file.
+  #
+  # Provenance: extracted from per-study source h5ads by
+  # Extraction/scripts/extract_native_labels.py. Source h5ads retained for
+  # provenance (see below) but script 00 reads the CSV directly.
+  native_labels:
+    # source_csv resolved at runtime via paths.yaml token
+    # `ihbcav1_assembly_components` + native_labels.csv. Wrapper
+    # `--native-labels-csv` arg overrides any value here.
+    source_csv: null
+    column_prefix: native_                # columns are native_{study}
+    studies: [kumar, nee, gray, murrow, twigger, pal, reed]
+
+    # Provenance: source h5ads and the obs column each native_ column was
+    # pulled from. Verified 2026-04-23 by direct obs inspection. Source dir
+    # resolves via paths.yaml token `source_datasets`.
+    provenance:
+      source_dir: null
+      per_study:
+        kumar:   {file: kumar2023.h5ad,   column: author_cell_type}
+        reed:    {file: reed2024.h5ad,    column: level2}
+        pal:     {file: pal2021.h5ad,     column: cell_type_ontology_term_id, decode: CL_ontology}
+        twigger: {file: twigger2022.h5ad, column: original_celltype}
+        murrow:  {file: murrow2022.h5ad,  column: Type}
+        nee:     {file: nee2023.h5ad,     column: cell_state}
+        gray:    {file: gray2022.h5ad,    column: cellSubtype}
+
+# -----------------------------------------------------------------------------
+# Immune compartment
+# -----------------------------------------------------------------------------
+compartments:
+  imm:
+    display_name: Immune
+    n_cells: 162626
+    lumsec_exception: false
+
+    # Lineage order for label grouping in heatmaps (canonical order: T → B/plasma →
+    # NK/ILC → myeloid → granulocytes → artifact at the end). "Resembles X" info
+    # for artifacts lives in per-label notes, not in the taxonomy.
+    lineage_order:
+      - CD8_T
+      - CD4_T
+      - Treg
+      - T_ambiguous
+      - B
+      - plasma
+      - NK
+      - ILC
+      - monocyte
+      - macrophage
+      - DC
+      - pDC
+      - mast
+      - neutrophil
+      - artifact
+
+    # Lineage markers (L1 cell-type signatures) — sourced from Kumar 2023
+    # (Nature, doi:10.1038/s41586-023-06252-9) and Reed 2024 (Nat Genet,
+    # doi:10.1038/s41588-024-01688-9), cross-validated 2026-04-23.
+    # Source tags: k=Kumar text-cited, r=Reed Fig 2 dotplot row, kr=both.
+    # Used for: (a) lineage heatmap, tiled across curated resolutions;
+    # (b) UCell signature scoring per label.
+    lineage_markers:
+      # Pan-T lineage (both papers)
+      T_cell: [CD3D, CD3E, CD3G]                            # kr
+
+      # CD4 compartment
+      CD4_T: [CD4, CCR4]                                    # r
+      CD4_naive: [SELL, CD40LG, CCR7]                       # k (SELL); r (CD40LG)
+      CD4_Th: [IL7R, CCR6, CCL20, PTPN13]                   # k (IL7R/CCR6/CCL20); r (PTPN13)
+      CD4_Tem: [LMNA, ANXA1]                                # k
+      CD4_Treg: [FOXP3, CTLA4, TIGIT, BATF]                 # k
+      CD4_activated: [ZNF683, PLCG2]                        # k (TCR engagement genes)
+
+      # CD8 compartment
+      CD8_T: [CD8A, CD8B]                                   # kr
+      CD8_Tem: [GZMK, TNFRSF9, EOMES]                       # k (GZMK); r (TNFRSF9)
+      CD8_Trm: [ITGA1, KLRC1, KLRD1, AUTS2]                 # k (ITGA1); r (KLRC1)
+      CD8_Tc1: [IFNG, TNF, GZMB]                            # r
+      CD8_activated: [ZNF683, PLCG2]                        # k
+
+      # Unconventional T / innate lymphoid
+      GD_T: [TRDC, TRGC2]                                   # k
+      NK: [GNLY, NKG7, KLRC3, XCL1, XCL2, GZMH]             # k (GNLY); r (KLRC3/XCL2)
+      NKT: [GNLY, CD3D, GZMB, GZMH]                         # k
+      ILC: [IL7R, IL1R1, KIT]                               # k (IL7R); r (IL1R1/KIT)
+      T_prol: [MKI67, TOP2A, STMN1, TUBB]                   # k
+
+      # B cell compartment
+      B_cell: [MS4A1, CD79A, CD79B, CD19, CD74, HLA-DRA]    # kr (MS4A1/CD79A); r (CD74)
+      B_naive: [TCL1A, YBX3, IGHD]                          # r (TCL1A/YBX3)
+      B_memory_switched: [MYC, LTB, TNFRSF13C, MIR155HG]    # k (MYC); r (LTB/TNFRSF13C)
+      B_memory_unswitched: [EGR3, REL]                      # r (EGR3)
+      Plasma: [IGKC, JCHAIN, MZB1, XBP1, SDC1, IGHG1, IGHA1]  # kr
+
+      # Myeloid — macrophage states
+      Macrophage: [C1QA, C1QB, FCER1G, CD68, CD163, APOE]   # r (C1QB/FCER1G); k (APOE)
+      Macro_m1: [IL1B, CCL3, CCL4, C3]                      # k (IL1B)
+      Macro_m2: [MRC1, LYVE1, SELENOP, F13A1]               # k (MRC1); k text (LYVE1/SELENOP via macro-m2 set)
+      Macro_lipo: [APOE, LIPA, LPL, APOC1, GPNMB, SPP1]     # k (APOC/LIPA/LPL); r (APOE/GPNMB)
+      Macro_IFN: [IFIT1, IFIT2, IFIT3, ISG15, MX1]          # k (IFIT1/IFIT2)
+
+      # Myeloid — monocytes
+      Mono_classical: [CD14, EREG, VCAN, FCN1, S100A8, S100A9]  # k (EREG)
+      Mono_nonclassical: [FCGR3A, CDKN1C, LST1, SMIM25]     # k (FCGR3A)
+
+      # Myeloid — dendritic cells
+      cDC1: [CLEC9A, XCR1, IRF8, BATF3, CPVL]               # k (CLEC9A); r (CPVL)
+      cDC2: [CLEC10A, FCER1A, CD1C, IL1R2]                  # k (CLEC10A)
+      mDC: [LAMP3, CCR7, LGALS2]                            # k (LAMP3)
+      pDC: [LILRA4, IL3RA, CLEC4C, IRF8]                    # k (LILRA4)
+
+      # Granulocytes (REQUIRED per 2026-04-23 QA — previously missing)
+      Mast: [TPSAB1, TPSB2, KIT, MS4A2, CPA3, CMA1, HPGD]   # k (TPSAB1/CPA3); k dotplot (CMA1/HPGD)
+      Neutrophil: [ELANE, MPO, FCGR3B, CSF3R, AQP9, S100A8, S100A9]  # k dotplot (FCGR3B/AQP9)
+
+    # Artifact markers. Must include out-of-compartment signal per QA.
+    artifact_markers:
+      out_of_compartment_epithelial: [EPCAM, KRT8, KRT18, KRT19, KRT14, KRT5]
+      out_of_compartment_stromal: [COL1A1, COL1A2, COL3A1, DCN, LUM]
+      out_of_compartment_endothelial: [PECAM1, CDH5, VWF]
+      out_of_compartment_mural: [ACTA2, MYH11, PDGFRB, RGS5]
+      proliferation: [MKI67, TOP2A, PCNA, MCM2]
+      dissociation_stress: [FOS, JUN, JUNB, EGR1, HSPA1A, HSPA1B, DNAJB1, DNAJB6]
+
+# -----------------------------------------------------------------------------
+# Epithelial compartment
+# -----------------------------------------------------------------------------
+  epi:
+    display_name: Epithelial
+    n_cells: 990379
+    lumsec_exception: true    # permits expression-mode labels within LumSec coarse parent
+
+    lineage_order:
+      - Basal
+      - LumHR
+      - LASP            # Luminal adaptive secretory precursor (= Kumar Lumsec)
+      - Lactocyte
+      - artifact
+
+    lineage_markers:
+      Basal: [KRT5, KRT14, TP63, KRT17, ACTA2, MYLK]   # basal-myoepithelial (BMYO)
+      LumHR: [ESR1, PGR, FOXA1, ANKRD30A, AR, AGR2, AGR3, TFF3]  # hormone-sensing luminal (LHS)
+      LASP: [KIT, ELF5, MFGE8, LTF, KRT8, KRT18, GABRP, KRT15, MMP7, SLPI]  # luminal adaptive secretory precursor (= Kumar Lumsec)
+      Lactocyte: [CSN2, CSN3, LALBA, CIDEA, OLAH, BTN1A1]  # twigger lactation samples
+      PTN_positive: [PTN]   # PTN+_LumSec expression-mode target (Spatial_HBCA Fig 4)
+
+    artifact_markers:
+      out_of_compartment_immune: [PTPRC, CD3D, CD68, MS4A1, LYZ]
+      out_of_compartment_stromal: [COL1A1, COL1A2, COL3A1, DCN]
+      out_of_compartment_endothelial: [PECAM1, CDH5]
+      proliferation: [MKI67, TOP2A, PCNA, MCM2]
+      dissociation_stress: [FOS, JUN, JUNB, EGR1, HSPA1A, HSPA1B, DNAJB1]
+
+# -----------------------------------------------------------------------------
+# Stromal compartment
+# -----------------------------------------------------------------------------
+  str:
+    display_name: Stromal
+    n_cells: 973500
+    lumsec_exception: false
+
+    # Lineage order: fibroblast states → perivascular (pericyte/VSMC) → vascular
+    # endothelial → lymphatic endothelial → adipocyte → artifact-like variants.
+    lineage_order:
+      - Fibroblast
+      - Perivascular
+      - Endothelial_vascular
+      - Endothelial_lymphatic
+      - Adipocyte
+      - Schwann
+      - artifact
+
+    lineage_markers:
+      Fibroblast: [COL1A1, COL1A2, COL3A1, DCN, LUM, PDGFRA, COL6A1]
+      vSMC: [ACTA2, MYH11, TAGLN, CNN1, ACTG2]
+      Pericyte: [RGS5, PDGFRB, NOTCH3, KCNJ8, MCAM, CSPG4]
+      Endothelial_vascular: [PECAM1, CDH5, VWF, CLDN5]
+      Endothelial_lymphatic: [PROX1, LYVE1, PDPN, CCL21]
+      Adipocyte: [PLIN1, ADIPOQ, LEP, FABP4]
+
+    artifact_markers:
+      out_of_compartment_immune: [PTPRC, CD3D, CD68, MS4A1, LYZ]
+      out_of_compartment_epithelial: [EPCAM, KRT8, KRT18, KRT14]
+      proliferation: [MKI67, TOP2A, PCNA, MCM2]
+      dissociation_stress: [FOS, JUN, JUNB, EGR1, HSPA1A, HSPA1B, DNAJB1]

@@ -1,0 +1,35 @@
+# L0.5 vocabulary — harmonized across Xenium and FLEX.
+#
+# 15 cell types in three compartments. No splitting at L0.5 — subtypes are
+# resolved at L1.5 (per-compartment integration, downstream of this pipeline).
+#
+# Aligned to Reed et al. 2024, Supplementary Table 2. Adipocyte, Mast, and
+# Neutro are panel-resolvable additions not present in the Reed table.
+#
+# NK is present in the Xenium panel but absent from the FLEX reference L0.5
+# annotation — this is expected and handled by the majority-of-3 arbitration
+# in 04_label_transfer/ (see phase 4 notes in CLAUDE.md).
+
+compartments:
+  Epithelial:
+    - LASP      # Luminal adaptive secretory progenitor
+    - LHS       # Luminal hormone-sensing
+    - BMYO      # Basal / myoepithelial
+
+  Stromal:
+    - FB        # Fibroblast
+    - PV        # Perivascular
+    - LE        # Lymphatic endothelial
+    - VE        # Vascular endothelial
+    - Adipocyte # Panel-resolvable; not in Reed 2024 Sup. Table 2
+
+  Immune:
+    - T_cell
+    - B_cell
+    - Plasma
+    - NK        # Not present in FLEX L0.5 reference; Xenium-only assignment
+    - Myeloid
+    - Mast      # Panel-resolvable; not in Reed 2024 Sup. Table 2
+    - Neutro    # Panel-resolvable; not in Reed 2024 Sup. Table 2
+
+# Total: 3 + 5 + 7 = 15 types.

@@ -1,0 +1,31 @@
+{
+  "L2": "str::Vas-capillary",
+  "L2_safe": "str__Vas_capillary",
+  "contrast": "HRS_vs_AR",
+  "n_viable_NGs": 2,
+  "n_genes_picked": 50,
+  "n_cells_total": 38627,
+  "gene_selection": {
+    "rule": "leading-edge x F.3, score = NES * logFC, per-pathway diversified, pct-in filtered",
+    "top_genes_per_ng": 25,
+    "top_genes_per_pathway": 5,
+    "candidate_multiplier": 3,
+    "min_pct_in_source_NG": 0.25,
+    "gsea_padj": 0.1,
+    "gsea_NES_filter": "NES > 0",
+    "marker_fdr": 0.1,
+    "marker_logFC_filter": "logFC > 0",
+    "marker_dissoc_filter": "is_dissoc_stress excluded"
+  },
+  "max_cells_per_ng": 0,
+  "inputs": {
+    "lookup": "/share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/outputs/nhoodgroup_renaming/lookup.csv",
+    "gsea": "/share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/outputs/stageI3_gsea/per_nhoodgroup_nes.csv",
+    "markers_dir": "/share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/outputs/stageF3_markers/HRS_vs_AR",
+    "atlas_nhoods": "/share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/parity_x_risk_20260504/outputs/atlas_nhoods",
+    "nhood_groups": "/share/crsp/lab/dalawson/nwechter/iHBCA_V1/Analysis/stages/V1_Abundance/da_pipeline/inquiries/risk_main_effects_20260507/outputs/stageF1_nhoodgroups/HRS_vs_AR/nhood_groups.csv",
+    "counts_npz": "/share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/str_counts.npz",
+    "compartment_metadata": "/share/crsp/lab/dalawson/nwechter/iHBCAv1_upload/.dev/assembly_rebuild_20260405/outputs/components/str_metadata.csv",
+    "labels_full": "/share/crsp/lab/dalawson/nwechter/iHBCA_publication/publication/analysis/annotation/labels_full.csv"
+  }
+}

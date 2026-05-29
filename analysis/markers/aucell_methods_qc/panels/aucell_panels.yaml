@@ -1,0 +1,198 @@
+# AUCell signature panels — canonical gene lists for Fig 2c + s2.6
+#
+# Source-of-truth for the 11 signature panels scored by
+# publication/analysis/markers/aucell_methods_qc/scripts/build_ihbca_fig2_aucell_scores.py
+#
+# Schema:
+#   panels[i].key                  — internal key (matches script ALL_PANELS tuple[0])
+#   panels[i].display              — human-readable name for figure legends
+#   panels[i].source.citation      — primary publication
+#   panels[i].source.pmid          — PubMed ID (or list for synthesized panels)
+#   panels[i].source.doi           — DOI (or list for synthesized panels)
+#   panels[i].source.location      — specific table/figure within publication
+#   panels[i].source.full_or_subset — "full" if entire source list; "subset" if curated
+#   panels[i].source.curation      — null if full; reason + procedure if subset
+#   panels[i].source.legacy_key    — (optional) backward-compat key used in earlier drafts
+#   panels[i].genes                — gene symbols (HGNC)
+#
+# Used as canonical input by:
+#   - build_ihbca_fig2_aucell_scores.py (TODO: refactor to read from this YAML)
+#   - submission/figures/fig2/tables/s_fig2_ihbca_aucell_panels.csv (generated from this)
+#   - submission/methods/drafts/M-4c_v1_clinical_da.md (citations in AUCell subsection)
+#
+# PMID/DOI fields added 2026-05-23 from coordination/drafts/aucell_panel_citations_with_pmids.md
+# (8/8 panels resolved via PubMed lookup). Suryadevara authorship corrected from "Suzuki"
+# transcription error (DOI 10.1038/s41580-024-00738-8 resolves to Suryadevara et al. 2024
+# "SenNet recommendations for detecting senescent cells", Nat Rev Mol Cell Biol 25:1001-1023).
+
+version: 3
+last_updated: 2026-05-23
+
+panels:
+
+  # ---------- Tumor-context reference anchors ----------
+  # Panels rebuilt 2026-05-23 to use Wu et al. 2020 GitHub stromal_subclasses
+  # repo as the authoritative AUCell gene-list source. The Wu lab assembled
+  # PDAC iCAF/myCAF reference panels from Öhlund 2017 (mouse) and Elyada 2019
+  # (human) — performing mouse-to-human ortholog mapping and AUCell-formatting —
+  # and released them at:
+  #   https://github.com/sunnyzwu/stromal_subclasses/blob/master/
+  #   05_gene_signature_analysis/AUCell/gene_signatures.csv
+  #   commit 9c819769bd622c71d67bbdf75a4e1c34cdfa36b6 (2019-11-21)
+  # We use these published curated panels directly to ensure that the gene
+  # lists scored here match the lists scored in Wu et al. 2020.
+  # The prior Wu2020 panel (11 chemokine markers) was removed: those genes
+  # represent a cross-paper canonical iCAF marker set (Costa 2018 / Pelon 2020 /
+  # Pal 2021 / Zheng 2022) rather than the Wu 2020 iCAF cluster signature,
+  # and Wu's own cluster signature (Dataset EV1; 610 iCAF DEGs) is not
+  # retrievable from the Springer-deposited supplementary materials (the
+  # Dataset EV1 ZIP contains only a README).
+
+  - key: Ohlund2017
+    display: "Öhlund 2017 PDAC iCAF (Tuveson curated)"
+    source:
+      citation: "Öhlund et al. 2017 J Exp Med 214:579-596"
+      pmid: 28232471
+      doi: "10.1084/jem.20162024"
+      location: "39-gene iCAF reference panel curated by the Tuveson lab from Öhlund et al. 2017 mouse PSC-organoid co-culture DESeq2 data, mouse-to-human orthologs mapped by the Tuveson lab. Distributed as the `Tuveson_iCAF_mouse` column of Wu et al. 2020 stromal_subclasses GitHub repo (commit 9c819769bd622c71d67bbdf75a4e1c34cdfa36b6, file 05_gene_signature_analysis/AUCell/gene_signatures.csv)."
+      full_or_subset: "full"
+      curation: "Used verbatim from the Wu 2020 GitHub `Tuveson_iCAF_mouse` column. Curation performed by the Tuveson lab as part of Öhlund 2017; ortholog mapping performed by the Wu/Tuveson labs for the Wu 2020 manuscript. No further filtering applied in this study."
+      ortholog_mapping_note: "Mouse → human symbols mapped by the Tuveson lab in the source CSV. AUCell silently drops genes lacking a human ortholog entry in the iHBCA v1 gene_symbol → Ensembl mapping."
+    genes: [CLEC3B, GSN, PTX3, LY6C1, EFEMP1, LY6A, FIGF, TNFAIP6, IFI27L2A, DPT, ADM, PLPP3, TNXB, CXCL12, GSTM1, C4B, OGN, C3, PCOLCE2, CXCL1, COL14A1, SVEP1, ADAMTS5, HP, HAS1, SCARA3, IFI205, DPEP1, SFRP4, PRSS23, ACKR3, HTRA3, APOE, CCL7, IL6, SFRP2, PLA1A, SCARA5, SNED1]
+
+  - key: Elyada2019_iCAF
+    display: "Elyada 2019 PDAC iCAF (Tuveson curated)"
+    source:
+      citation: "Elyada et al. 2019 Cancer Discov 9:1102-1123"
+      pmid: 31197017
+      doi: "10.1158/2159-8290.CD-19-0094"
+      location: "84-gene human iCAF reference panel curated by the Tuveson lab from Elyada et al. 2019 Supplementary Table S13 (human PDAC fibroblast markers, iCAF sheet). Distributed as the `Tuveson_iCAF_human` column of Wu et al. 2020 stromal_subclasses GitHub repo (commit 9c819769bd622c71d67bbdf75a4e1c34cdfa36b6, file 05_gene_signature_analysis/AUCell/gene_signatures.csv); gene list matches the full Elyada Supp Table S13 iCAF sheet (84 genes ranked by MAST Score)."
+      full_or_subset: "full"
+      curation: "Used verbatim from the Wu 2020 GitHub `Tuveson_iCAF_human` column. Independently verified to match the full 84-gene Elyada 2019 Supplementary Table S13 iCAF sheet (cached at coordination/reports/supp_xlsx_cache/elyada2019_supp_table_S13.xlsx)."
+    genes: [C3, DUSP1, FBLN1, LMNA, CLU, CCDC80, MYC, EFEMP1, HAS1, NR4A1, CFD, ANXA1, CXCL12, FGF7, KLF4, EMP1, GPRC5A, SRPX, MT2A, MEDAG, IGF1, MGST1, MCL1, CEBPD, S100A10, UAP1, TNXB, CEBPB, PNRC1, SOCS3, PTGDS, FOSB, NFKBIA, CXCL2, THBS1, CCL2, OGN, GSN, DPT, PLA2G2A, NAMPT, ITM2A, RGCC, JUND, NNMT, ZFP36, PIM1, CPE, GFPT2, SOD2, KDM6B, FSTL1, FBLN2, NR4A3, MFAP5, ABL2, SGK1, CILP, UGDH, FBLN5, ADAMTS1, ADH1B, WISP2, GPX3, S100A4, IL6, HAS2, PLAC9, IGFBP6, FBN1, BDKRB1, TPPP3, RASD1, MT1A, CXCL14, PI16, APOE, IL8, ARC, PTX3, TNFAIP6, MT1E, MT1X, CXCL1]
+
+  - key: Elyada2019_myCAF
+    display: "Elyada 2019 PDAC myCAF"
+    source:
+      citation: "Elyada et al. 2019 Cancer Discov 9:1102-1123"
+      pmid: 31197017
+      doi: "10.1158/2159-8290.CD-19-0094"
+      location: "Supplementary Table S13 (human PDAC fibroblast markers — myCAF sheet)"
+      full_or_subset: "full"
+      curation: "rebuilt 2026-05-23 to clean Galbo S3 / Elyada S13 subsets per verification audit (coordination/reports/fig2_aucell_panel_verification_20260523.md); prior hybrid panel mixed Elyada S13 with canonical lit collagens and included MMP2 in error of MMP11"
+    genes: [MYL9, CALD1, MMP11, HOPX, BGN, IGFBP7, TPM2, CTHRC1, ACTA2, TAGLN, INHBA, COL10A1, TPM1, POSTN, GRP, CST1]
+
+  - key: Galbo2021_pan_iCAF
+    display: "Galbo 2021 pan-cancer iCAF"
+    source:
+      citation: "Galbo et al. 2021 Clin Cancer Res 27:2636-2647"
+      pmid: 33622705
+      doi: "10.1158/1078-0432.CCR-20-4226"
+      location: "Supplementary Table S3, pan-iCAF column (signature genes for pan-CAF subtypes)"
+      full_or_subset: "full"
+      curation: "rebuilt 2026-05-23 to clean Galbo S3 pan-iCAF subset per verification audit (coordination/reports/fig2_aucell_panel_verification_20260523.md); prior 13-gene panel was hybrid (6/13 from Galbo S3 pan-iCAF, rest from canonical iCAF literature)"
+    genes: [CFD, GPC3, C3, ADH1B, IGF1, EFEMP1, PODN, SEPP1, CXCL12, ABI3BP, FBLN1, MGST1, MFAP4, PLA2G2A, DPT, WISP2, CCDC80, SFRP2, PTGDS, DCN, MGP, C1S, IGFBP6, GSN, TMEM176A, FIBIN, TMEM176B, SERPINF1, FHL1, GPX3, CTGF, C1R, SFRP4, CYP1B1, CST3, SLC40A1, FHL2, ELN, KLF4, RARRES1, CYR61, IGFBP5]
+
+  - key: Galbo2021_pan_myCAF
+    display: "Galbo 2021 pan-cancer myCAF"
+    source:
+      citation: "Galbo et al. 2021 Clin Cancer Res 27:2636-2647"
+      pmid: 33622705
+      doi: "10.1158/1078-0432.CCR-20-4226"
+      location: "Supplementary Table S3, pan-myCAF column (signature genes for pan-CAF subtypes)"
+      full_or_subset: "full"
+      curation: "rebuilt 2026-05-23 to clean Galbo S3 pan-myCAF subset per verification audit (coordination/reports/fig2_aucell_panel_verification_20260523.md); prior 12-gene panel mixed Galbo pan-myCAF with Galbo pan-dCAF collagens (COL1A1/COL3A1/FN1/POSTN/VCAN) and non-S3 markers (FAP, SPARC, MYL9) — biologically distinct subtypes"
+    genes: [ADIRF, ACTA2, MYH11, TAGLN, SPARCL1, MCAM, A2M, MYLK, IGFBP7, CRIP1, TINAGL1, TPM2, PTP4A3, PPP1R14A, CRIP2, ADAMTS1, CSRP2, NDUFA4L2, TPM1, MAP1B, FRZB, PRKCDBP, CSRP1, CAV1, ADAMTS4, GJA4, RGS5, MEF2C, CALM2, APOLD1, OAZ2, MGST3, ISYNA1, CPM, PGF, GUCY1B3, UBA2, YIF1A, PHLDA1, NDRG2, ID3, RGS16, CYB5R3, CRYAB, OLFML2A, TIMP3, GUCY1A3, FILIP1, FAM13C, NDUFS4, ITGB1, KCNE4, CPE]
+
+  # ---------- Preneoplastic-breast panels (internal reproduction targets) ----------
+
+  - key: Nee2023_preCAF
+    display: "Nee 2023 preCAF"
+    source:
+      citation: "Nee et al. 2023 Nat Genet 55:595-606"
+      pmid: 36914836
+      doi: "10.1038/s41588-023-01298-x"
+      location: "Supplementary Table 6 (pre-CAF DE signature)"
+      full_or_subset: "subset"
+      curation: |
+        Filtered to FDR < 0.05, log2FC > 1.0, then curated to
+        inflammatory/MMP/chemokine/growth-factor genes only;
+        translation machinery and housekeeping genes excluded.
+    genes: [CXCL3, MMP12, FST, CXCL2, MMP3, CXCL8, FGF7, CXCL5, IL1RL1, INHBA, TNFRSF12A, MMP10, PHLDA1, SERPINE2]
+
+  - key: Reed2024_FB2
+    display: "Reed 2024 FB2"
+    source:
+      citation: "Reed et al. 2024 Nat Genet 56:652-662"
+      pmid: 38548988
+      doi: "10.1038/s41588-024-01688-9"
+      location: "Supplementary Table 4 (FB2 cluster top markers)"
+      full_or_subset: "subset"
+      curation: |
+        Top 30 markers of the FB2 cluster, filtered to remove
+        lncRNAs and uncharacterised loci (4 genes dropped; 26 remain).
+    genes: [CNIH3, MMP3, ARSG, C11orf53, GAL, SDK1, SLC12A8, THBS2, PTGES, WNT2, RSPO3, TWIST2, NMB, FHAD1, SH3PXD2B, LIMK1, ADPRHL1, MMP12, TNFAIP6, LHFPL2, WIPI1, CLMP, MEDAG, SERPINE2, TAC1, MAP3K4]
+
+  - key: MMP_convergent
+    display: "MMP3/10/12 cross-paper"
+    source:
+      citation: "Synthesized: Nee et al. 2023 + Pal et al. 2021 + Reed et al. 2024"
+      pmid: [36914836, 33950524, 38548988]  # Nee, Pal, Reed
+      doi: ["10.1038/s41588-023-01298-x", "10.15252/embj.2020107333", "10.1038/s41588-024-01688-9"]
+      location: "Cross-paper convergence on preneoplastic-breast inflammatory fibroblast program"
+      full_or_subset: "subset"
+      curation: |
+        Three MMP genes (MMP3, MMP10, MMP12) appearing in all three
+        source signatures (Nee preCAF + Pal 2021 stromal-1 + Reed FB2).
+        Not from any single publication.
+    genes: [MMP3, MMP10, MMP12]
+
+  # ---------- Senescence panels (SenNet biomarker DB) ----------
+
+  - key: Senescence_SASP
+    display: "Senescence SASP"
+    source:
+      citation: "Suryadevara et al. 2024 Nat Rev Mol Cell Biol 25:1001-1023"
+      pmid: 38831121
+      doi: "10.1038/s41580-024-00738-8"
+      legacy_key: "Suzuki2024"  # transcription error in earlier drafts; DOI resolves to Suryadevara et al.
+      location: "Supplementary Table 1 (SenNet biomarker database — SASP biomolecules)"
+      full_or_subset: "subset"
+      curation: |
+        SenNet DB entries filtered to: organism in {human, human+mouse},
+        biomolecule type = mRNA, citation count >= 2.
+        Subset reflects high-confidence human-supported SASP markers.
+    genes: [TNF, IL6, CCL3, TGFB1, CXCL1, CXCL8, CCL2, CCL8, IGFBP4, IL1A, IL1B, SERPINE1, CSF1, CSF2, FAS, ICAM1, IGFBP7, PAPPA, MMP3, MMP1, CXCL2, CXCL3, IGFBP2, IGFBP3, TIMP2, CCL4, CCL5, CXCL10]
+
+  - key: Senescence_CCA
+    display: "Senescence cell cycle arrest"
+    source:
+      citation: "Suryadevara et al. 2024 Nat Rev Mol Cell Biol 25:1001-1023"
+      pmid: 38831121
+      doi: "10.1038/s41580-024-00738-8"
+      legacy_key: "Suzuki2024"  # transcription error in earlier drafts; DOI resolves to Suryadevara et al.
+      location: "Supplementary Table 1 (SenNet biomarker database — cell cycle arrest)"
+      full_or_subset: "subset"
+      curation: "All reported human-mRNA cell cycle arrest markers (no citation-count filter)."
+    genes: [CDKN1A, CDKN2A, TP53, CDKN1C, CDKN2D, SATB1, CDKN1B, CDKN2B]
+
+# ---------- Notes ----------
+# - 3 tumor-context panels (Wu, Ohlund, Elyada_iCAF) remain marked "VERIFY":
+#   audit confirmed VERIFIED at body-text / signature level. source_location strings
+#   tightened 2026-05-23 to point to concrete supp tables / figures.
+# - 3 tumor-context panels (Galbo_iCAF, Galbo_myCAF, Elyada_myCAF) rebuilt 2026-05-23
+#   to be clean subsets of their cited supplementary tables (Galbo S3 / Elyada S13).
+#   See coordination/reports/fig2_aucell_panel_verification_20260523.md for the audit
+#   that triggered the rebuild.
+# - Wu2020 display label updated 2026-05-23: "breast cancer" → "TNBC" (Wu et al. studied
+#   5 TNBC samples specifically). Gene list unchanged.
+# - Senescence panels: author attribution corrected 2026-05-23 from "Suzuki" (transcription
+#   error in our earlier docs) to "Suryadevara" (verified via DOI 10.1038/s41580-024-00738-8).
+#   legacy_key: "Suzuki2024" retained under source: for backward-compat with earlier methods drafts.
+# - The 5 explicit subsets (Nee, Reed, MMP_convergent, Senescence_SASP, Senescence_CCA)
+#   have documented curation procedures here matching the .py script docstring.
+# - PMID + DOI fields added 2026-05-23 for all 11 panels (full citation lookup at
+#   coordination/drafts/aucell_panel_citations_with_pmids.md).
+# - Methods text (M-4c AUCell subsection) cites this YAML as the authoritative gene-list source.
+# - Backlog: refactor build_ihbca_fig2_aucell_scores.py to read panels from this YAML
+#   directly (currently gene lists are hardcoded in the .py + mirrored here — silent-desync risk).

@@ -1,0 +1,179 @@
+# annotation_hierarchy.yaml — Label resolution system across platforms and datasets
+#
+# This file defines how cell types are annotated at different resolutions
+# across the three data modalities (iHBCA, Chromium spatial, Xenium) and
+# how labels flow between them.
+#
+# The hierarchy is NOT a strict tree — it is a set of parallel resolution
+# systems connected by transfer methods (SingleR, CellTypist, cosine mapping).
+
+# ---- iHBCA v1 (2.12M cells, 287 individuals, 7 studies) ----
+ihbca:
+  levels:
+    L0:
+      name: compartment
+      description: "Major tissue compartments"
+      types: [Stromal, Epithelial, Immune, Epidermal]
+      source: "Reed et al. 2024, Nature Genetics"
+
+    L1:
+      name: cell_type
+      description: "Canonical iHBCA v1 cell types"
+      count: ~20
+      source: "iHBCA v1 level1.5 annotations (Reed et al.)"
+      note: "Exact count depends on resolution — L1 (11 types) vs L1.5 (20 types)"
+
+    L2.0c:
+      name: clinical_behavioral_group
+      description: "Behavioral groups defined by clinical covariate response patterns. Operationally: NhoodGroups from V1 Clinical DA (parity × risk inquiry), where each NhoodGroup is a Louvain cluster of topologically and behaviorally coherent Milo neighborhoods."
+      count: "200+ sparse Louvain groups -> ~22 after meta-grouping (L1 × direction)"
+      status: computed
+      source: publication/analysis/abundance/clinical/parity_findings/
+      source_detail: |
+        Bundle 1.1 V1 Clinical DA substrate, promoted 2026-05-10. Canonical NhoodGroup
+        lookup at publication/analysis/abundance/clinical/parity_findings/nhoodgroups/lookup.csv.
+        Inquiry: parity_x_risk_20260504 (parity × risk × BRCA1 interaction design).
+        Milo object: publication/analysis/abundance/clinical/milo/milo_full.rds (201K neighborhoods,
+        4.6GB; paths.yaml: ihbca_milo_full).
+        Manifest entry: bundle_1_1_v1_clinical_da_substrate_20260510.
+      derivation:
+        step_1: "Build Milo object on iHBCA v1 (2.12M cells, 201K neighborhoods) — COMPLETE"
+        step_2: "Run tiered DA across clinical covariates (age, parity, BRCA, menopause) — COMPLETE"
+        step_3: "Construct logFC matrix (neighborhoods x conditions) — COMPLETE"
+        step_4: "Prune neighborhood graph by discordance — COMPLETE"
+        step_5: "Louvain clustering on pruned graph -> candidate groups (NhoodGroups) — COMPLETE"
+        step_6: "Select low-entropy regions to define L2.0c signatures — IN PROGRESS (meta-grouping 200+ -> ~22)"
+        step_7: "Expand labels to full dataset via SingleR or CellTypist — PENDING"
+      format: "{L1_type}_{ClinicalGroup}"
+      produces:
+        - analysis/abundance/clinical/parity_findings/nhoodgroups/lookup.csv  # canonical NhoodGroup assignments (computed)
+        - analysis/abundance/clinical/graph_pruning/candidate_groups_clinical.csv  # pending graph pruning step
+        - analysis/annotation/l2_formalization/l2c_labels.csv  # pending label expansion
+
+# ---- Chromium Spatial (258K cells, 4 patients, 62 positions) ----
+chromium_spatial:
+  levels:
+    L0:
+      name: compartment
+      description: "Inherited from iHBCA L0"
+      types: [Stromal, Epithelial, Immune, Epidermal]
+
+    L1.0:
+      name: cell_type
+      description: "iHBCA L1 via SingleR (11 types) + 5 cluster_annotation overrides = 16 types"
+      count: 16
+      types:
+        singler_vote: [Fibro, Basal, VascEndo, LumSec, T_cells, Myeloid, LumHR, Peri, B_cells, LymphEndo, Neutro]
+        cluster_override: [Adipo, Mast, RBC, PS_Epi, pDC]
+      derivation:
+        step_1: "Build L1 pseudobulk reference (11 iHBCA L1 types)"
+        step_2: "SingleR classification on 258K FLEX cells"
+        step_3: "Override 5 populations from preprocessing cluster_annotation (Adipocyte, Neutrophil, Mast, RBC, PS_Epithelial, pDC)"
+        step_4: "Leiden vote consolidation"
+      source: "l1_reannotation_20260323/results/harmonized_l1_labels.csv"
+      supersedes: "S1_label_harmonization/harmonized_l1_labels.csv (old 19-type L1.5)"
+      xopt_l0.5: "Drop pDC, PS_Epi, RBC → 13 types, 1:1 map to Xenium canonical"
+
+    L2.0s:
+      name: spatial_behavioral_group
+      description: "Behavioral groups defined by anatomic position response patterns"
+      count: ~40
+      status: computed
+      note: "The existing '40 L2 labels' from behavioral_group_characterization_20260318 ARE L2.0s"
+      derivation:
+        step_1: "Sample/position grouping informs anatomic contrasts (05_Analyses experiments)"
+        step_2: "Milo DA across 19 position-based contrasts"
+        step_3: "Construct logFC matrix (neighborhoods x positions)"
+        step_4: "Prune neighborhood graph by discordance"
+        step_5: "Louvain clustering on pruned graph -> candidate groups"
+        step_6: "L2 label assignment: {L1_type}_{FunctionalGroup_v2}"
+      format: "{L1_type}_{SpatialGroup}"
+      produces:
+        - analysis/abundance/spatial/graph_pruning/candidate_groups_spatial.csv
+        - analysis/annotation/l2_formalization/l2s_labels.csv
+      current_source: "Spatial_HBCA/Analysis/Submission_v1/stages/S2_behavioral_groups/l2_labels.csv"
+
+# ---- Xenium (~1.5M cells, 67 samples, 280-gene panel) ----
+xenium:
+  levels:
+    L0:
+      name: compartment
+      description: "Inherited from Chromium L0"
+      types: [Stromal, Epithelial, Immune, Epidermal]
+
+    L0.5:
+      name: xenium_resolvable
+      description: "Highest resolution where all types are pairwise distinguishable in Xenium 280-gene space"
+      count: ~13
+      derivation:
+        method: "Empirical per-position consensus with Chromium L1 centroid naming"
+        detail: "Per-position unsupervised clustering (67 positions), cosine mapping to Chromium L1 centroids. 13 types emerge at all resolutions 0.1-2.0."
+      tiers:
+        tier_1_gt80pct: [Fibroblasts, VascEndo, Myeloid, Adipocytes, LASP, T_cells]
+        tier_2_40to80pct: [Pericytes, LymphEndo, BMYO, B_cells, Mast_cells]
+        tier_3_lt40pct: [LHS, Neutrophil]
+
+    L1.5:
+      name: manual_harmonized
+      description: "Manual annotation in harmonized space, layered with spatial context"
+      derivation:
+        method: "Layered: SingleR + FICTURE spatial factors + NMP arbitration + manual review"
+        source_plan: "xenium_optimization/xopt_stage3"
+
+  spatial_layers:
+    cellcharter:
+      description: "Spatial community membership from CellCharter"
+      status: pilot_only
+      note: "Pat1 pilot complete (9-11 communities at l=1-3). Full cohort pending."
+    ficture:
+      description: "Spatial factor assignments from FICTURE (segmentation-free LDA)"
+      status: partial
+      note: "Seeded (14-factor) and unseeded (K=12) on Pat1. Multi-patient pending."
+
+# ---- v1.5 Assembly (aspirational) ----
+v1.5:
+  description: "Reprocessed atlas combining iHBCA component studies + spatial data"
+  prerequisite: "Map L2.0c labels onto spatial data via SingleR before building"
+  levels:
+    L0: compartment
+    L1: cell_type
+    L2.0c: clinical_behavioral_group   # Transferred from iHBCA via SingleR
+    L2.0s: spatial_behavioral_group     # From spatial analysis
+  preprocessing: "scQC pipeline (manifold discordance, scDblFinder, BigSUR normalization)"
+
+# ---- Cross-platform relationships ----
+transfers:
+  ihbca_to_chromium_spatial:
+    method: SingleR
+    source_level: L1
+    target_level: L1
+    reference: "iHBCA pseudobulk per L1 type"
+
+  chromium_to_xenium:
+    method: "Annotation bridge (L1 -> L0.5 many-to-one mapping)"
+    source_level: L1
+    target_level: L0.5
+    config: "annotation_types.yaml in annotation/xenium/config/"
+    note: "Some L1 types collapse (e.g., CD4T/CD8T -> T_Cell) due to panel limitations"
+
+  ihbca_l2c_to_spatial:
+    method: SingleR or CellTypist
+    source_level: L2.0c
+    target_level: L2.0c
+    note: "Maps clinical behavioral groups onto spatial data for v1.5 bridge"
+    status: not_yet_implemented
+
+# ---- Open questions ----
+open_questions:
+  - question: "What is the final cell state count for the paper?"
+    status: resolves_with_L2.0_work
+    current_evidence: "summary_idents.csv has 41 rows (40 L2 groups + header/unassigned). Final count determined by L2.0c and L2.0s computation."
+
+  - question: "Will L2.0c (clinical) produce a different group count than L2.0s (spatial)?"
+    status: resolved
+    note: >
+      Yes, and that's by design. Each question gets its own Milo DA + grouping.
+      L2.0c summarizes clinical risk response; L2.0s summarizes anatomic position
+      response. Milo determines the clustering that best summarizes each response
+      in each population. Groups do not need to align across conditions.
+      Fig 2 supplementals show other clinical comparisons as separate analyses.

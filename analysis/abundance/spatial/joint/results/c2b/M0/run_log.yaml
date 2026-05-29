@@ -1,0 +1,20 @@
+scope: joint_full
+contrast: C2b_p3_axis_P_vs_M
+tier: M0
+formula_yaml: ~ patient_id + platform + log_n_cells + quadrant + axis_amp
+formula_resolved: ~ patient_id + platform + log_n_cells + quadrant + contrast_factor
+contrast_levels:
+- M
+- P
+positive_level: P
+n_libraries: 63
+n_per_group:
+  M: 31
+  P: 32
+n_nhoods: 61889
+n_sig_FDR_0.1: 835
+n_sig_FDR_0.05: 362
+fdr_weighting: graph-overlap
+design_dim: 63 x 10
+date: 2026-05-17 13:54:45.711298
+milo: /share/crsp/lab/dalawson/nwechter/Spatial_HBCA_Xenium/DifferentialAbundance/outputs/All/All_milo.rds

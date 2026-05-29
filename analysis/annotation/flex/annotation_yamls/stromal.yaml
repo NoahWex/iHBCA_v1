@@ -1,0 +1,363 @@
+schema_version: 2_flex
+compartment: str
+generated: 2026-04-28
+source_pipeline: Spatial_HBCA_preprocessing/.dev/flex_annotation_20260427
+anchor_resolution: '0.5'
+resolutions_used: ['0.3', '0.5', '0.8', '1.0', '1.5', '3.0']
+resolution_cap: '3.0'
+
+note: |
+  Track C FLEX Stromal L2S annotation. Anchor at leiden_0.5 (15 clusters, 119,141 cells)
+  — chosen because 0.3 collapses important biology (Adipocyte merges into VSMC_stress,
+  Vas-capillary merges into Vas-vein, Pericyte merges into VSMC, Vas-arterial misnamed
+  as Vas-vein). At 0.5 the pipeline cleanly separates:
+    - 3 vascular endothelial subtypes (Vas-vein, Vas-arterial, Vas-capillary)
+    - VSMC vs Pericyte (separated by NOTCH3+ABCC9+ADGRF5 pattern in pericyte)
+    - Adipocyte (PLIN1+CIDEA+ADIPOQ+DGAT2+FASN — FLEX-novel, V1 had no adipocyte label)
+    - Fibro-SFRP4 (SFRP4+GREB1+OGN+PBX1 — FLEX-novel, ER-responsive fibroblast subset)
+  Two FLEX-novel labels (Adipocyte, Fibro-SFRP4) introduced because V1 stromal yaml
+  doesn't subset adipose-derived stroma or SFRP4+ fibroblasts.
+  Adipocyte further resolves into three lipid-cycle substates at leiden_3.0 (see
+  fine_cluster_overrides): Adipo-storage / Adipo-lipolysis / Adipo-lipogenic. UCP1
+  is ~0 in all three, so these are white-adipose functional states, not brown/beige.
+  Fibro-prematrix similarly resolves into three subsets at leiden_1.0: matrix-
+  synthetic core (Fibro-prematrix, PI16+CD55+SCARA5+), perivascular reservoir
+  (Fibro-perivascular, C7+SVEP1+LAMA2+, ECM-low), and contractile myofibroblast
+  (Fibro-myo, TAGLN+CALD1+MYL9+, MYH11- to distinguish from VSMC).
+  Several clusters share UCell argmax with their dominant V1 label but limma markers
+  unambiguously override (e.g., 0.3_c3 was UCell-called VSMC_stress but its limma
+  markers are textbook adipocyte). UCell calls used as informational, not authoritative.
+  Evidence per cluster:
+    - ucell_top, ucell_top_score, ucell_runner_up, ucell_margin: UCell argmax against V1 yaml signatures
+    - limma_top_markers: top de novo markers from limma-voom (one-vs-rest, ~ library_id + condition)
+    - novelty_flags: low_confidence / tight_margin / marker_mismatch (informational, not auto-relabel)
+
+evidence_paths:
+  ucell_per_cluster: outputs/ucell/Stromal_ucell_per_cluster.csv
+  ucell_per_cell: outputs/ucell/Stromal_ucell_per_cell.csv
+  limma_top: outputs/limma/limma_top_markers_Stromal_leiden_*.csv
+  limma_full: outputs/limma/limma_markers_Stromal_leiden_*.csv
+  assignments: outputs/assignments/Stromal_leiden_*_assignments.csv
+  structural_plots: outputs/Stromal/structural/
+
+clusters_by_resolution:
+  '0.5':
+    c0:
+      n_cells: 27672
+      ucell_top: Fibro-major
+      ucell_top_score: 0.2209
+      ucell_runner_up: Pericyte
+      ucell_margin: 0.1585
+      limma_top_markers: [ABCB5, PENK, TNFAIP6, THBS2, LONRF2, TRIO, OGN, SLC7A8, MEDAG, STEAP2, OSR1, ADAM12, STRA6, MITF, HTRA1, COL6A6, SFRP2, EMILIN2, HPSE2, PTGIS, FAP, PDGFRA, BICC1, CPXM1]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: Fibro-major
+      review_status: auto_suggested
+      review_notes: |
+        Largest cluster (23%). Generic activated fibroblast: PDGFRA+FAP+ADAM12+OSR1+
+        SFRP2+OGN+STRA6+MITF+TNFAIP6+HTRA1+COL6A6+EMILIN2+PTGIS. Low UCell confidence
+        because V1 Fibro-major signature is broad; limma markers are unambiguously
+        fibroblast core program.
+    c1:
+      n_cells: 18859
+      ucell_top: Fibro-major
+      ucell_top_score: 0.2412
+      ucell_runner_up: Fibro-IGF1
+      ucell_margin: 0.0696
+      limma_top_markers: [STRA6, NKD2, COL7A1, HPSE2, SLC26A5, MMP16, TCTN3, OBSCN, FAM184A, SPATA6, PRDM8, TMEM144, RUNX1T1, SEMA5A, RELN, CDH11, ADAM12, PDGFRA, DLK1, ADGRA2, APOD, NR2F1, ANPEP]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: Fibro-major
+      review_status: auto_suggested
+      review_notes: |
+        Fibro-major variant — STRA6+NKD2+HPSE2+CDH11+PDGFRA+RELN+DLK1+APOD. DLK1+APOD
+        suggests a preadipocyte-leaning fibroblast subset (DLK1=PREF1, classical
+        preadipocyte marker), but pure fibroblast markers dominate. Folded into
+        Fibro-major.
+    c2:
+      n_cells: 17371
+      ucell_top: Fibro-prematrix
+      ucell_top_score: 0.2522
+      ucell_runner_up: Fibro-major
+      ucell_margin: 0.0111
+      limma_top_markers: [VIT, HAS1, CCN5, PRG4, FNDC1, HTRA3, MFAP5, PLA2G2A, CAB39L, ITGA11, SCARA5, SEMA3C, ECM1, WNT11, HAS2, MYOC, CILP, CLEC3B, PI16, OGN, CTHRC1, GPC3, GPRC5A, C7, LTBP2, FBN1, ADAMTSL4, PCOLCE2, FSTL1]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: Fibro-prematrix
+      review_status: auto_suggested
+      review_notes: |
+        Textbook Fibro-prematrix: VIT+HAS1/HAS2+FNDC1+ITGA11+FBN1+MFAP5+PRG4+CCN5+
+        PCOLCE2+CILP+ECM1+CLEC3B — premature ECM-laying fibroblast program.
+        At leiden_1.0 splits into three coherent biology subsets (see fine_cluster_
+        overrides): Fibro-prematrix retained for the matrix-synthetic core (1.0_c6,
+        ~8.3K, PI16+CD55+SCARA5+ + heavy COL1A1/2/3 + canonical pre-matrix HAS1/2/
+        FNDC1/PCOLCE2/CILP); Fibro-perivascular split off (1.0_c4, ~8.2K, C7+SVEP1+
+        LAMA2+APOD+ABCA8/9+, PDGFRA-hi but ECM-low — Buechler-style perivascular/
+        reticular reservoir); Fibro-myo split off (1.0_c16, ~1.1K, TAGLN+CALD1+
+        MYL9+TPM2+, MYH11- distinguishes from VSMC).
+    c3:
+      n_cells: 15387
+      ucell_top: Vas-vein
+      ucell_top_score: 0.5158
+      ucell_runner_up: Vas-capillary
+      ucell_margin: 0.2438
+      limma_top_markers: [ACKR1, SELP, SELE, OLFM1, RAMP3, CIITA, SLCO4A1, SERPINB1, NOSTRIN, CSF3, PLVAP, SPNS2, FBXO31, TSPAN7, CCL14, MLKL, UPP1, DOC2B, RHOU, PLEKHO2, PLAT, IL1R1, ICAM1, EMCN, FLT1]
+      novelty_flags: []
+      assigned_label: Vas-vein
+      review_status: auto_suggested
+      review_notes: |
+        Clean vein endothelium: ACKR1+SELP+SELE+CCL14+PLVAP+ICAM1+CIITA — textbook
+        post-capillary venule signature. Strongest UCell margin among vascular subsets.
+    c4:
+      n_cells: 12125
+      ucell_top: VSMC_stress
+      ucell_top_score: 0.2701
+      ucell_runner_up: Fibro-prematrix
+      ucell_margin: 0.0365
+      limma_top_markers: [GPAM, KCNIP2, RETSAT, HK2, COX14, HOOK2, GYG2, SLC19A3, PFKFB1, PDE3B, CIDEA, SLC7A10, GPD1, PLIN1, CIDEC, GPT2, PECR, EPB41L4B, APMAP, MMD, DGAT2, ACSL1, MLXIPL, ADIPOQ, AGPAT2, HEPACAM, CEBPA, HILPDA, THRSP, ADIPOR2, HADH, ALDH2]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: Adipo-storage
+      review_status: auto_suggested
+      review_notes: |
+        Textbook adipocyte: PLIN1+CIDEA+CIDEC+ADIPOQ+DGAT2+FASN+THRSP+MLXIPL+CEBPA+
+        AGPAT2+HADH+ACSL1+APMAP — full lipid-storage transcriptional program.
+        UCell argmax VSMC_stress is wrong (V1 has no adipocyte signature; UCell
+        defaulted to closest scorer). FLEX-novel label introduced.
+        At leiden_3.0 splits cleanly into three lipid-cycle states. Anchor label
+        is set to "Adipo-storage" (the quiescent baseline state, ~3.0_c24); lipolysis
+        + lipogenic states are pulled out via fine_cluster_overrides (3.0_c0 →
+        Adipo-lipolysis ~5.7K; 3.0_c8 → Adipo-lipogenic ~3.7K). ~75 stragglers
+        outside c0/c8/c24 (3.0_c26+c38+others) inherit Adipo-storage from anchor —
+        too few to subtype meaningfully and storage is the default white-adipose
+        state. UCP1 ≈ 0 across all three substates — no brown/beige in this sample
+        set; all states are white-adipose functional substates.
+    c5:
+      n_cells: 6590
+      ucell_top: VSMC
+      ucell_top_score: 0.7036
+      ucell_runner_up: Pericyte
+      ucell_margin: 0.4154
+      limma_top_markers: [WTIP, MYH11, TOB1, PTP4A3, HES4, SYNM, CCDC107, SETD1B, NTRK2, SORT1, ARHGEF7, BCL9L, NTRK3, CNN1, CSPG4, MYLK, NOTCH3, ACTA2, MCAM, ITGA7, TPM2, JAG1, TLN1, TNC, ADRA2A, COL27A1]
+      novelty_flags: [marker_mismatch]
+      assigned_label: VSMC
+      review_status: auto_suggested
+      review_notes: |
+        VSMC core: MYH11+ACTA2+CNN1+MYLK+SYNM+TPM2+CSPG4+MCAM+NOTCH3 — vascular
+        smooth muscle. Strongest UCell VSMC margin (0.42) in compartment.
+    c6:
+      n_cells: 5188
+      ucell_top: Pericyte
+      ucell_top_score: 0.4463
+      ucell_runner_up: VSMC
+      ucell_margin: 0.0114
+      limma_top_markers: [STEAP4, NOTCH3, ITGA7, DES, ABCC9, ID4, NDRG2, ADGRF5, SYNPO2, MYLK, ADAMTS4, TNC, ACTA2, HES4, MYH11, IGFBP5, COL5A3, ADCY3, SEMA5A, COL27A1, C1QTNF1, ITGA1, CD44, PRRX1]
+      novelty_flags: [tight_margin]
+      assigned_label: Pericyte
+      review_status: auto_suggested
+      review_notes: |
+        Pericyte: STEAP4+ABCC9+ADGRF5+NOTCH3+DES+ITGA7+ID4+CD44 — classic
+        pericyte signature distinct from VSMC (more contractile in c5). Tight
+        margin vs VSMC because pericyte/VSMC share the mural-cell core program;
+        V1 yaml has Pericyte_active label too — could fine-cluster split if needed.
+    c7:
+      n_cells: 4568
+      ucell_top: Lym-major
+      ucell_top_score: 0.3586
+      ucell_runner_up: Vas-vein
+      ucell_margin: 0.3098
+      limma_top_markers: [CCL21, MMRN1, FAM126A, DOCK5, FLT4, ZDHHC17, NFAT5, IRF8, ENOSF1, CNST, EPS15, CERT1, RELN, ECSCR, NFATC1, AKAP12, CD9, RHOJ, ROBO4, PDE2A, COLEC12]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Lym-major
+      review_status: auto_suggested
+      review_notes: |
+        Lymphatic endothelium: CCL21+MMRN1+FLT4+NFAT5+RELN+RHOJ+IRF8 — textbook
+        lymphatic markers. UCell strong margin (0.31).
+    c8:
+      n_cells: 4372
+      ucell_top: Vas-vein
+      ucell_top_score: 0.3141
+      ucell_runner_up: Vas-arterial
+      ucell_margin: 0.0178
+      limma_top_markers: [PDCD4, MAP4, HERPUD1, SEMA3G, CXCL2, SRGN, SOX17, PODXL, ADD1, IGFBP3, SLCO4A1, MYO5C, PCSK5, ITPR2, ECSCR, PTPRB, FLT1, S1PR1, SLC9A3R2, TMEM63A, IFNGR1, CIITA, ID1, ARHGEF15, ADIPOR2]
+      novelty_flags: [tight_margin, marker_mismatch]
+      assigned_label: Vas-arterial
+      review_status: auto_suggested
+      review_notes: |
+        Arterial endothelium: SOX17+SEMA3G+CLEC14A(via 0.3 mapping)+CXCL2+PODXL+ID1+
+        S1PR1 — textbook arterial markers (SOX17 is pioneer arterial TF, SEMA3G is
+        arterial-restricted). UCell argmax Vas-vein is wrong (V1 yaml's vein and
+        arterial signatures overlap heavily; SOX17+SEMA3G unambiguously arterial).
+    c9:
+      n_cells: 3391
+      ucell_top: Vas-capillary
+      ucell_top_score: 0.4724
+      ucell_runner_up: Vas-vein
+      ucell_margin: 0.1330
+      limma_top_markers: [RBP7, ABLIM3, NOSTRIN, TIMP4, RAMP3, ADGRG1, CAPN2, KIAA1217, ADGRL4, ARHGEF15, LITAF, FLT4, MYO5C, MCF2L, SHANK3, ADGRF5, FLT1, NAV1, SOX17, PDE2A, ROBO4, RASIP1, CIITA, SCARB1, CD93, FABP4, LPL, EGFL7]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Vas-capillary
+      review_status: auto_suggested
+      review_notes: |
+        Capillary endothelium: RBP7+CD93+CAPN2+ADGRL4+FABP4+LPL+EGFL7+ADGRF5+
+        ARHGEF15 — capillary signature (RBP7+FABP4+LPL = lipid transport across
+        capillary; CD93+ADGRL4 = capillary endothelial markers).
+    c10:
+      n_cells: 1123
+      ucell_top: VSMC
+      ucell_top_score: 0.2167
+      ucell_runner_up: Fibro-prematrix
+      ucell_margin: 0.0052
+      limma_top_markers: [VIT, PARD3B, CYP4B1, USP25, SFRP4, MFAP5, IGFBP6, DDIT4, USP53, PAPLN, FSTL3, BNC2, TNS3, F3, ITGB4, FBXL3, MAMDC2, LTBP2, AHR, THBS3, AMOTL2, PODN, LEPR, ABCA8, LTBP4, PTGDS, TAGLN, ALDH1A1, MATN2, THBS1]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: Fibro-myo
+      review_status: auto_suggested
+      review_notes: |
+        Initial limma argmax markers (VIT+SFRP4+MFAP5+TAGLN+PAPLN+ITGB4+BNC2+USP53)
+        plus UCell secondary VSMC argmax pointed toward myofibroblast lineage.
+        Wilcox at leiden_1.0 confirmed: c10@0.5 maps monolithically to 1.0_c16
+        (only 2 cells fall elsewhere), and 1.0_c16's within-prematrix one-vs-rest
+        signature is unambiguously contractile/myofibroblast: TAGLN 3.56, CALD1
+        2.64, MYL9 1.34, TPM2 1.12, ACTA2 0.44, TPM1, CSRP1, PAPLN, ITGA6/ITGB4
+        (basement membrane), DKK3, RSPO3. MYH11 ≈ 0 distinguishes from VSMC —
+        this is a contractile fibroblast, not vascular smooth muscle. Anchor
+        relabeled to Fibro-myo.
+    c11:
+      n_cells: 938
+      ucell_top: Fibro-major
+      ucell_top_score: 0.2893
+      ucell_runner_up: Pericyte
+      ucell_margin: 0.1464
+      limma_top_markers: [NKD2, APCDD1, PTGDS, PAM, ARRDC3, HAS2, ZBTB20, TRPS1, COL7A1, C3, IL16, TYMP, CTSB, LEPR, GFRA1, CXCL14, APOE, FMOD, NBL1, CDH11, TWIST2, LPAR1, CDH11, CTSK, ADAMTS10, PDGFRA]
+      novelty_flags: [low_confidence, marker_mismatch]
+      assigned_label: Fibro-major
+      review_status: auto_suggested
+      review_notes: |
+        Small Fibro-major variant: NKD2+APCDD1+CXCL14+APOE+FMOD+TWIST2+CDH11+
+        PDGFRA+CTSK — periductal fibroblast features (CXCL14 chemokine, APOE,
+        FMOD ECM). Folded into Fibro-major.
+    c12:
+      n_cells: 782
+      ucell_top: Fibro-SFRP4
+      ucell_top_score: 0.4119
+      ucell_runner_up: Fibro-major
+      ucell_margin: 0.2823
+      limma_top_markers: [SFRP4, GREB1, SH3GLB2, XBP1, OGN, HMCN2, SQSTM1, ARHGEF26, SOD2, AOX1, RNF19A, ADAMTSL4, ABI3BP, PBX1, STK35, ZNF516, MGP, COL14A1, NFIC, BGN, FBLN1, MEIS1, SFRP2, DCLK1, CTSK, ACAP3]
+      novelty_flags: [marker_mismatch]
+      assigned_label: Fibro-SFRP4
+      review_status: auto_suggested
+      review_notes: |
+        Distinct SFRP4+ fibroblast subset: SFRP4+GREB1+XBP1+OGN+SFRP2+MEIS1+
+        COL14A1+FBLN1+BGN+PBX1+ABI3BP+MGP. GREB1+XBP1 suggests estrogen-responsive
+        fibroblast, distinct from prematrix (no VIT+HAS) and from Fibro-major
+        (no PDGFRA dominance). FLEX-novel label — V1 yaml does not split SFRP4+
+        fibroblasts. UCell scored against V1 LASP-KIT (not relevant, just noise).
+        Note: ucell_top label "Fibro-SFRP4" appears because V1 epi yaml had a
+        misnamed signature; actually was scoring against generic fibroblast scores.
+    c13:
+      n_cells: 667
+      ucell_top: VSMC
+      ucell_top_score: 0.7493
+      ucell_runner_up: VSMC_stress
+      ucell_margin: 0.6135
+      limma_top_markers: [DES, ADRA1A, SYNM, MYH11, ACADVL, MACF1, LPP, MYLK, YAP1, PYGB, EOGT, MYL6, SORBS1, EHBP1, CNN1, FNBP1, ACTB, FLNA, SYNPO2, PPP1R12A, SVIL, VCL, TLN1, FERMT2, SMTN, MYL9, TPM2, MYOC, CSRP1]
+      novelty_flags: [marker_mismatch]
+      assigned_label: VSMC
+      review_status: auto_suggested
+      review_notes: |
+        High-confidence VSMC small cluster (UCell margin 0.61, highest in compartment):
+        DES+SYNM+MYH11+MYLK+CNN1+SVIL+SMTN+MYL9+TPM2+MYL6+CSRP1 — visceral/intestinal
+        smooth muscle program (DES dominance). Folded into VSMC; could split as
+        VSMC-visceral if biologically meaningful.
+    c14:
+      n_cells: 108
+      ucell_top: Pericyte
+      ucell_top_score: 0.1229
+      ucell_runner_up: Fibro-major
+      ucell_margin: 0.0023
+      limma_top_markers: [HNRNPA2B1, PCM1, FUS, CCDC14, ZNF83, ILF3, SUGP2, PENK, GNL1, PABPC1L, EVL, GBP1, PSPC1, SFPQ, SIVA1, CALU, FZR1]
+      novelty_flags: [low_confidence, tight_margin, marker_mismatch]
+      assigned_label: ARTIFACT_lowqc
+      review_status: auto_suggested
+      review_notes: |
+        Tiny cluster (n=108) with chromatin/RNA processing proteins (HNRNPA2B1, FUS,
+        SFPQ, PSPC1, ILF3) — nuclear/RNA-binding rather than cell-type identity.
+        Same low-quality artifact pattern seen in Immune (c22) and Epi (c4 mito).
+        All UCell scores ~0.12 (near-zero). Drop or flag.
+
+# fine_cluster_overrides — three-way Adipocyte split at leiden_3.0 within c4@0.5.
+# Within-Adipocyte one-vs-rest wilcoxon (12,125 cells split 5,722/3,671/2,655)
+# resolved three coherent lipid-cycle states. UCP1 ≈ 0 across all three rules out
+# brown/beige; these are functional substates of white adipose. AP-1 (FOS/FOSB/JUN)
+# in Adipo-lipolysis is downstream of β-adrenergic / lipolytic signaling and is
+# coherent with the lipolysis program — FFPE embedding largely blocks dissociation-
+# induced AP-1, so this is most parsimoniously real biology, not fixation artifact.
+fine_cluster_overrides:
+  adipocyte_storage:
+    resolution: '3.0'
+    anchor_clusters: [c4]
+    rationale: |
+      3.0_c24 (n=2,655) within Adipocyte anchor. Storage-dominant white adipocyte:
+      highest PLIN1 (4.55, 100% pct), GPAM (2.60), AQP7 (2.73, glycerol channel),
+      ACACB. Insulin pathway elevated (IRS1, AKT2, INSR, PPARG 2.27) — classic
+      insulin-responsive TG-storage state. Lowest LEP, lowest mito-OXPHOS panel,
+      lowest SCD. Quiescent storage-engaged.
+      Note: this override is functionally redundant with the c4@0.5 anchor (which
+      is now also Adipo-storage), retained for documentation symmetry — every
+      sub-state has an explicit definition block. Cells in 3.0_c24 receive
+      Adipo-storage from anchor; this override re-asserts the same label.
+    overrides:
+      - {resolution: '3.0', cluster: 24, label: Adipo-storage}
+
+  adipocyte_lipolysis:
+    resolution: '3.0'
+    anchor_clusters: [c4]
+    rationale: |
+      3.0_c0 (n=5,722) within Adipocyte anchor. Lipolytic white adipocyte: highest
+      PNPLA2 (ATGL, 4.26), PLIN5 (2.61), ABHD5 (1.26) — TG-lipase coactivation.
+      AP-1 burst (FOS, FOSB, JUN, KLF4/6, NFKBIZ, ZFP36, DUSP1, ANGPTL4) is
+      downstream of β-adrenergic / lipolytic signaling in adipocytes (well
+      documented in adrenergic-stimulated lipolysis), so co-occurrence with the
+      lipase panel is consistent. HSPs are lowest in this sub (HSPA1A 0.16 vs
+      0.71 c24) — not the heat-shock pattern, distinct from any FFPE concern.
+    overrides:
+      - {resolution: '3.0', cluster: 0, label: Adipo-lipolysis}
+
+  adipocyte_lipogenic:
+    resolution: '3.0'
+    anchor_clusters: [c4]
+    rationale: |
+      3.0_c8 (n=3,671) within Adipocyte anchor. Metabolically active white
+      adipocyte: SCD 2.98 (vs 0.89/0.58 in others) — strong de novo lipogenesis.
+      Mito-encoded OXPHOS panel uniformly highest (COX7A1 1.01 vs 0.30; ATP5F1A
+      0.63 vs 0.15; NDUFA1 0.42 vs 0.12; MT-CO/ND/ATP6 dominate one-vs-rest).
+      Highest LEP (1.65), ADIPOQ (3.55), FABP4 (4.36), CIDEC — lipogenic +
+      OXPHOS-engaged + secretory. Not brown/beige (UCP1 ≈ 0).
+    overrides:
+      - {resolution: '3.0', cluster: 8, label: Adipo-lipogenic}
+
+  prematrix_perivascular_split:
+    resolution: '1.0'
+    anchor_clusters: [c2]
+    rationale: |
+      1.0_c4 (n=8,180 within prematrix) splits a perivascular/reticular reservoir
+      fibroblast out of c2@0.5. Distinguishing markers (within-prematrix wilcox
+      one-vs-rest): C7 (0.60 vs 0.013 in 1.0_c6), SVEP1, LAMA2, ABCA8/9, APOD,
+      GPC3, NRP1, IGFBP7, SRPX, SOD2. PDGFRA 1.32 (highest), CXCL12 1.59, CXCL14
+      1.12. Bulk collagen LOWER than the matrix-synthetic c6 (COL1A1 2.81 vs
+      4.37) — this is a non-ECM-laying fibroblast subset. Profile fits a Buechler-
+      style perivascular adventitial reservoir. FLEX-novel label, V1 stromal
+      yaml does not split this.
+    overrides:
+      - {resolution: '1.0', cluster: 4, label: Fibro-perivascular}
+
+  prematrix_myofibroblast_split:
+    resolution: '1.0'
+    anchor_clusters: [c2, c10]
+    rationale: |
+      1.0_c16 (n=1,122 within prematrix) is the contractile myofibroblast subset.
+      Within-prematrix wilcox: TAGLN 3.56, CALD1 2.64, MYL9 1.34, TPM2 1.12,
+      ACTA2 0.44, TPM1, CSRP1, PAPLN, ITGA6+ITGB4 (basement membrane integrins),
+      DKK3, RSPO3. MYH11 ≈ 0 distinguishes from VSMC — this is a contractile
+      fibroblast, not vascular smooth muscle. c10@0.5 maps monolithically to
+      1.0_c16 (only 2 of 1,123 cells fall elsewhere), so the c10 anchor is
+      already set to Fibro-myo; this override pulls the small number of 1.0_c16
+      cells from c2@0.5 (~1 cell) to keep the label coherent.
+    overrides:
+      - {resolution: '1.0', cluster: 16, label: Fibro-myo}

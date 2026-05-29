@@ -1,0 +1,222 @@
+# =============================================================================
+# EXTERNAL STUDIES MANIFEST
+# =============================================================================
+# Consumer-facing manifest for all external study data.
+# Downstream sections (03_Integration, 04_DifferentialAbundance) consume this
+# instead of reaching into harmonization internals.
+#
+# Configuration cascade position:
+#   reference_datasets.yaml → [this file] → integration_manifest.yaml
+#
+# Source: Generated from harmonization/config/study_manifest.yaml + build.yaml files
+# Created: 2026-02-02
+# Last updated: 2026-02-02
+# =============================================================================
+
+version: "1.0"
+
+# Base paths (HPC)
+paths:
+  published_outputs: "external_studies/outputs"
+  harmonization_outputs: "external_studies/harmonization/outputs"
+  harmonized_metadata: "external_studies/outputs/harmonized_metadata"
+  component_studies: "${SOURCE_COMPONENT_STUDIES}"
+
+# Per-study entries
+# Each study has: citation, cell count, embedding info, and published output paths
+# File paths under published/ are populated in Increment B (HPC audit)
+studies:
+  gray:
+    citation: "Gray et al. 2022, Developmental Cell"
+    ihbca_dataset: gray
+    expected_cells: 52681
+    donors: 16
+    source_format: h5ad
+    embedding:
+      type: PCA
+      dims: 50
+      note: "Recomputed — CELLxGENE had UMAP only"
+    mapping_type: batch_aware
+    published:
+      build_yaml: "02_ExternalStudies/outputs/gray/published/build.yaml"
+      # Files TBD from HPC inventory (Increment B)
+
+  kumar:
+    citation: "Kumar et al. 2023, Nature"
+    ihbca_dataset: kumar
+    expected_cells: 714331
+    donors: 126
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: identity
+    published:
+      build_yaml: "02_ExternalStudies/outputs/kumar/published/build.yaml"
+
+  murrow:
+    citation: "Murrow et al. 2022, Cell Systems"
+    ihbca_dataset: murrow
+    expected_cells: 86136
+    donors: 28
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: identity
+    notes: "All premenopausal, all AR (reduction mammoplasty). Parity testing only."
+    published:
+      build_yaml: "02_ExternalStudies/outputs/murrow/published/build.yaml"
+
+  nee:
+    citation: "Nee et al. 2023, Nature Genetics"
+    ihbca_dataset: nee
+    expected_cells: 230100
+    donors: 22
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: identity
+    caveats:
+      - "iHBCA risk_status mislabels 8 controls as HR — use mutation column from source RDS"
+    published:
+      build_yaml: "02_ExternalStudies/outputs/nee/published/build.yaml"
+
+  twigger:
+    citation: "Twigger et al. 2022, Nature Communications"
+    ihbca_dataset: twigger
+    expected_cells: 110744
+    donors: 16
+    source_format: h5ad
+    embedding:
+      type: fastMNN_corrected
+      dims: 50
+      note: "Requires L1 reprocessing from ArrayExpress counts"
+    mapping_type: identity_with_normalization
+    notes: "17,349 cells have reversed barcode format — normalization handles this."
+    published:
+      build_yaml: "02_ExternalStudies/outputs/twigger/published/build.yaml"
+
+  reed:
+    citation: "Reed et al. 2024, Nature Genetics"
+    ihbca_dataset: reed
+    expected_cells: 803283
+    donors: 55
+    source_format: h5ad
+    embedding:
+      type: scVI
+      dims: 20
+      note: "20D from CELLxGENE; 100D available via iHBCA_V1 build"
+    mapping_type: identity
+    published:
+      build_yaml: "02_ExternalStudies/outputs/reed/published/build.yaml"
+
+  pal_norm_epi:
+    citation: "Pal et al. 2021, EMBO J"
+    ihbca_dataset: pal
+    expected_cells: 53716
+    donors: 11
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: custom_pal
+    expected_match_rate: 85.7
+    notes: "Epithelial-focused substudy. ~14% cells not in iHBCA Pal subset."
+    published:
+      build_yaml: "02_ExternalStudies/outputs/pal_norm_epi/published/build.yaml"
+
+  pal_norm_total:
+    citation: "Pal et al. 2021, EMBO J"
+    ihbca_dataset: pal
+    expected_cells: 54332
+    donors: 13
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: custom_pal
+    expected_match_rate: 88.1
+    notes: "All cell types. ~12% cells not in iHBCA Pal subset."
+    published:
+      build_yaml: "02_ExternalStudies/outputs/pal_norm_total/published/build.yaml"
+
+  pal_norm_b1:
+    citation: "Pal et al. 2021, EMBO J"
+    ihbca_dataset: pal
+    expected_cells: 59766
+    donors: 4
+    source_format: rds
+    embedding:
+      type: cca_pca
+      dims: 30
+    mapping_type: custom_pal
+    expected_match_rate: 89.1
+    notes: "BRCA1 substudy. Donor 0123 excluded (6,498 cells) — barcode collision with MH0023."
+    published:
+      build_yaml: "02_ExternalStudies/outputs/pal_norm_b1/published/build.yaml"
+
+# Build order (matches SLURM array indices from harmonization/config/study_manifest.yaml)
+build_order:
+  - gray           # 0
+  - kumar          # 1
+  - murrow         # 2
+  - nee            # 3
+  - twigger        # 4
+  - pal_norm_epi   # 5
+  - pal_norm_total # 6
+  - pal_norm_b1    # 7
+  - reed           # 8
+
+# Condition availability matrix (which conditions are testable per study)
+# Consumed by DA config for valid study-condition pair enumeration
+condition_availability:
+  gray:       [parity_binary, age_binary, brca_genotype]          # was risk_status_binary — BRCA1 vs BRCA2 within HR (confounding audit 2026-02-05)
+  kumar:      [parity_binary, menopausal_status_binary, age_binary]
+  murrow:     [parity_binary]
+  nee:        [parity_binary, age_binary, risk_genotype_only]     # was risk_status_binary — genotype-corrected (fixes iHBCA mislabeling)
+  twigger:    [parity_binary, age_binary]
+  reed:       [parity_binary, age_binary, risk_status_binary]
+  pal_norm_epi:   [menopausal_status_binary]
+  pal_norm_total: [menopausal_status_binary]
+  # pal_norm_b1: DROPPED — 4 donors (2 pre / 2 post), underpowered for menopausal DA
+
+# Design formula overrides
+# Default formula: ~ group (for all pairs not listed here)
+# Overrides specify covariates justified by confounding audit (2026-02-05)
+# NOTE: run_da.R reads these via config_loader.R:get_design_override()
+design_overrides:
+  reed:
+    parity_binary:
+      formula: "~ group + age_binary"
+      covariates: [age_binary]
+      rationale: "age_continuous SEV (11y mean diff parous vs nulliparous); N=51 supports 1 covariate"
+
+# Structural confounders (documented, not resolvable with covariates)
+# These are inherent to study populations — interpret DA results with caution
+structural_confounders:
+  age_menopausal:
+    pairs: [age_binary, menopausal_status_binary]
+    mechanism: "Biological — age drives menopause"
+    affects: [kumar×age, kumar×menopausal, reed×age, gray×age, nee×age, pal_epi×menopausal, pal_total×menopausal]
+    note: "Disambiguation requires pooled analysis with ~ menopausal + age_continuous + study (combined Milo)"
+  risk_tissue:
+    pairs: [risk_status_binary, tissue_indication]
+    mechanism: "Surgical selection — HR→prophylactic/contralateral, AR→reduction"
+    affects: [reed×risk_status, nee×risk_genotype_only, gray×brca_genotype]
+    note: "Gray BRCA1 vs BRCA2 avoids AR/HR tissue confound but tissue still varies within HR"
+
+# Cell type annotation columns per study (native study annotations)
+# Used by DA testing for annotateNhoods/groupNhoods
+# TODO: Replace with harmonized celltype_L1/L1.5/L2 columns (see .plans/drafts/celltype_harmonization.md)
+celltype_columns:
+  gray: cellSubtype           # 17 unique (HSb, AP, VE, F3, BL, etc.)
+  kumar: author_cell_type     # 57 unique (LummHR-major, Fibro-prematrix, etc.)
+  murrow: Type                # 8 unique (HRpos_Luminal, Basal, Fibroblast, etc.)
+  nee: cell_type              # 11 unique (Basal, Fibroblasts, Luminal1, etc.)
+  twigger: original_celltype  # 9 unique (LC2, HR, LP, BA, etc.)
+  reed: cell_type             # 10 unique (ontology terms)
+  pal_norm_epi: seurat_clusters    # Cluster numbers only (no author labels)
+  pal_norm_total: seurat_clusters  # Cluster numbers only (no author labels)
+  pal_norm_b1: seurat_clusters     # Cluster numbers only (no author labels)

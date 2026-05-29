@@ -1,0 +1,58 @@
+# Canonical L2 order for the Fig 2 supplemental all-L2 omnibus beeswarms.
+#
+# Order matches the Fig 1c marker heatmap row order:
+#   compartment (epi -> str -> imm) > LBridge family > L2 label.
+#
+# Format: one compartment::label entry per line. Blank lines and lines
+# starting with # are ignored. L2s present in the data but missing from
+# this file are appended at the bottom in alphabetical order with a warning.
+#
+# Source: derived from LBRIDGE mapping in
+# publication/figures/render/ihbca/render_fig1c_marker_heatmap.R.
+#
+# Epithelial (BMYO -> LASP -> LASP-basal -> LHS -> Lactocyte)
+epi::BMYO-myo
+epi::BMYO-basal
+epi::LASP-major
+epi::LASP-KIT
+epi::LASP-HLA
+epi::LASP-basal
+epi::LHS-major
+epi::Lactocyte-LC1
+epi::Lactocyte-LC2
+# Stromal (Fibroblast -> Fibro-SFRP4 -> Endothelial -> Lymphatic_Endothelial -> Perivascular)
+str::Fibro-major
+str::Fibro-prematrix
+str::Fibro-IGF1
+str::Fibro-SFRP4
+str::Vas-capillary
+str::Vas-vein
+str::Vas-arterial
+str::Lym-major
+str::Pericyte
+str::Pericyte_active
+str::VSMC
+str::VSMC_stress
+# Immune (Macrophage -> Monocyte -> cDC1/cDC2 -> pDC -> Mast -> Neutrophil -> B -> Plasma -> Treg -> CD4 T -> CD8 T -> NK)
+imm::Macro_C1Q
+imm::Macro_FOLR2
+imm::Macro_LAM
+imm::Macro_inflam
+imm::Mono_NC
+imm::cDC1
+imm::cDC2
+imm::pDC
+imm::Mast
+imm::Neutrophil
+imm::B_cell
+imm::Plasma
+imm::Treg
+imm::CD4_Th_like
+imm::Th17
+imm::CD8_Trm
+imm::CD8_Resting
+imm::CD8_Tem
+imm::IFNg_T
+imm::ZNF683_T
+imm::NK
+imm::NK_ILC_prolif

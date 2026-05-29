@@ -1,0 +1,22 @@
+# Manual per-L0.5 proximity thresholds (joint_v1 latent, cosine mean_knn_dist, k=30).
+# Rationale: ECDF shapes differ across L0.5 types; no single rule (MAD k, quantile,
+# kneedle) fit all. Thresholds were eyeballed on the rising-core of each ECDF,
+# biased low to make proximity a precision filter (NMP + QC cover other failure
+# modes). Rationale logged in .dev/06_filter/knowledge/proximity_threshold_choice.md.
+
+# User-set (manual):
+Adipocyte: 0.20
+BMYO: 0.45
+B_cell: 0.20
+FB: 0.45
+LASP: 0.45
+LE: 0.20
+LHS: 0.25
+Mast: 0.20
+
+# Proposed (k=-1 MAD on unresolved types, accepted):
+Plasma: 0.12
+Myeloid: 0.24
+PV: 0.47
+T_cell: 0.30
+VE: 0.39

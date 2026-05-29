@@ -1,0 +1,43 @@
+# Canonical markers for Stromal L0.5 dotplot — nuclear layer.
+# Derived from annotation_cascade.yaml evidence (2026-04-20).
+# Gene order = display order (most diagnostic first).
+# All genes confirmed present in 280-gene Xenium nuclear panel.
+
+Fibroblast:
+  - FBLN1
+  - CCDC80
+  - LUM
+  - MMP2
+  - CXCL12
+
+CAF:
+  - POSTN
+  - IGF1
+  - PDGFRB
+  - PDGFRA
+
+Endothelial:
+  - PECAM1
+  - VWF
+  - AQP1
+  - CD93
+  - MMRN2
+
+Lymphatic Endothelial:
+  - CAVIN2
+  - MRC1
+  - CD9
+
+Smooth Muscle:
+  - ACTA2
+  - MYH11
+  - MYLK
+  - ACTG2
+  - CAV1
+
+Adipocyte:
+  - ADIPOQ
+  - ADH1B
+  - LPL
+  - SCD
+  - FASN

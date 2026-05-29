@@ -1,0 +1,89 @@
+# inquiry_l1.yaml — risk_l2_voom_20260519 (L1 resolution)
+# L1 voom DE, A2_sampletype formula on both cohorts.
+# Reuses scripts/02_voom_de_sweep.R unchanged (after the 2026-05-20 brca_genotype
+# filter extension). Same engine, different substrate + cohort definitions.
+
+inquiry: risk_l1_voom_20260520
+inquiry_schema_version: 1
+description: |
+  L1-resolution voom DE of BR1 vs AR, computed on pseudobulk (L1 x donor x
+  sample_type) counts. Two cohorts (full + tested) x one formula (A2_sampletype)
+  x 22 L1 types. Matches the L2 sweep methodology — same engine, same gates,
+  same audit table — but at L1 granularity (more cells per group, less subtype
+  resolution).
+
+# Cohort definitions
+cohorts:
+
+  A_full:
+    description: |
+      All BR1 + AR donors from the risk_main_effects cohort (twigger excluded).
+      Canonical headline cohort — conservative-dilution argument applies (occult
+      BR1 in untested AR biases the contrast toward null; defensible as
+      conservative-rigorous per cohort_choice_rationale.md).
+    donor_filter:
+      risk_class: [AR, BR1]
+      study: {exclude: [twigger]}
+    n_donors_expected:
+      AR: 125
+      BR1: 34
+
+  A_tested:
+    description: |
+      Ascertainment-clean sensitivity cohort. AR restricted to brca_genotype ==
+      "negative" (genotype-tested-negative); BR1 = BRCA1 carriers. Removes the
+      occult-BR1 dilution concern at the cost of substantial power loss.
+      Mirrors the cohort used by scripts/07_genotyped_cohort_fibros.R:75.
+    donor_filter:
+      risk_class: [AR, BR1]
+      study: {exclude: [twigger]}
+      brca_genotype: [negative, BRCA1]
+    n_donors_expected:
+      AR_tested_negative: 28
+      BR1: 38
+
+# Formula — A2_sampletype, locked canonical per cohort_choice_rationale.md.
+# Same formula applied to both cohorts (Noah 2026-05-20). The cohort split is
+# the differentiating axis; the formula is consistent.
+formulas:
+
+  A2_full:
+    cohort: A_full
+    formula: "~ sample_type + parity_binary + age_binary + risk_class"
+    rationale: "Canonical A2_sampletype on full cohort."
+
+  A2_tested:
+    cohort: A_tested
+    formula: "~ sample_type + parity_binary + age_binary + risk_class"
+    rationale: "Canonical A2_sampletype on tested cohort (sensitivity)."
+
+# Test contrast
+contrasts:
+  - name: BR1_vs_AR
+    type: coef
+    coef: risk_classBR1
+    description: "BRCA1 main effect on gene expression, parity- and other-covariate-adjusted."
+
+# Pseudobulk filters — match L2 sweep (cohort_choice_rationale.md locked thresholds)
+pseudobulk:
+  level2_column: L1_label        # NOTE: this is L1 grouping (despite the key name)
+  donor_column: patientID
+  study_column: dataset
+  min_cells_per_donor_l2: 5      # min cells per (L1 x donor) pseudobulk
+  min_donors_per_class: 5
+
+# Gene filter — match L2 sweep
+gene_filter:
+  method: rowSums_min10
+  min_expressed_genes: 200
+
+# Significance thresholds — match L2 sweep
+significance:
+  fdr_threshold: 0.05
+  logfc_threshold: 0.5
+
+caveats:
+  - id: l1_aggregates_subtypes
+    description: "L1 collapses fibroblast L2 subtypes (Fibro-major + Fibro-IGF1 + Fibro-SFRP4 + Fibro-prematrix) into a single Fibroblast group. Gains power; loses subtype resolution. L2 sweep is the canonical subtype-resolved result."
+  - id: tested_cohort_demographics
+    description: "Tested cohort BR1 carriers skew premenopausal-nulliparous due to surveillance ascertainment. parity_binary remains in the formula (matching script 07's working configuration); design audit will gate any rank-deficient L1 combinations."

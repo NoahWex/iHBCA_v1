@@ -1,0 +1,206 @@
+# =============================================================================
+# PHASE A: STUDY MANIFEST FOR PARALLEL CELL ID MAPPING
+# =============================================================================
+# Central configuration for all component studies.
+# Each entry contains pointers to shared reference + study-specific config.
+#
+# Usage: Generic mapper reads this manifest and processes studies in parallel.
+# =============================================================================
+
+version: "1.0"
+created: "2026-01-21"
+
+# -----------------------------------------------------------------------------
+# SHARED REFERENCE (all studies read from these)
+# -----------------------------------------------------------------------------
+shared:
+  ihbca_inventory: "${SOURCE_IHBCAV1_HARMONIZATION%/}/outputs/ihbca_reference/ihbca_cell_inventory.csv"
+  ihbca_summary: "${SOURCE_IHBCAV1_HARMONIZATION%/}/outputs/ihbca_reference/ihbca_reference_summary.yaml"
+  output_base: "${SOURCE_IHBCAV1_HARMONIZATION%/}/studies"
+
+# -----------------------------------------------------------------------------
+# STUDY DEFINITIONS
+# -----------------------------------------------------------------------------
+# Each study has:
+#   - source_path: component study file (h5ad or rds)
+#   - format: file format
+#   - ihbca_dataset: value to filter ihbca_inventory by dataset column
+#   - mapping_type: identity | batch_aware | custom
+#   - expected_cells: for validation
+#   - expected_match_rate: percentage (100 unless documented exception)
+#   - expected_issues: list of knowledge.md issue IDs to verify
+#   - cell_id_regex: pattern for parsing (used by batch_aware/custom)
+
+studies:
+  # ---------------------------------------------------------------------------
+  # IDENTITY MAPPING STUDIES (cell IDs match exactly)
+  # ---------------------------------------------------------------------------
+
+  kumar:
+    source_path: "${SOURCE_COMPONENT_STUDIES}/kumar.rds"
+    format: rds
+    ihbca_dataset: kumar
+    mapping_type: identity
+    expected_cells: 714331
+    expected_match_rate: 100.0
+    expected_issues: []
+    # Cell ID format: {batch}_{barcode} e.g., r1_hbca_c01_AACCATGGTATGCTTG
+    notes: "Largest study. Simple identity mapping."
+
+  murrow:
+    source_path: "${SOURCE_COMPONENT_STUDIES}/murrow.rds"
+    format: rds
+    ihbca_dataset: murrow
+    mapping_type: identity
+    expected_cells: 86136
+    expected_match_rate: 100.0
+    expected_issues: []
+    # Cell ID format: {prefix}_{barcode-1} e.g., V3.RMs_AAACCCAAGAGGATGA-1
+    notes: "Identity mapping. No age/BRCA contrast available."
+
+  nee:
+    source_path: "${SOURCE_BRCA_NATGEN%/}/brca_v4_all_patients_integrated_final_filtered.rds"
+    format: rds
+    ihbca_dataset: nee
+    mapping_type: identity
+    expected_cells: 230100
+    expected_match_rate: 100.0
+    expected_issues:
+      - nee-brca-mislabeling
+    # Cell ID format: UCI_Patients _{donor}_{donor}_Epi_{barcode}-1 (complex)
+    notes: "Identity mapping. BRCA mislabeling in iHBCA metadata - use mutation column."
+    verification:
+      check_mutation_column: true
+      expected_ctrl_donors: 11
+      expected_brca1_donors: 11
+
+  reed:
+    source_path: "${SOURCE_COMPONENT_STUDIES}/reed.h5ad"
+    format: h5ad
+    ihbca_dataset: reed
+    mapping_type: identity
+    expected_cells: 803283
+    expected_match_rate: 100.0
+    expected_issues: []
+    # Cell ID format: {barcode}-{batch} e.g., CGTCAAAAGACGTCGA-SLX-19902-20449_SIGAA3
+    notes: "Reed's own contribution to iHBCA. Identity mapping."
+
+  # ---------------------------------------------------------------------------
+  # BATCH-AWARE MAPPING STUDIES (need translation)
+  # ---------------------------------------------------------------------------
+
+  gray:
+    source_path: "${SOURCE_COMPONENT_STUDIES}/gray.h5ad"
+    format: h5ad
+    ihbca_dataset: gray
+    mapping_type: batch_aware
+    expected_cells: 52681
+    expected_match_rate: 100.0
+    expected_issues:
+      - gray-rm-donor-mismatch
+    # Cell ID format: Human-{BRCA_status}-{batch}_{barcode}
+    cell_id_regex: "^Human-(BRCA1|BRCA2|WT)-([A-Z])_([ACGT]{16})$"
+    notes: "COMPLETE (2026-01-21). Two-pass batch-aware mapping. RM-* = WT donors."
+    status: complete
+    results:
+      mapped: 52681
+      match_rate: 100.0
+      rm_donors: ["RM-A", "RM-B", "RM-C", "RM-D"]
+      wt_cells: 19362
+
+  twigger:
+    source_path: "${SOURCE_COMPONENT_STUDIES}/twigger.h5ad"
+    format: h5ad
+    ihbca_dataset: twigger
+    mapping_type: identity_with_normalization
+    expected_cells: 110744
+    expected_match_rate: 100.0
+    expected_issues:
+      - twigger-reversed-cellids
+    # Cell ID format: {batch}_{barcode-1} e.g., RB5_AAACCCAAGAGGTCAC-1
+    # BUT: 17,349 cells have reversed format {barcode}-{batch}
+    notes: "Identity mapping BUT some cells need format normalization."
+    normalization:
+      reversed_batches: ["HMC", "RB1", "RB2", "RB3"]
+      reversed_count: 17349
+      method: "Try identity first, then try reversed format"
+
+  # ---------------------------------------------------------------------------
+  # PAL SUBSTUDIES (complex - different filtering, barcode collision)
+  # ---------------------------------------------------------------------------
+
+  pal_norm_epi:
+    source_path: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormEpi.rds"
+    format: rds
+    ihbca_dataset: pal
+    mapping_type: custom_pal
+    expected_cells: 53716
+    expected_match_rate: 85.7  # ~14.3% unmatched documented
+    expected_issues:
+      - pal-unmatched-epi
+    # Component format: N_{donor}_{type}_{barcode-1} e.g., N_1105_epi_AAACCTGAGTATGACA-1
+    # iHBCA format: MH{donor}_mix_{barcode-1} e.g., MH0023_mix_BR1_AAACCTGAGAGACTAT-1
+    notes: "Different cell ID format from iHBCA. ~14% cells not in iHBCA Pal subset."
+
+  pal_norm_total:
+    source_path: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormTotal.rds"
+    format: rds
+    ihbca_dataset: pal
+    mapping_type: custom_pal
+    expected_cells: 54332
+    expected_match_rate: 88.1  # ~11.9% unmatched documented
+    expected_issues:
+      - pal-unmatched-total
+    notes: "Different cell ID format from iHBCA. ~12% cells not in iHBCA Pal subset."
+
+  pal_norm_b1:
+    source_path: "${SOURCE_PAL_ORIGINAL%/}/SeuratObject_NormB1Total.rds"
+    format: rds
+    ihbca_dataset: pal
+    mapping_type: custom_pal
+    expected_cells: 59766
+    expected_match_rate: 89.1  # After 0123 exclusion
+    expected_issues:
+      - pal-0123-collision
+    notes: "Donor 0123 barcode collision - exclude 6,498 cells."
+    exclusions:
+      donor_0123:
+        reason: "Barcode collision between MH0023 and 0123"
+        cells_excluded: 6498
+
+# -----------------------------------------------------------------------------
+# BUILD ORDER (for SLURM array job)
+# -----------------------------------------------------------------------------
+# Index = SLURM_ARRAY_TASK_ID
+
+build_order:
+  - gray           # 0 - COMPLETE
+  - kumar          # 1
+  - murrow         # 2
+  - nee            # 3
+  - twigger        # 4
+  - pal_norm_epi   # 5
+  - pal_norm_total # 6
+  - pal_norm_b1    # 7
+  - reed           # 8
+
+# -----------------------------------------------------------------------------
+# MAPPING TYPE DEFINITIONS
+# -----------------------------------------------------------------------------
+mapping_types:
+  identity:
+    description: "Cell IDs match exactly between component and iHBCA"
+    method: "Direct lookup in ihbca_inventory by cell_id"
+
+  batch_aware:
+    description: "Cell IDs need batch→patient translation"
+    method: "Two-pass: discover mapping, then translate"
+    reference: "scripts/map_gray_cells.py"
+
+  identity_with_normalization:
+    description: "Identity mapping but some cells need format normalization"
+    method: "Try identity, then try normalized format"
+
+  custom_pal:
+    description: "Pal-specific mapping due to different ID formats"
+    method: "Barcode extraction and matching with donor mapping"

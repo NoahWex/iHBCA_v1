@@ -1,0 +1,41 @@
+# =============================================================================
+# Provenance Schema — Required fields for manifest entries
+# =============================================================================
+# Two manifests exist:
+#   Analysis/Submission_v1/manifest.yaml  — data promotion provenance
+#   Figures/Submission_v1/panels/manifest.yaml — per-panel rendering provenance
+#
+# Every entry in either manifest must include the required fields below.
+# validate_submission.R checks conformance.
+# =============================================================================
+
+# Fields required for data promotion (Analysis/ manifest)
+promotion:
+  required:
+    - stage_id          # e.g., "S1_label_harmonization"
+    - source_path       # full path in project/
+    - promoted_path     # full path in Analysis/Submission_v1/stages/
+    - file_count        # number of files promoted
+    - validation_gate   # what was checked (e.g., "row_count == 258317")
+    - validation_result # pass | fail
+    - promote_date      # ISO 8601
+    - notes             # free text (empty string OK)
+
+# Fields required for panel rendering (Figures/ manifest)
+panel:
+  required:
+    - panel_id          # e.g., "l1_umap"
+    - description       # human-readable
+    - tags              # list of content tags
+    - analysis_stage    # which stage in Analysis/ this reads from
+    - source_script     # rendering script path
+    - source_data       # list of input file paths (in Analysis/)
+    - rendered_files    # list: {format: pdf|png, path: ...}
+    - panel_type        # key from aesthetics.yaml dimensions.panel_types
+    - dimensions        # {width_in: N, height_in: N}
+    - label_level       # L0 | L1 | L2
+    - cell_count        # for UMAPs (null for non-cell plots)
+    - aesthetic_config   # path to aesthetics.yaml used
+    - render_date       # ISO 8601
+    - render_job_id     # SLURM job ID (null if local)
+    - status            # pending | rendered | validated | approved

@@ -1,0 +1,132 @@
+# =============================================================================
+# HARMONIZED METADATA SCHEMA
+# =============================================================================
+# Interface contract for outputs/harmonized/{study}_metadata.csv
+# merge_canonical.R expects files conforming to this schema.
+# =============================================================================
+
+version: "1.0"
+description: "Schema for {study}_metadata.csv output files"
+
+# -----------------------------------------------------------------------------
+# FILE FORMAT
+# -----------------------------------------------------------------------------
+
+format:
+  type: CSV
+  encoding: UTF-8
+  delimiter: ","
+  quote_char: '"'
+  null_representation: "NA"
+  header: true
+
+naming:
+  pattern: "{study}_metadata.csv"
+  example: "gray_metadata.csv"
+
+# -----------------------------------------------------------------------------
+# COLUMN NAMING CONVENTION
+# -----------------------------------------------------------------------------
+
+column_prefix:
+  pattern: "{study}_"
+  description: "All columns must be prefixed with study name"
+  example: "gray_cell_id, gray_donor, gray_age"
+
+# -----------------------------------------------------------------------------
+# REQUIRED COLUMNS
+# -----------------------------------------------------------------------------
+
+required_columns:
+  - name: "{study}_cell_id"
+    type: string
+    description: "Original cell ID from component study"
+    nullable: false
+
+  - name: "{study}_ihbca_cell_id"
+    type: string
+    description: "Matched cell ID in iHBCA reference"
+    nullable: false
+
+  - name: "{study}_donor"
+    type: string
+    description: "Donor/patient identifier"
+    nullable: false
+
+# -----------------------------------------------------------------------------
+# CONDITION COLUMNS
+# -----------------------------------------------------------------------------
+# Include all of these columns. Use NA if data not available for study.
+
+condition_columns:
+  - name: "{study}_age"
+    type: numeric
+    description: "Donor age in years (continuous)"
+    nullable: true
+    note: "NA if not collected (e.g., Kumar has binary only)"
+
+  - name: "{study}_age_binary"
+    type: string
+    description: "Age category for DA testing"
+    allowed_values: ["<50", ">=50", "NA"]
+    nullable: true
+
+  - name: "{study}_parity"
+    type: string
+    description: "Parity status"
+    allowed_values: ["nulliparous", "parous", "NA"]
+    nullable: true
+
+  - name: "{study}_parity_binary"
+    type: string
+    description: "Binary parity (same as parity for this project)"
+    allowed_values: ["nulliparous", "parous", "NA"]
+    nullable: true
+
+  - name: "{study}_risk_status"
+    type: string
+    description: "BRCA risk status (binary)"
+    allowed_values: ["AR", "HR", "NA"]
+    nullable: true
+
+  - name: "{study}_menopausal"
+    type: string
+    description: "Menopausal status"
+    allowed_values: ["pre", "post", "NA"]
+    nullable: true
+
+# -----------------------------------------------------------------------------
+# ROW DEFINITION
+# -----------------------------------------------------------------------------
+
+row_definition:
+  unit: "cell"
+  description: "One row per cell in the study"
+  uniqueness: "{study}_cell_id must be unique"
+
+# -----------------------------------------------------------------------------
+# EXAMPLE
+# -----------------------------------------------------------------------------
+
+example:
+  file: gray_metadata.csv
+  columns:
+    - gray_cell_id
+    - gray_ihbca_cell_id
+    - gray_donor
+    - gray_age
+    - gray_age_binary
+    - gray_parity
+    - gray_parity_binary
+    - gray_risk_status
+    - gray_menopausal
+  sample_row:
+    gray_cell_id: "PM-D_AAACCTGAGAATCTCC"
+    gray_ihbca_cell_id: "PM-D_AAACCTGAGAATCTCC"
+    gray_donor: "PM-D"
+    gray_age: 45
+    gray_age_binary: "<50"
+    gray_parity: "parous"
+    gray_parity_binary: "parous"
+    gray_risk_status: "AR"
+    gray_menopausal: "NA"
