@@ -41,3 +41,6 @@ Thumbs.db
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# --- Internal promotion-tracking manifest (not reviewer-facing) ---
+manifest.yaml
